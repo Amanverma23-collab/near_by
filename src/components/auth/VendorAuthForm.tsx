@@ -152,15 +152,16 @@ export default function VendorAuthForm() {
           password: password,
         });
       } else {
-        const { error: updateError } = await supabase.auth.updateUser({
+        const { data: sessionData } = await supabase.auth.getSession();
+        console.log('Vendor Registration: Session before password set:', sessionData?.session);
+
+        const { data: updateData, error: updateError } = await supabase.auth.updateUser({
           password: password,
         });
         if (updateError) throw updateError;
 
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) throw new Error('User not found');
+        const user = updateData.user;
+        if (!user) throw new Error('User not found after password set');
 
         const { error: insertError } = await supabase.from('vendors').insert({
           auth_user_id: user.id,

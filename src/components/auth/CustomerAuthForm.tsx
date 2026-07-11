@@ -155,16 +155,16 @@ export default function CustomerAuthForm() {
         });
       } else {
         // Production: user is already authenticated via OTP, just set password
-        const { error: updateError } = await supabase.auth.updateUser({
+        const { data: sessionData } = await supabase.auth.getSession();
+        console.log('Customer Registration: Session before password set:', sessionData?.session);
+
+        const { data: updateData, error: updateError } = await supabase.auth.updateUser({
           password: password,
         });
 
         if (updateError) throw updateError;
 
-        // Get current user
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const user = updateData.user;
         if (!user) throw new Error('User not found after password set');
 
         // Insert customer record

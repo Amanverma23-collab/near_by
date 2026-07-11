@@ -121,11 +121,45 @@ if (hasValidCreds) {
       },
       verifyOtp: async ({ phone, token }: any) => {
         console.log('Mock Auth: verifyOtp triggered for phone:', phone, 'with token:', token);
-        return { data: { user: null, session: null }, error: null };
+        const userId = 'mock-user-' + Math.random().toString(36).substring(2, 11);
+        const mockUser = {
+          id: userId,
+          phone,
+          role: 'authenticated',
+          factor_id: null,
+          created_at: new Date().toISOString(),
+        };
+        const mockSession = {
+          access_token: 'mock-access-token-' + userId,
+          token_type: 'bearer',
+          expires_in: 3600,
+          refresh_token: 'mock-refresh-token-' + userId,
+          user: mockUser,
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+        };
+
+        localStorage.setItem('nearbe_mock_session', JSON.stringify(mockSession));
+        authListeners.forEach((cb) => cb('SIGNED_IN', mockSession));
+
+        return { data: { user: mockUser, session: mockSession }, error: null };
       },
       updateUser: async ({ password }: any) => {
         console.log('Mock Auth: updateUser (set password) triggered');
-        return { data: { user: null }, error: null };
+        const session = getSessionFromStorage();
+        if (!session || !session.user) {
+          return { data: { user: null }, error: new Error('Mock Auth: No active session found to update.') };
+        }
+
+        const updatedUser = { ...session.user };
+        const users = getMockUsers();
+        users[updatedUser.phone] = { user: updatedUser, password };
+        localStorage.setItem('nearbe_mock_users', JSON.stringify(users));
+
+        const updatedSession = { ...session, user: updatedUser };
+        localStorage.setItem('nearbe_mock_session', JSON.stringify(updatedSession));
+        authListeners.forEach((cb) => cb('SIGNED_IN', updatedSession));
+
+        return { data: { user: updatedUser }, error: null };
       },
       signOut: async () => {
         localStorage.removeItem('nearbe_mock_session');
