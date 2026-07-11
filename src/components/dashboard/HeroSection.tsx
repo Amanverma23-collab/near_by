@@ -66,7 +66,7 @@ export default function HeroSection() {
         {/* Absolute interactive overlay elements */}
         <div className="absolute inset-0 z-10 p-4 sm:p-6 md:p-8 pointer-events-none flex justify-end items-start">
           {/* Top-Right Location Selector */}
-          <div className="pointer-events-auto">
+          <div className="pointer-events-auto hidden sm:block">
             <button
               onClick={(e) => {
                 e.stopPropagation();

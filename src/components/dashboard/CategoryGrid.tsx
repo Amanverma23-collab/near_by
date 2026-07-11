@@ -1,4 +1,5 @@
-import { motion } from 'framer-motion';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   Car,
@@ -11,8 +12,13 @@ import {
   AlertTriangle,
   GraduationCap,
   BookOpen,
+  MapPin,
+  ChevronDown,
+  LocateFixed,
 } from 'lucide-react';
 import type { ServiceCategory } from '../../types';
+import { useLocation } from '../../context/LocationContext';
+import CitySelector from '../location/CitySelector';
 
 const categories: (ServiceCategory & { shadowColor: string })[] = [
   {
@@ -241,96 +247,202 @@ function CategoryCustomIcon({ slug }: CategoryCustomIconProps) {
 
 export default function CategoryGrid() {
   const navigate = useNavigate();
+  const { location, setCityManually } = useLocation();
+  const [cityModalOpen, setCityModalOpen] = useState(false);
+
+  const handleCitySelect = (city: string) => {
+    setCityManually(city);
+    setCityModalOpen(false);
+  };
+
+  const handleRedetect = () => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          try {
+            const resp = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+            );
+            const data = await resp.json();
+            const city =
+              data.address?.city ||
+              data.address?.town ||
+              data.address?.village ||
+              data.address?.state_district ||
+              'Unknown';
+            setCityManually(city);
+          } catch {
+            setCityManually('Unknown');
+          }
+          setCityModalOpen(false);
+        },
+        () => {
+          // Keep modal open for manual entry
+        }
+      );
+    }
+  };
 
   return (
-    <section id="category-grid" className="px-4 pb-8">
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="flex items-center justify-between mb-5"
-      >
-        <div>
-          <h2 className="text-lg font-display font-bold text-ink">
-            What do you need?
-          </h2>
-          <p className="text-sm text-ink-muted font-body mt-0.5">
-            Tap a category to find nearby services
-          </p>
-        </div>
-      </motion.div>
+    <>
+      <section id="category-grid" className="px-4 pb-8">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="flex items-center justify-between mb-5 gap-3"
+        >
+          <div className="min-w-0">
+            <h2 className="text-lg font-display font-bold text-ink truncate">
+              What do you need?
+            </h2>
+            <p className="text-xs sm:text-sm text-ink-muted font-body mt-0.5 truncate">
+              Tap a category to find services
+            </p>
+          </div>
 
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className="grid grid-cols-2 gap-4 [&>*:last-child:nth-child(odd)]:col-span-2 [&>*:last-child:nth-child(odd)]:sm:col-span-1 sm:grid-cols-3"
-      >
-        {categories.map((category) => {
-          const [, SecondaryIcon] = iconMap[category.icon] || [
-            null,
-            Wrench,
-          ];
-
-          return (
-            <motion.button
-              key={category.id}
-              variants={cardVariants}
-              whileHover="hover"
-              whileTap="tap"
-              onClick={() => navigate(`/category/${category.slug}`)}
-              className="relative overflow-hidden bg-surface-card rounded-[var(--radius-lg)] p-5 text-left border border-border-light shadow-card transition-shadow group"
+          {/* Location button next to the header on mobile view only */}
+          <div className="flex sm:hidden shrink-0">
+            <button
+              onClick={() => setCityModalOpen(true)}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-brand-50 text-brand rounded-[var(--radius-pill)] transition-all text-[11px] font-display font-bold border border-brand/20 shadow-sm shrink-0 cursor-pointer"
             >
-              {/* Background gradient accent */}
-              <div
-                className={`absolute -top-10 -right-10 w-24 h-24 rounded-full bg-gradient-to-br ${category.gradient} opacity-10 group-hover:opacity-20 transition-opacity duration-300`}
-              />
+              <MapPin size={11} className="text-brand shrink-0" />
+              <span className="truncate max-w-[80px]">{location?.city || 'Set Location'}</span>
+              <ChevronDown size={11} className="text-brand/80 shrink-0" />
+            </button>
+          </div>
+        </motion.div>
 
-              {/* Icons */}
-              <div className="relative flex items-center gap-2 mb-4">
-                <motion.div
-                  variants={badgeVariants}
-                  style={{
-                    boxShadow: `0 6px 18px -2px ${category.shadowColor}`,
-                  }}
-                  className={`w-11 h-11 rounded-[var(--radius-md)] bg-gradient-to-br ${category.gradient} flex items-center justify-center`}
-                >
-                  <CategoryCustomIcon slug={category.slug} />
-                </motion.div>
-                <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-surface border border-border-light flex items-center justify-center -ml-3 relative z-10">
-                  <SecondaryIcon size={14} className="text-ink-muted" />
-                </div>
-              </div>
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-2 gap-4 [&>*:last-child:nth-child(odd)]:col-span-2 [&>*:last-child:nth-child(odd)]:sm:col-span-1 sm:grid-cols-3"
+        >
+          {categories.map((category) => {
+            const [, SecondaryIcon] = iconMap[category.icon] || [
+              null,
+              Wrench,
+            ];
 
-              {/* Text */}
-              <h3 className="text-sm font-display font-bold text-ink mb-1 leading-tight">
-                {category.title}
-              </h3>
-              <p className="text-xs text-ink-muted font-body leading-relaxed">
-                {category.description}
-              </p>
+            return (
+              <motion.button
+                key={category.id}
+                variants={cardVariants}
+                whileHover="hover"
+                whileTap="tap"
+                onClick={() => navigate(`/category/${category.slug}`)}
+                className="relative overflow-hidden bg-surface-card rounded-[var(--radius-lg)] p-5 text-left border border-border-light shadow-card transition-shadow group"
+              >
+                {/* Background gradient accent */}
+                <div
+                  className={`absolute -top-10 -right-10 w-24 h-24 rounded-full bg-gradient-to-br ${category.gradient} opacity-10 group-hover:opacity-20 transition-opacity duration-300`}
+                />
 
-              {/* Sub-services pills */}
-              <div className="flex flex-wrap gap-1 mt-3">
-                {category.subServices.slice(0, 3).map((service) => (
-                  <span
-                    key={service}
-                    className="px-2 py-0.5 text-[10px] font-body font-medium bg-surface rounded-[var(--radius-pill)] text-ink-muted border border-border-light"
+                {/* Icons */}
+                <div className="relative flex items-center gap-2 mb-4">
+                  <motion.div
+                    variants={badgeVariants}
+                    style={{
+                      boxShadow: `0 6px 18px -2px ${category.shadowColor}`,
+                    }}
+                    className={`w-11 h-11 rounded-[var(--radius-md)] bg-gradient-to-br ${category.gradient} flex items-center justify-center`}
                   >
-                    {service}
-                  </span>
-                ))}
-                {category.subServices.length > 3 && (
-                  <span className="px-2 py-0.5 text-[10px] font-body font-medium text-brand">
-                    +{category.subServices.length - 3} more
-                  </span>
-                )}
+                    <CategoryCustomIcon slug={category.slug} />
+                  </motion.div>
+                  <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-surface border border-border-light flex items-center justify-center -ml-3 relative z-10">
+                    <SecondaryIcon size={14} className="text-ink-muted" />
+                  </div>
+                </div>
+
+                {/* Text */}
+                <h3 className="text-sm font-display font-bold text-ink mb-1 leading-tight">
+                  {category.title}
+                </h3>
+                <p className="text-xs text-ink-muted font-body leading-relaxed">
+                  {category.description}
+                </p>
+
+                {/* Sub-services pills */}
+                <div className="flex flex-wrap gap-1 mt-3">
+                  {category.subServices.slice(0, 3).map((service) => (
+                    <span
+                      key={service}
+                      className="px-2 py-0.5 text-[10px] font-body font-medium bg-surface rounded-[var(--radius-pill)] text-ink-muted border border-border-light"
+                    >
+                      {service}
+                    </span>
+                  ))}
+                  {category.subServices.length > 3 && (
+                    <span className="px-2 py-0.5 text-[10px] font-body font-medium text-brand">
+                      +{category.subServices.length - 3} more
+                    </span>
+                  )}
+                </div>
+              </motion.button>
+            );
+          })}
+        </motion.div>
+      </section>
+
+      {/* City Change Modal */}
+      <AnimatePresence>
+        {cityModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+          >
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setCityModalOpen(false)}
+              className="absolute inset-0 bg-ink/40"
+            />
+
+            {/* Modal Content */}
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 250 }}
+              className="relative w-full sm:max-w-md bg-surface rounded-t-[var(--radius-xl)] sm:rounded-[var(--radius-xl)] p-6 shadow-elevated z-10 border border-border-light max-h-[85vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h3 className="text-lg font-display font-extrabold text-ink">Change City</h3>
+                  <p className="text-xs text-ink-muted font-body mt-0.5">Select or search for your city</p>
+                </div>
+                <button
+                  onClick={() => setCityModalOpen(false)}
+                  className="text-xs font-display font-bold text-ink-muted hover:text-ink cursor-pointer"
+                >
+                  Close
+                </button>
               </div>
-            </motion.button>
-          );
-        })}
-      </motion.div>
-    </section>
+
+              {/* GPS Auto-detect */}
+              <button
+                onClick={handleRedetect}
+                className="w-full mb-6 flex items-center justify-center gap-2 py-3 bg-brand-50 hover:bg-brand-100 text-brand rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors cursor-pointer"
+              >
+                <LocateFixed size={14} />
+                <span>Detect My Location</span>
+              </button>
+
+              <div className="border-t border-border-light pt-6">
+                <CitySelector onSelect={handleCitySelect} />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
