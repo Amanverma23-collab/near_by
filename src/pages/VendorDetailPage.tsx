@@ -91,7 +91,7 @@ export default function VendorDetailPage() {
     reviewsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const waMsg = encodeURIComponent('Hi, I found your business on NearBe and would like to inquire about your services.');
+  const waMsg = encodeURIComponent('Hi, I found your business on NearBy and would like to inquire about your services.');
 
   /* ── 404 ── */
   if (!vendor) {

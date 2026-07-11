@@ -27,7 +27,7 @@ if (hasValidCreds) {
   supabaseClient = createClient(rawUrl, rawAnonKey);
 } else {
   console.warn(
-    '⚠️ NearBe: Valid Supabase credentials not found. Initializing Local Mock Client.'
+    '⚠️ NearBy: Valid Supabase credentials not found. Initializing Local Mock Client.'
   );
 
   // Mock Auth Callback Listeners
@@ -35,7 +35,7 @@ if (hasValidCreds) {
 
   const getSessionFromStorage = () => {
     try {
-      const sessionStr = localStorage.getItem('nearbe_mock_session');
+      const sessionStr = localStorage.getItem('nearby_mock_session');
       return sessionStr ? JSON.parse(sessionStr) : null;
     } catch {
       return null;
@@ -44,7 +44,7 @@ if (hasValidCreds) {
 
   const getMockUsers = () => {
     try {
-      return JSON.parse(localStorage.getItem('nearbe_mock_users') || '{}');
+      return JSON.parse(localStorage.getItem('nearby_mock_users') || '{}');
     } catch {
       return {};
     }
@@ -81,10 +81,10 @@ if (hasValidCreds) {
         // Save user registration credentials
         const users = getMockUsers();
         users[phone] = { user: mockUser, password };
-        localStorage.setItem('nearbe_mock_users', JSON.stringify(users));
+        localStorage.setItem('nearby_mock_users', JSON.stringify(users));
 
         // Save active session
-        localStorage.setItem('nearbe_mock_session', JSON.stringify(mockSession));
+        localStorage.setItem('nearby_mock_session', JSON.stringify(mockSession));
 
         // Notify listeners
         authListeners.forEach((cb) => cb('SIGNED_IN', mockSession));
@@ -110,7 +110,7 @@ if (hasValidCreds) {
           expires_at: Math.floor(Date.now() / 1000) + 3600,
         };
 
-        localStorage.setItem('nearbe_mock_session', JSON.stringify(mockSession));
+        localStorage.setItem('nearby_mock_session', JSON.stringify(mockSession));
         authListeners.forEach((cb) => cb('SIGNED_IN', mockSession));
 
         return { data: { user: match.user, session: mockSession }, error: null };
@@ -138,7 +138,7 @@ if (hasValidCreds) {
           expires_at: Math.floor(Date.now() / 1000) + 3600,
         };
 
-        localStorage.setItem('nearbe_mock_session', JSON.stringify(mockSession));
+        localStorage.setItem('nearby_mock_session', JSON.stringify(mockSession));
         authListeners.forEach((cb) => cb('SIGNED_IN', mockSession));
 
         return { data: { user: mockUser, session: mockSession }, error: null };
@@ -153,16 +153,16 @@ if (hasValidCreds) {
         const updatedUser = { ...session.user };
         const users = getMockUsers();
         users[updatedUser.phone] = { user: updatedUser, password };
-        localStorage.setItem('nearbe_mock_users', JSON.stringify(users));
+        localStorage.setItem('nearby_mock_users', JSON.stringify(users));
 
         const updatedSession = { ...session, user: updatedUser };
-        localStorage.setItem('nearbe_mock_session', JSON.stringify(updatedSession));
+        localStorage.setItem('nearby_mock_session', JSON.stringify(updatedSession));
         authListeners.forEach((cb) => cb('SIGNED_IN', updatedSession));
 
         return { data: { user: updatedUser }, error: null };
       },
       signOut: async () => {
-        localStorage.removeItem('nearbe_mock_session');
+        localStorage.removeItem('nearby_mock_session');
         authListeners.forEach((cb) => cb('SIGNED_OUT', null));
         return { error: null };
       },
@@ -192,7 +192,7 @@ if (hasValidCreds) {
                 maybeSingle: async () => {
                   try {
                     const items = JSON.parse(
-                      localStorage.getItem(`nearbe_mock_db_${table}`) || '[]'
+                      localStorage.getItem(`nearby_mock_db_${table}`) || '[]'
                     );
                     const item = items.find((i: any) => i[col] === val);
                     return { data: item || null, error: null };
@@ -207,7 +207,7 @@ if (hasValidCreds) {
         insert: async (data: any) => {
           try {
             const items = JSON.parse(
-              localStorage.getItem(`nearbe_mock_db_${table}`) || '[]'
+              localStorage.getItem(`nearby_mock_db_${table}`) || '[]'
             );
             const newRecord = {
               id: 'mock-record-' + Math.random().toString(36).substring(2, 11),
@@ -215,7 +215,7 @@ if (hasValidCreds) {
               ...data,
             };
             items.push(newRecord);
-            localStorage.setItem(`nearbe_mock_db_${table}`, JSON.stringify(items));
+            localStorage.setItem(`nearby_mock_db_${table}`, JSON.stringify(items));
             return { data: newRecord, error: null };
           } catch (err: any) {
             return { data: null, error: err };

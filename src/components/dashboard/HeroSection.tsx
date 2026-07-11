@@ -60,7 +60,7 @@ export default function HeroSection() {
         <img
           src="/hero-image.png"
           className="w-full h-full object-cover pointer-events-none"
-          alt="NearBe Local Services banner"
+          alt="NearBy Local Services banner"
         />
 
         {/* Absolute interactive overlay elements */}

@@ -21,7 +21,7 @@ export default function Navbar() {
               Near
             </span>
             <span className="text-xl font-extrabold font-display text-brand">
-              Be
+              By
             </span>
           </div>
 

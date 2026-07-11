@@ -253,10 +253,9 @@ export default function CategoryPage() {
                       <span>Call</span>
                     </a>
 
-                    {/* WhatsApp CTA */}
                     <a
                       href={`https://wa.me/91${vendor.whatsappNumber}?text=${encodeURIComponent(
-                        'Hi, I found your business on NearBe and would like to inquire about your services.'
+                        'Hi, I found your business on NearBy and would like to inquire about your services.'
                       )}`}
                       target="_blank"
                       rel="noopener noreferrer"

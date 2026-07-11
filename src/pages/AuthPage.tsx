@@ -34,7 +34,7 @@ export default function AuthPage() {
         >
           <h1 className="text-4xl font-extrabold font-display">
             <span className="text-ink">Near</span>
-            <span className="text-brand">Be</span>
+            <span className="text-brand">By</span>
           </h1>
         </motion.div>
 
@@ -70,7 +70,7 @@ export default function AuthPage() {
           transition={{ delay: 0.5 }}
           className="mt-8 text-xs text-ink-muted font-body text-center max-w-sm"
         >
-          By continuing, you agree to NearBe's Terms of Service and Privacy Policy
+          By continuing, you agree to NearBy's Terms of Service and Privacy Policy
         </motion.p>
       </div>
     </motion.div>

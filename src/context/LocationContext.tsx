@@ -17,7 +17,7 @@ interface LocationContextType {
   clearLocation: () => void;
 }
 
-const STORAGE_KEY = 'nearbe_location';
+const STORAGE_KEY = 'nearby_location';
 
 const LocationContext = createContext<LocationContextType>({
   location: null,
