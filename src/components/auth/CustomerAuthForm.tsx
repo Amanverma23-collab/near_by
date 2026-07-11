@@ -64,7 +64,24 @@ export default function CustomerAuthForm() {
 
     try {
       if (DEV_MODE) {
-        // In dev mode, skip OTP entirely — go straight to password
+        // Dev mode: create user via email signUp to establish a session,
+        // then skip OTP and go straight to password step.
+        // A temporary password is used; the real one is set via updateUser.
+        const devEmail = getDevEmail(mobile);
+        const tempPassword = `temp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: devEmail,
+          password: tempPassword,
+        });
+        if (signUpError) throw signUpError;
+
+        // Sign in to get an active session
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: devEmail,
+          password: tempPassword,
+        });
+        if (signInError) throw signInError;
+
         setRegisterStep('password');
         setSuccessMsg('Dev mode: OTP skipped. Set your password.');
       } else {
@@ -127,57 +144,30 @@ export default function CustomerAuthForm() {
     setLoading(true);
 
     try {
-      if (DEV_MODE) {
-        // Dev mode: create user with email + password (phone signups disabled)
-        const devEmail = getDevEmail(mobile);
-        const { data: signUpData, error: signUpError } =
-          await supabase.auth.signUp({
-            email: devEmail,
-            password: password,
-          });
-
-        if (signUpError) throw signUpError;
-
-        const userId = signUpData.user?.id;
-        if (!userId) throw new Error('User creation failed');
-
-        // Insert customer record
-        const { error: insertError } = await supabase.from('customers').insert({
-          auth_user_id: userId,
-          full_name: fullName.trim(),
-          mobile_number: mobile,
-        });
-
-        if (insertError) throw insertError;
-
-        // Sign in with the new credentials
-        await supabase.auth.signInWithPassword({
-          email: devEmail,
-          password: password,
-        });
-      } else {
-        // Production: user is already authenticated via OTP, just set password
-        const { data: sessionData } = await supabase.auth.getSession();
-        console.log('Customer Registration: Session before password set:', sessionData?.session);
-
-        const { data: updateData, error: updateError } = await supabase.auth.updateUser({
-          password: password,
-        });
-
-        if (updateError) throw updateError;
-
-        const user = updateData.user;
-        if (!user) throw new Error('User not found after password set');
-
-        // Insert customer record
-        const { error: insertError } = await supabase.from('customers').insert({
-          auth_user_id: user.id,
-          full_name: fullName.trim(),
-          mobile_number: mobile,
-        });
-
-        if (insertError) throw insertError;
+      // Confirm an active session exists (created by OTP verify or dev signUp)
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) {
+        throw new Error('No active session. Please restart the registration process.');
       }
+
+      // Set the user's real password via updateUser (works on the active session)
+      const { data: updateData, error: updateError } = await supabase.auth.updateUser({
+        password: password,
+      });
+
+      if (updateError) throw updateError;
+
+      const user = updateData.user;
+      if (!user) throw new Error('User not found after password set');
+
+      // Insert customer record into the database
+      const { error: insertError } = await supabase.from('customers').insert({
+        auth_user_id: user.id,
+        full_name: fullName.trim(),
+        mobile_number: mobile,
+      });
+
+      if (insertError) throw insertError;
 
       setSuccessMsg('Account created! Redirecting...');
       // Auth state change listener in AuthContext will handle the redirect
