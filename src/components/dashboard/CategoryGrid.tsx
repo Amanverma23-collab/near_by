@@ -20,6 +20,20 @@ import type { ServiceCategory } from '../../types';
 import { useLocation } from '../../context/LocationContext';
 import CitySelector from '../location/CitySelector';
 import vehicleEmergencyImg from '../../assets/images/vehicle-emergency.png';
+import homeMaintenanceImg from '../../assets/images/home-maintenance.png';
+
+const categoryImageMap: Record<string, string> = {
+  'vehicle-emergency': vehicleEmergencyImg,
+  'home-maintenance': homeMaintenanceImg,
+};
+
+const getCategoryColor = (slug: string) => {
+  switch (slug) {
+    case 'vehicle-emergency': return '#FF6B35';
+    case 'home-maintenance': return '#0C9D61';
+    default: return '#FF6B35';
+  }
+};
 
 const categories: (ServiceCategory & { shadowColor: string })[] = [
   {
@@ -327,7 +341,8 @@ export default function CategoryGrid() {
               null,
               Wrench,
             ];
-            const isVehicleEmergency = category.slug === 'vehicle-emergency';
+            const customImg = categoryImageMap[category.slug];
+            const categoryColor = getCategoryColor(category.slug);
 
             return (
               <motion.button
@@ -338,13 +353,13 @@ export default function CategoryGrid() {
                 onClick={() => navigate(`/category/${category.slug}`)}
                 className="relative overflow-hidden bg-surface-card rounded-[var(--radius-lg)] p-5 text-left border border-border-light shadow-card transition-shadow group flex flex-col justify-between min-h-[160px]"
               >
-                {isVehicleEmergency ? (
+                {customImg ? (
                   <>
                     {/* Background image covering the card, offset to right */}
                     <div 
                       className="absolute inset-0 bg-cover bg-no-repeat transition-transform duration-500 group-hover:scale-105"
                       style={{ 
-                        backgroundImage: `url(${vehicleEmergencyImg})`,
+                        backgroundImage: `url(${customImg})`,
                         backgroundPosition: 'right -10px center'
                       }}
                     />
@@ -367,7 +382,11 @@ export default function CategoryGrid() {
                         {category.subServices.slice(0, 3).map((service) => (
                           <span
                             key={service}
-                            className="px-2 py-0.5 text-[9px] font-body font-bold bg-white/95 rounded-[var(--radius-pill)] text-[#FF6B35] border border-[#FF6B35]/20 shadow-sm"
+                            className="px-2 py-0.5 text-[9px] font-body font-bold bg-white/95 rounded-[var(--radius-pill)] border shadow-sm"
+                            style={{
+                              color: categoryColor,
+                              borderColor: `${categoryColor}33` // 20% opacity hex extension
+                            }}
                           >
                             {service}
                           </span>
