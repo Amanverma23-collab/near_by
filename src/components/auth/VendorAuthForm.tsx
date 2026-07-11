@@ -223,18 +223,7 @@ export default function VendorAuthForm() {
 
   return (
     <div className="space-y-6">
-      {/* Login / Register Toggle */}
-      <div className="flex items-center justify-center gap-2 text-sm font-body">
-        <span className="text-ink-muted">
-          {mode === 'login' ? "Don't have an account?" : 'Already registered?'}
-        </span>
-        <button
-          onClick={toggleMode}
-          className="font-semibold text-brand hover:text-brand-dark transition-colors"
-        >
-          {mode === 'login' ? 'Register' : 'Login'}
-        </button>
-      </div>
+      {/* Messages */}
 
       {/* Messages */}
       <AnimatePresence mode="wait">
@@ -317,10 +306,22 @@ export default function VendorAuthForm() {
               </button>
             </div>
 
-            <AnimatedButton fullWidth size="lg" isLoading={loading} onClick={handleLogin}>
-              <span>Login</span>
-              <ArrowRight size={20} />
-            </AnimatedButton>
+            {/* Login & Register Buttons */}
+            <div className="flex flex-col gap-3">
+              <AnimatedButton fullWidth size="lg" isLoading={loading} onClick={handleLogin}>
+                <span>Login</span>
+                <ArrowRight size={20} />
+              </AnimatedButton>
+              <AnimatedButton
+                fullWidth
+                size="lg"
+                variant="outline"
+                type="button"
+                onClick={toggleMode}
+              >
+                <span>Register</span>
+              </AnimatedButton>
+            </div>
           </motion.div>
         ) : (
           <motion.div
@@ -405,10 +406,22 @@ export default function VendorAuthForm() {
                     </div>
                   </div>
 
-                  <AnimatedButton fullWidth size="lg" isLoading={loading} onClick={handleSendOtp}>
-                    <span>Send OTP</span>
-                    <ArrowRight size={20} />
-                  </AnimatedButton>
+                  {/* Send OTP & Login Buttons */}
+                  <div className="flex flex-col gap-3">
+                    <AnimatedButton fullWidth size="lg" isLoading={loading} onClick={handleSendOtp}>
+                      <span>Send OTP</span>
+                      <ArrowRight size={20} />
+                    </AnimatedButton>
+                    <AnimatedButton
+                      fullWidth
+                      size="lg"
+                      variant="outline"
+                      type="button"
+                      onClick={toggleMode}
+                    >
+                      <span>Login</span>
+                    </AnimatedButton>
+                  </div>
                 </motion.div>
               )}
 
@@ -476,10 +489,22 @@ export default function VendorAuthForm() {
                     }
                   />
 
-                  <AnimatedButton fullWidth size="lg" isLoading={loading} onClick={handleCreateAccount}>
-                    <span>Create Vendor Account</span>
-                    <ArrowRight size={20} />
-                  </AnimatedButton>
+                  {/* Create Account & Login Buttons */}
+                  <div className="flex flex-col gap-3">
+                    <AnimatedButton fullWidth size="lg" isLoading={loading} onClick={handleCreateAccount}>
+                      <span>Create Vendor Account</span>
+                      <ArrowRight size={20} />
+                    </AnimatedButton>
+                    <AnimatedButton
+                      fullWidth
+                      size="lg"
+                      variant="outline"
+                      type="button"
+                      onClick={toggleMode}
+                    >
+                      <span>Login</span>
+                    </AnimatedButton>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>

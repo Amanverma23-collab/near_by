@@ -3,7 +3,7 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
 interface AnimatedButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
-  variant?: 'primary' | 'secondary' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'outline';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
   fullWidth?: boolean;
@@ -29,6 +29,8 @@ export default function AnimatedButton({
       'bg-brand-50 text-brand hover:bg-brand-100 disabled:opacity-50',
     ghost:
       'bg-transparent text-ink hover:bg-border-light disabled:opacity-50',
+    outline:
+      'border-2 border-brand bg-transparent text-brand hover:bg-brand/5 disabled:opacity-50',
   };
 
   const sizes = {
