@@ -10,7 +10,7 @@ import { useLocation } from '../context/LocationContext';
 import BrandLoader from '../components/ui/BrandLoader';
 
 export default function LocationPage() {
-  const { session, loading: authLoading } = useAuth();
+  const { session, role, loading: authLoading } = useAuth();
   const { locationSet, setLocation, setCityManually, loading: locLoading } =
     useLocation();
   const navigate = useNavigate();
@@ -20,7 +20,7 @@ export default function LocationPage() {
   const [error, setError] = useState<string | null>(null);
 
   if (authLoading || locLoading) return <BrandLoader />;
-  if (!session) return <Navigate to="/" replace />;
+  if (!session || !role) return <Navigate to="/" replace />;
   if (locationSet) return <Navigate to="/dashboard" replace />;
 
   const handleEnableLocation = async () => {

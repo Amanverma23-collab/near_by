@@ -8,11 +8,11 @@ import { useAuth } from '../context/AuthContext';
 import BrandLoader from '../components/ui/BrandLoader';
 
 export default function AuthPage() {
-  const { session, loading } = useAuth();
+  const { session, role, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<'customer' | 'vendor'>('customer');
 
   if (loading) return <BrandLoader />;
-  if (session) return <Navigate to="/location" replace />;
+  if (session && role) return <Navigate to="/location" replace />;
 
   return (
     <motion.div

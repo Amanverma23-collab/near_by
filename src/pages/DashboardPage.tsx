@@ -8,11 +8,11 @@ import { useLocation } from '../context/LocationContext';
 import BrandLoader from '../components/ui/BrandLoader';
 
 export default function DashboardPage() {
-  const { session, loading: authLoading } = useAuth();
+  const { session, role, loading: authLoading } = useAuth();
   const { locationSet, loading: locLoading } = useLocation();
 
   if (authLoading || locLoading) return <BrandLoader />;
-  if (!session) return <Navigate to="/" replace />;
+  if (!session || !role) return <Navigate to="/" replace />;
   if (!locationSet) return <Navigate to="/location" replace />;
 
   return (
