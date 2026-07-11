@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -21,6 +21,7 @@ import { useLocation } from '../../context/LocationContext';
 import CitySelector from '../location/CitySelector';
 import vehicleEmergencyImg from '../../assets/images/vehicle-emergency.png';
 import homeMaintenanceImg from '../../assets/images/home-maintenance.png';
+import vehicleEmergencyVideo from '../../assets/videos/vehicle-emergency-hover.mp4';
 
 const categoryImageMap: Record<string, string> = {
   'vehicle-emergency': vehicleEmergencyImg,
@@ -260,6 +261,176 @@ function CategoryCustomIcon({ slug }: CategoryCustomIconProps) {
   return null;
 }
 
+interface CategoryCardProps {
+  category: ServiceCategory & { shadowColor: string; gradient: string };
+  SecondaryIcon: any;
+  onClick: () => void;
+}
+
+function CategoryCard({ category, SecondaryIcon, onClick }: CategoryCardProps) {
+  const customImg = categoryImageMap[category.slug];
+  const categoryColor = getCategoryColor(category.slug);
+  
+  const isVehicleEmergency = category.slug === 'vehicle-emergency';
+  const [hasHovered, setHasHovered] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [canHover, setCanHover] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
+
+  useEffect(() => {
+    // Only enable hover video for devices capable of real hover interaction
+    const mediaQuery = window.matchMedia('(hover: hover) and (pointer: fine)');
+    setCanHover(mediaQuery.matches);
+    
+    const listener = (e: MediaQueryListEvent) => setCanHover(e.matches);
+    mediaQuery.addEventListener('change', listener);
+    return () => mediaQuery.removeEventListener('change', listener);
+  }, []);
+
+  const handleMouseEnter = () => {
+    if (isVehicleEmergency && canHover) {
+      setIsHovered(true);
+      setHasHovered(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (isVehicleEmergency) {
+      setIsHovered(false);
+    }
+  };
+
+  return (
+    <motion.button
+      variants={cardVariants}
+      whileHover="hover"
+      whileTap="tap"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onClick={onClick}
+      className="relative overflow-hidden bg-surface-card rounded-[var(--radius-lg)] p-5 text-left border border-border-light shadow-card transition-shadow group flex flex-col justify-between min-h-[160px]"
+    >
+      {customImg ? (
+        <>
+          {/* Background image covering the card */}
+          <div 
+            className="absolute inset-0 bg-cover bg-no-repeat transition-transform duration-500 group-hover:scale-105"
+            style={{ 
+              backgroundImage: `url(${customImg})`,
+              backgroundPosition: 'right -10px center'
+            }}
+          />
+          
+          {/* Hover video element (lazy-loaded on first hover, desktop only) */}
+          {isVehicleEmergency && hasHovered && canHover && (
+            <video
+              src={vehicleEmergencyVideo}
+              muted
+              loop
+              playsInline
+              preload="auto"
+              onCanPlay={() => setVideoReady(true)}
+              className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 z-0 pointer-events-none group-hover:scale-105"
+              style={{ 
+                objectPosition: 'right -10px center',
+                opacity: isHovered && videoReady ? 1 : 0
+              }}
+              ref={(el) => {
+                if (el) {
+                  if (isHovered) {
+                    el.play().catch(() => {});
+                  } else {
+                    el.pause();
+                  }
+                }
+              }}
+            />
+          )}
+          
+          {/* Gradient overlay to make text highly readable */}
+          <div className="absolute inset-0 bg-gradient-to-r from-white via-white/90 to-white/30 z-10" />
+          
+          {/* Card Content */}
+          <div className="relative z-20 flex flex-col h-full justify-between w-full">
+            <div>
+              <h3 className="text-sm font-display font-extrabold text-ink mb-1 leading-tight">
+                {category.title}
+              </h3>
+              <p className="text-xs text-ink-muted font-body leading-relaxed max-w-[70%]">
+                {category.description}
+              </p>
+            </div>
+            
+            {/* Sub-services pills */}
+            <div className="flex flex-wrap gap-1 mt-3">
+              {category.subServices.slice(0, 3).map((service) => (
+                <span
+                  key={service}
+                  className="px-2 py-0.5 text-[9px] font-body font-bold bg-white/95 rounded-[var(--radius-pill)] border shadow-sm"
+                  style={{
+                    color: categoryColor,
+                    borderColor: `${categoryColor}33`
+                  }}
+                >
+                  {service}
+                </span>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Background gradient accent */}
+          <div
+            className={`absolute -top-10 -right-10 w-24 h-24 rounded-full bg-gradient-to-br ${category.gradient} opacity-10 group-hover:opacity-20 transition-opacity duration-300`}
+          />
+
+          {/* Icons */}
+          <div className="relative flex items-center gap-2 mb-4">
+            <motion.div
+              variants={badgeVariants}
+              style={{
+                boxShadow: `0 6px 18px -2px ${category.shadowColor}`,
+              }}
+              className={`w-11 h-11 rounded-[var(--radius-md)] bg-gradient-to-br ${category.gradient} flex items-center justify-center`}
+            >
+              <CategoryCustomIcon slug={category.slug} />
+            </motion.div>
+            <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-surface border border-border-light flex items-center justify-center -ml-3 relative z-10">
+              <SecondaryIcon size={14} className="text-ink-muted" />
+            </div>
+          </div>
+
+          {/* Text */}
+          <h3 className="text-sm font-display font-bold text-ink mb-1 leading-tight">
+            {category.title}
+          </h3>
+          <p className="text-xs text-ink-muted font-body leading-relaxed">
+            {category.description}
+          </p>
+
+          {/* Sub-services pills */}
+          <div className="flex flex-wrap gap-1 mt-3">
+            {category.subServices.slice(0, 3).map((service) => (
+              <span
+                key={service}
+                className="px-2 py-0.5 text-[10px] font-body font-medium bg-surface rounded-[var(--radius-pill)] text-ink-muted border border-border-light"
+              >
+                {service}
+              </span>
+            ))}
+            {category.subServices.length > 3 && (
+              <span className="px-2 py-0.5 text-[10px] font-body font-medium text-brand">
+                +{category.subServices.length - 3} more
+              </span>
+            )}
+          </div>
+        </>
+      )}
+    </motion.button>
+  );
+}
+
 export default function CategoryGrid() {
   const navigate = useNavigate();
   const { location, setCityManually } = useLocation();
@@ -341,109 +512,14 @@ export default function CategoryGrid() {
               null,
               Wrench,
             ];
-            const customImg = categoryImageMap[category.slug];
-            const categoryColor = getCategoryColor(category.slug);
 
             return (
-              <motion.button
+              <CategoryCard
                 key={category.id}
-                variants={cardVariants}
-                whileHover="hover"
-                whileTap="tap"
+                category={category}
+                SecondaryIcon={SecondaryIcon}
                 onClick={() => navigate(`/category/${category.slug}`)}
-                className="relative overflow-hidden bg-surface-card rounded-[var(--radius-lg)] p-5 text-left border border-border-light shadow-card transition-shadow group flex flex-col justify-between min-h-[160px]"
-              >
-                {customImg ? (
-                  <>
-                    {/* Background image covering the card, offset to right */}
-                    <div 
-                      className="absolute inset-0 bg-cover bg-no-repeat transition-transform duration-500 group-hover:scale-105"
-                      style={{ 
-                        backgroundImage: `url(${customImg})`,
-                        backgroundPosition: 'right -10px center'
-                      }}
-                    />
-                    {/* Gradient overlay to make text highly readable */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-white via-white/90 to-white/30" />
-                    
-                    {/* Card Content */}
-                    <div className="relative z-10 flex flex-col h-full justify-between w-full">
-                      <div>
-                        <h3 className="text-sm font-display font-extrabold text-ink mb-1 leading-tight">
-                          {category.title}
-                        </h3>
-                        <p className="text-xs text-ink-muted font-body leading-relaxed max-w-[70%]">
-                          {category.description}
-                        </p>
-                      </div>
-                      
-                      {/* Sub-services pills */}
-                      <div className="flex flex-wrap gap-1 mt-3">
-                        {category.subServices.slice(0, 3).map((service) => (
-                          <span
-                            key={service}
-                            className="px-2 py-0.5 text-[9px] font-body font-bold bg-white/95 rounded-[var(--radius-pill)] border shadow-sm"
-                            style={{
-                              color: categoryColor,
-                              borderColor: `${categoryColor}33` // 20% opacity hex extension
-                            }}
-                          >
-                            {service}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    {/* Background gradient accent */}
-                    <div
-                      className={`absolute -top-10 -right-10 w-24 h-24 rounded-full bg-gradient-to-br ${category.gradient} opacity-10 group-hover:opacity-20 transition-opacity duration-300`}
-                    />
-
-                    {/* Icons */}
-                    <div className="relative flex items-center gap-2 mb-4">
-                      <motion.div
-                        variants={badgeVariants}
-                        style={{
-                          boxShadow: `0 6px 18px -2px ${category.shadowColor}`,
-                        }}
-                        className={`w-11 h-11 rounded-[var(--radius-md)] bg-gradient-to-br ${category.gradient} flex items-center justify-center`}
-                      >
-                        <CategoryCustomIcon slug={category.slug} />
-                      </motion.div>
-                      <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-surface border border-border-light flex items-center justify-center -ml-3 relative z-10">
-                        <SecondaryIcon size={14} className="text-ink-muted" />
-                      </div>
-                    </div>
-
-                    {/* Text */}
-                    <h3 className="text-sm font-display font-bold text-ink mb-1 leading-tight">
-                      {category.title}
-                    </h3>
-                    <p className="text-xs text-ink-muted font-body leading-relaxed">
-                      {category.description}
-                    </p>
-
-                    {/* Sub-services pills */}
-                    <div className="flex flex-wrap gap-1 mt-3">
-                      {category.subServices.slice(0, 3).map((service) => (
-                        <span
-                          key={service}
-                          className="px-2 py-0.5 text-[10px] font-body font-medium bg-surface rounded-[var(--radius-pill)] text-ink-muted border border-border-light"
-                        >
-                          {service}
-                        </span>
-                      ))}
-                      {category.subServices.length > 3 && (
-                        <span className="px-2 py-0.5 text-[10px] font-body font-medium text-brand">
-                          +{category.subServices.length - 3} more
-                        </span>
-                      )}
-                    </div>
-                  </>
-                )}
-              </motion.button>
+              />
             );
           })}
         </motion.div>
