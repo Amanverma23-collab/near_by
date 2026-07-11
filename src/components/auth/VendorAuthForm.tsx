@@ -79,6 +79,7 @@ export default function VendorAuthForm() {
         setSuccessMsg('OTP sent to your mobile number!');
       }
     } catch (err: any) {
+      console.error('Vendor Register OTP Error:', err);
       setError(err.message || 'Failed to send OTP.');
     } finally {
       setLoading(false);
@@ -105,6 +106,7 @@ export default function VendorAuthForm() {
         setSuccessMsg('OTP verified! Now set your password.');
       }
     } catch (err: any) {
+      console.error('Vendor Verify OTP Error:', err);
       setError(err.message || 'Invalid OTP.');
     } finally {
       setLoading(false);
@@ -200,6 +202,7 @@ export default function VendorAuthForm() {
       });
       if (loginError) throw loginError;
     } catch (err: any) {
+      console.error('Vendor Login Error:', err);
       setError(err.message || 'Invalid credentials.');
     } finally {
       setLoading(false);

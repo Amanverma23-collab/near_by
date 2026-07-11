@@ -76,6 +76,7 @@ export default function CustomerAuthForm() {
         setSuccessMsg('OTP sent to your mobile number!');
       }
     } catch (err: any) {
+      console.error('Customer Register OTP Error:', err);
       setError(err.message || 'Failed to send OTP. Please try again.');
     } finally {
       setLoading(false);
@@ -104,6 +105,7 @@ export default function CustomerAuthForm() {
         setSuccessMsg('OTP verified! Now set your password.');
       }
     } catch (err: any) {
+      console.error('Customer Verify OTP Error:', err);
       setError(err.message || 'Invalid OTP. Please try again.');
     } finally {
       setLoading(false);
@@ -208,6 +210,7 @@ export default function CustomerAuthForm() {
       if (loginError) throw loginError;
       // Auth state change listener will handle redirect
     } catch (err: any) {
+      console.error('Customer Login Error:', err);
       setError(err.message || 'Invalid credentials. Please try again.');
     } finally {
       setLoading(false);

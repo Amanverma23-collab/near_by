@@ -115,6 +115,18 @@ if (hasValidCreds) {
 
         return { data: { user: match.user, session: mockSession }, error: null };
       },
+      signInWithOtp: async ({ phone }: any) => {
+        console.log('Mock Auth: signInWithOtp triggered for phone:', phone);
+        return { data: { user: null, session: null }, error: null };
+      },
+      verifyOtp: async ({ phone, token }: any) => {
+        console.log('Mock Auth: verifyOtp triggered for phone:', phone, 'with token:', token);
+        return { data: { user: null, session: null }, error: null };
+      },
+      updateUser: async ({ password }: any) => {
+        console.log('Mock Auth: updateUser (set password) triggered');
+        return { data: { user: null }, error: null };
+      },
       signOut: async () => {
         localStorage.removeItem('nearbe_mock_session');
         authListeners.forEach((cb) => cb('SIGNED_OUT', null));
