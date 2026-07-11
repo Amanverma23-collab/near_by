@@ -19,6 +19,7 @@ import {
 import type { ServiceCategory } from '../../types';
 import { useLocation } from '../../context/LocationContext';
 import CitySelector from '../location/CitySelector';
+import vehicleEmergencyImg from '../../assets/images/vehicle-emergency.png';
 
 const categories: (ServiceCategory & { shadowColor: string })[] = [
   {
@@ -326,6 +327,7 @@ export default function CategoryGrid() {
               null,
               Wrench,
             ];
+            const isVehicleEmergency = category.slug === 'vehicle-emergency';
 
             return (
               <motion.button
@@ -334,53 +336,94 @@ export default function CategoryGrid() {
                 whileHover="hover"
                 whileTap="tap"
                 onClick={() => navigate(`/category/${category.slug}`)}
-                className="relative overflow-hidden bg-surface-card rounded-[var(--radius-lg)] p-5 text-left border border-border-light shadow-card transition-shadow group"
+                className="relative overflow-hidden bg-surface-card rounded-[var(--radius-lg)] p-5 text-left border border-border-light shadow-card transition-shadow group flex flex-col justify-between min-h-[160px]"
               >
-                {/* Background gradient accent */}
-                <div
-                  className={`absolute -top-10 -right-10 w-24 h-24 rounded-full bg-gradient-to-br ${category.gradient} opacity-10 group-hover:opacity-20 transition-opacity duration-300`}
-                />
+                {isVehicleEmergency ? (
+                  <>
+                    {/* Background image covering the card, offset to right */}
+                    <div 
+                      className="absolute inset-0 bg-cover bg-no-repeat transition-transform duration-500 group-hover:scale-105"
+                      style={{ 
+                        backgroundImage: `url(${vehicleEmergencyImg})`,
+                        backgroundPosition: 'right -10px center'
+                      }}
+                    />
+                    {/* Gradient overlay to make text highly readable */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-white via-white/90 to-white/30" />
+                    
+                    {/* Card Content */}
+                    <div className="relative z-10 flex flex-col h-full justify-between w-full">
+                      <div>
+                        <h3 className="text-sm font-display font-extrabold text-ink mb-1 leading-tight">
+                          {category.title}
+                        </h3>
+                        <p className="text-xs text-ink-muted font-body leading-relaxed max-w-[70%]">
+                          {category.description}
+                        </p>
+                      </div>
+                      
+                      {/* Sub-services pills */}
+                      <div className="flex flex-wrap gap-1 mt-3">
+                        {category.subServices.slice(0, 3).map((service) => (
+                          <span
+                            key={service}
+                            className="px-2 py-0.5 text-[9px] font-body font-bold bg-white/95 rounded-[var(--radius-pill)] text-[#FF6B35] border border-[#FF6B35]/20 shadow-sm"
+                          >
+                            {service}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Background gradient accent */}
+                    <div
+                      className={`absolute -top-10 -right-10 w-24 h-24 rounded-full bg-gradient-to-br ${category.gradient} opacity-10 group-hover:opacity-20 transition-opacity duration-300`}
+                    />
 
-                {/* Icons */}
-                <div className="relative flex items-center gap-2 mb-4">
-                  <motion.div
-                    variants={badgeVariants}
-                    style={{
-                      boxShadow: `0 6px 18px -2px ${category.shadowColor}`,
-                    }}
-                    className={`w-11 h-11 rounded-[var(--radius-md)] bg-gradient-to-br ${category.gradient} flex items-center justify-center`}
-                  >
-                    <CategoryCustomIcon slug={category.slug} />
-                  </motion.div>
-                  <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-surface border border-border-light flex items-center justify-center -ml-3 relative z-10">
-                    <SecondaryIcon size={14} className="text-ink-muted" />
-                  </div>
-                </div>
+                    {/* Icons */}
+                    <div className="relative flex items-center gap-2 mb-4">
+                      <motion.div
+                        variants={badgeVariants}
+                        style={{
+                          boxShadow: `0 6px 18px -2px ${category.shadowColor}`,
+                        }}
+                        className={`w-11 h-11 rounded-[var(--radius-md)] bg-gradient-to-br ${category.gradient} flex items-center justify-center`}
+                      >
+                        <CategoryCustomIcon slug={category.slug} />
+                      </motion.div>
+                      <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-surface border border-border-light flex items-center justify-center -ml-3 relative z-10">
+                        <SecondaryIcon size={14} className="text-ink-muted" />
+                      </div>
+                    </div>
 
-                {/* Text */}
-                <h3 className="text-sm font-display font-bold text-ink mb-1 leading-tight">
-                  {category.title}
-                </h3>
-                <p className="text-xs text-ink-muted font-body leading-relaxed">
-                  {category.description}
-                </p>
+                    {/* Text */}
+                    <h3 className="text-sm font-display font-bold text-ink mb-1 leading-tight">
+                      {category.title}
+                    </h3>
+                    <p className="text-xs text-ink-muted font-body leading-relaxed">
+                      {category.description}
+                    </p>
 
-                {/* Sub-services pills */}
-                <div className="flex flex-wrap gap-1 mt-3">
-                  {category.subServices.slice(0, 3).map((service) => (
-                    <span
-                      key={service}
-                      className="px-2 py-0.5 text-[10px] font-body font-medium bg-surface rounded-[var(--radius-pill)] text-ink-muted border border-border-light"
-                    >
-                      {service}
-                    </span>
-                  ))}
-                  {category.subServices.length > 3 && (
-                    <span className="px-2 py-0.5 text-[10px] font-body font-medium text-brand">
-                      +{category.subServices.length - 3} more
-                    </span>
-                  )}
-                </div>
+                    {/* Sub-services pills */}
+                    <div className="flex flex-wrap gap-1 mt-3">
+                      {category.subServices.slice(0, 3).map((service) => (
+                        <span
+                          key={service}
+                          className="px-2 py-0.5 text-[10px] font-body font-medium bg-surface rounded-[var(--radius-pill)] text-ink-muted border border-border-light"
+                        >
+                          {service}
+                        </span>
+                      ))}
+                      {category.subServices.length > 3 && (
+                        <span className="px-2 py-0.5 text-[10px] font-body font-medium text-brand">
+                          +{category.subServices.length - 3} more
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
               </motion.button>
             );
           })}
