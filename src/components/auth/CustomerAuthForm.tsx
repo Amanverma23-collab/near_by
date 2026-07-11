@@ -29,7 +29,7 @@ export default function CustomerAuthForm() {
   };
 
   const getFullPhone = (num: string) => `+91${num}`;
-  const getDevEmail = (num: string) => `${num}@nearby-dev.local`;
+  const getDevEmail = (num: string) => `${num}@nearbydev.com`;
 
   const resetForm = () => {
     setFullName('');

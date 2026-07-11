@@ -26,7 +26,7 @@ export default function VendorAuthForm() {
 
   const formatPhone = (num: string) => num.replace(/\D/g, '').slice(0, 10);
   const getFullPhone = (num: string) => `+91${num}`;
-  const getDevEmail = (num: string) => `${num}@nearby-dev.local`;
+  const getDevEmail = (num: string) => `${num}@nearbydev.com`;
 
   const isValidEmail = (e: string) =>
     !e || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
