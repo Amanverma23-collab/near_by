@@ -68,8 +68,9 @@ export default function VendorAuthForm() {
 
     try {
       if (DEV_MODE) {
-        setRegisterStep('otp');
-        setSuccessMsg('Dev mode: Use any 6-digit code (e.g. 123456)');
+        // In dev mode, skip OTP entirely — go straight to password
+        setRegisterStep('password');
+        setSuccessMsg('Dev mode: OTP skipped. Set your password.');
       } else {
         const { error: otpError } = await supabase.auth.signInWithOtp({
           phone: getFullPhone(mobile),

@@ -14,10 +14,7 @@ const isValidUrl = (url: string): boolean => {
   }
 };
 
-const isDevMode = import.meta.env.VITE_DEV_MODE === 'true';
-
 const hasValidCreds =
-  !isDevMode &&
   rawUrl &&
   isValidUrl(rawUrl) &&
   !rawUrl.includes('your-supabase-url-here') &&
