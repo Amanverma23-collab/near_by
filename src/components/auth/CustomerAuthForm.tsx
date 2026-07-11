@@ -29,6 +29,7 @@ export default function CustomerAuthForm() {
   };
 
   const getFullPhone = (num: string) => `+91${num}`;
+  const getDevEmail = (num: string) => `${num}@nearby-dev.local`;
 
   const resetForm = () => {
     setFullName('');
@@ -127,10 +128,11 @@ export default function CustomerAuthForm() {
 
     try {
       if (DEV_MODE) {
-        // Dev mode: create user with phone + password directly
+        // Dev mode: create user with email + password (phone signups disabled)
+        const devEmail = getDevEmail(mobile);
         const { data: signUpData, error: signUpError } =
           await supabase.auth.signUp({
-            phone: getFullPhone(mobile),
+            email: devEmail,
             password: password,
           });
 
@@ -150,7 +152,7 @@ export default function CustomerAuthForm() {
 
         // Sign in with the new credentials
         await supabase.auth.signInWithPassword({
-          phone: getFullPhone(mobile),
+          email: devEmail,
           password: password,
         });
       } else {
@@ -202,10 +204,10 @@ export default function CustomerAuthForm() {
     setLoading(true);
 
     try {
-      const { error: loginError } = await supabase.auth.signInWithPassword({
-        phone: getFullPhone(mobile),
-        password: password,
-      });
+      const credentials = DEV_MODE
+        ? { email: getDevEmail(mobile), password }
+        : { phone: getFullPhone(mobile), password };
+      const { error: loginError } = await supabase.auth.signInWithPassword(credentials);
 
       if (loginError) throw loginError;
       // Auth state change listener will handle redirect

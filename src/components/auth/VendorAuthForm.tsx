@@ -26,6 +26,7 @@ export default function VendorAuthForm() {
 
   const formatPhone = (num: string) => num.replace(/\D/g, '').slice(0, 10);
   const getFullPhone = (num: string) => `+91${num}`;
+  const getDevEmail = (num: string) => `${num}@nearby-dev.local`;
 
   const isValidEmail = (e: string) =>
     !e || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
@@ -129,9 +130,11 @@ export default function VendorAuthForm() {
 
     try {
       if (DEV_MODE) {
+        // Dev mode: create user with email + password (phone signups disabled)
+        const devEmail = getDevEmail(mobile);
         const { data: signUpData, error: signUpError } =
           await supabase.auth.signUp({
-            phone: getFullPhone(mobile),
+            email: devEmail,
             password: password,
           });
         if (signUpError) throw signUpError;
@@ -149,7 +152,7 @@ export default function VendorAuthForm() {
         if (insertError) throw insertError;
 
         await supabase.auth.signInWithPassword({
-          phone: getFullPhone(mobile),
+          email: devEmail,
           password: password,
         });
       } else {
@@ -198,10 +201,10 @@ export default function VendorAuthForm() {
     setLoading(true);
 
     try {
-      const { error: loginError } = await supabase.auth.signInWithPassword({
-        phone: getFullPhone(mobile),
-        password: password,
-      });
+      const credentials = DEV_MODE
+        ? { email: getDevEmail(mobile), password }
+        : { phone: getFullPhone(mobile), password };
+      const { error: loginError } = await supabase.auth.signInWithPassword(credentials);
       if (loginError) throw loginError;
     } catch (err: any) {
       console.error('Vendor Login Error:', err);
