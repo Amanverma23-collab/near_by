@@ -45,6 +45,12 @@
   --shadow-card-hover: 0 8px 30px rgba(26, 26, 46, 0.12);
   --shadow-elevated: 0 12px 40px rgba(26, 26, 46, 0.15);
   --shadow-brand: 0 4px 20px rgba(255, 82, 0, 0.3);
+
+  /* Accent Colors */
+  --color-accent: #D97706;
+  --color-accent-light: #F59E0B;
+  --color-accent-dark: #B45309;
+  --color-accent-glow: rgba(217, 119, 6, 0.3);
 }
 
 /* ===== Global Styles ===== */
@@ -103,21 +109,26 @@ input::placeholder {
   100% { background-position: 0% 50%; }
 }
 
-.animated-gradient {
+.animate-gradient-shift {
   background-size: 200% 200%;
   animation: gradient-shift 8s ease infinite;
 }
 
-/* ===== Pulse Ring Animation (for location pin) ===== */
+/* ===== Floating shapes ===== */
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(3deg); }
+}
+
+.animate-float-slow {
+  animation: float-slow 6s ease-in-out infinite;
+}
+
+/* ===== Pulse Ring animation for waves ===== */
 @keyframes pulse-ring {
-  0% {
-    transform: scale(0.5);
-    opacity: 0.8;
-  }
-  100% {
-    transform: scale(2.5);
-    opacity: 0;
-  }
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
 }
 
 .pulse-ring {
@@ -164,4 +175,30 @@ input::placeholder {
 .backdrop-blur-nav {
   backdrop-filter: blur(12px) saturate(180%);
   -webkit-backdrop-filter: blur(12px) saturate(180%);
+}
+
+/* ===== Hide scrollbars on scroll containers ===== */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* ===== Vendor Mode Colors (Teal / Emerald / Gold) ===== */
+.vendor-mode {
+  --color-brand: #0D9488;         /* Deep Teal */
+  --color-brand-light: #14B8A6;   /* Teal-500 */
+  --color-brand-dark: #0F766E;    /* Teal-700 */
+  --color-brand-50: #F0FDFA;      /* Teal-50 */
+  --color-brand-100: #CCFBF1;     /* Teal-100 */
+  --color-brand-200: #99F6E4;     /* Teal-200 */
+  --color-brand-glow: rgba(13, 148, 136, 0.25);
+  
+  --shadow-brand: 0 4px 20px rgba(13, 148, 136, 0.3);
+}
+
+.vendor-mode *:focus-visible {
+  outline: 2px solid var(--color-brand);
 }

@@ -9,6 +9,7 @@ import CategoryPage from './pages/CategoryPage';
 import VendorDetailPage from './pages/VendorDetailPage';
 import ProfilePage from './pages/ProfilePage';
 import SettingsPage from './pages/SettingsPage';
+import VendorRegisterPage from './pages/vendor/VendorRegisterPage';
 
 function AppRoutes() {
   return (
@@ -19,6 +20,7 @@ function AppRoutes() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/category/:slug" element={<CategoryPage />} />
         <Route path="/vendor/:vendorId" element={<VendorDetailPage />} />
+        <Route path="/vendor/register" element={<VendorRegisterPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

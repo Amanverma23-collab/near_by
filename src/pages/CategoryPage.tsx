@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, MapPin, Star, BadgeCheck, Phone, AlertCircle, Clock } from 'lucide-react';
 import { dummyVendors } from '../data/dummyVendors';
 import type { Vendor } from '../data/dummyVendors';
@@ -48,7 +48,10 @@ function SkeletonCard() {
 export default function CategoryPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const [selectedFilter, setSelectedFilter] = useState('All');
+  const location = useLocation();
+  const [selectedFilter, setSelectedFilter] = useState(() => {
+    return (location.state as { initialFilter?: string })?.initialFilter || 'All';
+  });
   const [isLoading, setIsLoading] = useState(true);
 
   const categoryName = categoryNames[slug || ''] || 'Services';
@@ -67,11 +70,16 @@ export default function CategoryPage() {
 
   useEffect(() => {
     setIsLoading(true);
+    if (location.state && (location.state as any).initialFilter) {
+      setSelectedFilter((location.state as any).initialFilter);
+    } else {
+      setSelectedFilter('All');
+    }
     const timer = setTimeout(() => {
       setIsLoading(false);
     }, 850); // Simulation loading time
     return () => clearTimeout(timer);
-  }, [slug]);
+  }, [slug, location.state]);
 
   // Motion Variants
   const listContainerVariants = {

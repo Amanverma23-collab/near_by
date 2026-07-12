@@ -2,434 +2,186 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
-  Car,
-  Home,
-  Heart,
-  ShoppingBag,
   Wrench,
+  Truck,
+  Disc,
+  Fuel,
+  Zap,
+  Droplet,
+  Wind,
+  Hammer,
+  Sparkles,
+  Store,
   Stethoscope,
+  Activity,
+  Pill,
+  Microscope,
+  Scissors,
+  ShoppingBag,
+  Bed,
   Coffee,
-  AlertTriangle,
+  Utensils,
+  Shirt,
   GraduationCap,
   BookOpen,
+  Home,
   MapPin,
   ChevronDown,
   LocateFixed,
 } from 'lucide-react';
-import type { ServiceCategory } from '../../types';
 import { useLocation } from '../../context/LocationContext';
 import CitySelector from '../location/CitySelector';
-import vehicleEmergencyImg from '../../assets/images/vehicle-emergency.png';
-import homeMaintenanceImg from '../../assets/images/home-maintenance.png';
-import vehicleEmergencyVideo from '../../assets/videos/vehicle-emergency-hover.mp4';
 
-const categoryImageMap: Record<string, string> = {
-  'vehicle-emergency': vehicleEmergencyImg,
-  'home-maintenance': homeMaintenanceImg,
-};
+interface ServiceInfo {
+  label: string;
+  dbValue: string;
+  icon: any;
+  imageUrl: string;
+}
 
-const getCategoryColor = (slug: string) => {
-  switch (slug) {
-    case 'vehicle-emergency': return '#FF6B35';
-    case 'home-maintenance': return '#0C9D61';
-    default: return '#FF6B35';
-  }
-};
+interface SectionInfo {
+  title: string;
+  slug: string;
+  gradient: string;
+  shadowColor: string;
+  color: string;
+  services: ServiceInfo[];
+}
 
-const categories: (ServiceCategory & { shadowColor: string })[] = [
+const serviceSections: SectionInfo[] = [
   {
-    id: '1',
-    slug: 'vehicle-emergency',
     title: 'Vehicle & Emergency',
-    description: 'Mechanic, Towing, Puncture, Fuel',
-    icon: 'car',
+    slug: 'vehicle-emergency',
     gradient: 'from-[#FF6B35] to-[#F7931E]',
-    shadowColor: 'rgba(255, 107, 53, 0.4)',
-    subServices: ['Mechanic', 'Towing', 'Puncture Repair', 'Fuel Delivery'],
+    shadowColor: 'rgba(255, 107, 53, 0.25)',
+    color: '#FF6B35',
+    services: [
+      { label: 'Mechanic', dbValue: 'Mechanic', icon: Wrench, imageUrl: 'https://images.unsplash.com/photo-1517524206127-48bbd363f3d7?auto=format&fit=crop&w=400&q=80' },
+      { label: 'Towing', dbValue: 'Towing', icon: Truck, imageUrl: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&w=400&q=80' },
+      { label: 'Puncture Repair', dbValue: 'Puncture Repair', icon: Disc, imageUrl: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=400&q=80' },
+      { label: 'Fuel Delivery', dbValue: 'Fuel Delivery', icon: Fuel, imageUrl: 'https://images.unsplash.com/photo-1527018601619-a508a2be00cd?auto=format&fit=crop&w=400&q=80' },
+    ]
   },
   {
-    id: '2',
-    slug: 'home-maintenance',
     title: 'Home Maintenance',
-    description: 'Electrician, Plumber, AC, Hardware',
-    icon: 'home',
+    slug: 'home-maintenance',
     gradient: 'from-[#0C9D61] to-[#2ECC71]',
-    shadowColor: 'rgba(12, 157, 97, 0.4)',
-    subServices: ['Electrician', 'Plumber', 'AC Repair', 'Carpenter', 'Cleaning', 'Hardware Shop'],
+    shadowColor: 'rgba(12, 157, 97, 0.25)',
+    color: '#0C9D61',
+    services: [
+      { label: 'Electrician', dbValue: 'Electrician', icon: Zap, imageUrl: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=400&q=80' },
+      { label: 'Plumber', dbValue: 'Plumber', icon: Droplet, imageUrl: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=400&q=80' },
+      { label: 'AC Repair', dbValue: 'AC Repair', icon: Wind, imageUrl: 'https://images.unsplash.com/photo-1621905251918-48416bd8575a?auto=format&fit=crop&w=400&q=80' },
+      { label: 'Carpenter', dbValue: 'Carpenter', icon: Hammer, imageUrl: 'https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?auto=format&fit=crop&w=400&q=80' },
+      { label: 'Cleaning', dbValue: 'Cleaning', icon: Sparkles, imageUrl: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=400&q=80' },
+      { label: 'Hardware Shop', dbValue: 'Hardware Shop', icon: Store, imageUrl: 'https://images.unsplash.com/photo-1513467535987-fd81bc7d62f8?auto=format&fit=crop&w=400&q=80' },
+    ]
   },
   {
-    id: '3',
-    slug: 'healthcare-wellness',
     title: 'Healthcare & Wellness',
-    description: 'Doctors, Clinics, Pharmacy, Salon',
-    icon: 'heart',
+    slug: 'healthcare-wellness',
     gradient: 'from-[#E74C3C] to-[#FF6B6B]',
-    shadowColor: 'rgba(231, 76, 60, 0.4)',
-    subServices: ['Doctors', 'Clinics', 'Pharmacy', 'Diagnostics', 'Salon'],
+    shadowColor: 'rgba(231, 76, 60, 0.25)',
+    color: '#E74C3C',
+    services: [
+      { label: 'Doctors', dbValue: 'Doctor', icon: Stethoscope, imageUrl: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=400&q=80' },
+      { label: 'Clinics', dbValue: 'Clinic', icon: Activity, imageUrl: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=400&q=80' },
+      { label: 'Pharmacy', dbValue: 'Pharmacy', icon: Pill, imageUrl: 'https://images.unsplash.com/photo-1586015555751-63bb77f4322a?auto=format&fit=crop&w=400&q=80' },
+      { label: 'Lab Tests', dbValue: 'Diagnostic Lab', icon: Microscope, imageUrl: 'https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop&w=400&q=80' },
+      { label: 'Salon', dbValue: 'Salon', icon: Scissors, imageUrl: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=400&q=80' },
+    ]
   },
   {
-    id: '4',
-    slug: 'daily-needs',
     title: 'Daily Needs & Hospitality',
-    description: 'Grocery, Hotel, Cafe, Clothing',
-    icon: 'shopping',
+    slug: 'daily-needs',
     gradient: 'from-[#8B5CF6] to-[#A78BFA]',
-    shadowColor: 'rgba(139, 92, 246, 0.4)',
-    subServices: ['Kirana Store', 'Restaurant', 'Hotel', 'Cafe', 'Clothing Shop', 'Grocery Store'],
+    shadowColor: 'rgba(139, 92, 246, 0.25)',
+    color: '#8B5CF6',
+    services: [
+      { label: 'Grocery/Kirana', dbValue: 'Kirana Store', icon: ShoppingBag, imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80' },
+      { label: 'Hotel', dbValue: 'Hotel', icon: Bed, imageUrl: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=400&q=80' },
+      { label: 'Cafe', dbValue: 'Cafe', icon: Coffee, imageUrl: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=400&q=80' },
+      { label: 'Restaurant', dbValue: 'Restaurant', icon: Utensils, imageUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=400&q=80' },
+      { label: 'Clothing Shop', dbValue: 'Clothing Shop', icon: Shirt, imageUrl: 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?auto=format&fit=crop&w=400&q=80' },
+    ]
   },
   {
-    id: '5',
-    slug: 'education-student',
     title: 'Education & Student Stay',
-    description: 'Coaching, Library, Mess, Hostel',
-    icon: 'education',
+    slug: 'education-student',
     gradient: 'from-[#1E40AF] to-[#3B82F6]',
-    shadowColor: 'rgba(30, 64, 175, 0.4)',
-    subServices: ['Coaching / Academy', 'Library', 'Mess', 'Hostel / PG'],
-  },
+    shadowColor: 'rgba(30, 64, 175, 0.25)',
+    color: '#1E40AF',
+    services: [
+      { label: 'Coaching/Academy', dbValue: 'Coaching / Academy', icon: GraduationCap, imageUrl: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=400&q=80' },
+      { label: 'Library', dbValue: 'Library', icon: BookOpen, imageUrl: 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=400&q=80' },
+      { label: 'Mess', dbValue: 'Mess', icon: Utensils, imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80' },
+      { label: 'Hostel/PG', dbValue: 'Hostel / PG', icon: Home, imageUrl: 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=400&q=80' },
+    ]
+  }
 ];
 
-const iconMap: Record<string, [any, any]> = {
-  car: [Car, AlertTriangle],
-  home: [Home, Wrench],
-  heart: [Heart, Stethoscope],
-  shopping: [ShoppingBag, Coffee],
-  education: [GraduationCap, BookOpen],
-};
-
-const containerVariants = {
-  hidden: {},
-  visible: {
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.3,
-    },
-  },
-};
-
-const cardVariants = {
-  hidden: { opacity: 0, y: 30, scale: 0.95 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      type: 'spring' as const,
-      stiffness: 200,
-      damping: 20,
-    },
-  },
-  hover: {
-    y: -4,
-    boxShadow: '0 12px 40px rgba(26, 26, 46, 0.15)',
-  },
-  tap: {
-    scale: 0.97
-  }
-};
-
-const badgeVariants = {
-  hover: {
-    scale: 1.1,
-    rotate: 4,
-    transition: { type: 'spring' as const, stiffness: 300, damping: 15 }
-  },
-  tap: {
-    scale: 0.95
-  }
-};
-
-interface CategoryCustomIconProps {
-  slug: string;
+interface ServiceTileProps {
+  categorySlug: string;
+  service: ServiceInfo;
+  gradient: string;
+  shadowColor: string;
+  categoryColor: string;
 }
 
-function CategoryCustomIcon({ slug }: CategoryCustomIconProps) {
-  if (slug === 'vehicle-emergency') {
-    return (
-      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-        {/* Car body */}
-        <path 
-          d="M19 13H5C3.34 13 2 14.34 2 16V18C2 18.55 2.45 19 3 19H4C4 17.9 4.9 17 6 17C7.1 17 8 17.9 8 19H16C16 17.9 16.9 17 18 17C19.1 17 20 17.9 20 19H21C21.55 19 22 18.55 22 18V16C22 14.34 20.66 13 19 13Z" 
-          fill="white" 
-        />
-        <path 
-          d="M5.5 12.5L7.8 7.3C8.3 6.2 9.4 5.5 10.6 5.5H13.4C14.6 5.5 15.7 6.2 16.2 7.3L18.5 12.5H5.5Z" 
-          fill="white" 
-        />
-        {/* Windshield inner accent - Light Orange */}
-        <path 
-          d="M7.8 7.5L6.2 11.5H17.8L16.2 7.5C15.9 6.8 15.2 6.3 14.4 6.3H9.6C8.8 6.3 8.1 6.8 7.8 7.5Z" 
-          fill="#FFEBE0" 
-          opacity="0.85"
-        />
-        {/* Headlights */}
-        <circle cx="4.5" cy="15.5" r="0.75" fill="#FFEBE0" />
-        <circle cx="19.5" cy="15.5" r="0.75" fill="#FFEBE0" />
-        {/* Wheels */}
-        <circle cx="6" cy="19" r="2.2" fill="white" />
-        <circle cx="6" cy="19" r="0.8" fill="#FF6B35" />
-        <circle cx="18" cy="19" r="2.2" fill="white" />
-        <circle cx="18" cy="19" r="0.8" fill="#FF6B35" />
-      </svg>
-    );
-  }
+function ServiceTile({ categorySlug, service, gradient, shadowColor, categoryColor }: ServiceTileProps) {
+  const navigate = useNavigate();
 
-  if (slug === 'home-maintenance') {
-    return (
-      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-        {/* Roof */}
-        <path 
-          d="M2.5 11.5L11.2 3.8C11.6 3.4 12.4 3.4 12.8 3.8L21.5 11.5L19.8 12.8L12 5.9L4.2 12.8L2.5 11.5Z" 
-          fill="white" 
-        />
-        {/* Walls */}
-        <path 
-          d="M5 11.5V19.5C5 20.33 5.67 21 6.5 21H17.5C18.33 21 19 20.33 19 19.5V11.5H5Z" 
-          fill="white" 
-        />
-        {/* Window - Light Green */}
-        <rect x="7.5" y="13" width="3.5" height="3.5" rx="0.5" fill="#E6FAF0" opacity="0.9" />
-        <rect x="13" y="13" width="3.5" height="3.5" rx="0.5" fill="#E6FAF0" opacity="0.9" />
-        {/* Door - Light Green */}
-        <path d="M10 18H14V21H10V18Z" fill="#E6FAF0" opacity="0.9" />
-      </svg>
-    );
-  }
-
-  if (slug === 'healthcare-wellness') {
-    return (
-      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-        {/* Heart Outer Body */}
-        <path 
-          d="M12 21.35L10.55 20.03C5.4 15.36 2 12.28 2 8.5C2 5.42 4.42 3 7.5 3C9.24 3 10.91 3.81 12 5.09C13.09 3.81 14.76 3 16.5 3C19.58 3 22 5.42 22 8.5C22 12.28 18.6 15.36 13.45 20.03L12 21.35Z" 
-          fill="white" 
-        />
-        {/* Medical Cross Accent - Light Pink */}
-        <path 
-          d="M10.5 8.5H13.5V11H16V13.5H13.5V16H10.5V13.5H8V11H10.5V8.5Z" 
-          fill="#FFEBEB" 
-          opacity="0.9"
-        />
-      </svg>
-    );
-  }
-
-  if (slug === 'daily-needs') {
-    return (
-      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-        {/* Basket Handles */}
-        <path 
-          d="M9 10C9 6.5 10.3 4 12 4C13.7 4 15 6.5 15 10" 
-          stroke="white" 
-          strokeWidth="2" 
-          strokeLinecap="round" 
-        />
-        {/* Basket Body */}
-        <path 
-          d="M19 10H5C3.9 10 3 10.9 3 12V17C3 18.1 3.9 19 5 19H19C20.1 19 21 18.1 21 17V12C21 10.9 20.1 10 19 10Z" 
-          fill="white" 
-        />
-        {/* Inside/Detail Pattern - Light Purple */}
-        <rect x="6" y="12" width="12" height="2" rx="0.5" fill="#F3EFFF" opacity="0.9" />
-        <rect x="6" y="15" width="12" height="2" rx="0.5" fill="#F3EFFF" opacity="0.9" />
-      </svg>
-    );
-  }
-
-  if (slug === 'education-student') {
-    return (
-      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-        {/* Graduation cap */}
-        <path
-          d="M12 3L1 9L5 11.18V17.18L12 21L19 17.18V11.18L21 10.09V17H23V9L12 3Z"
-          fill="white"
-        />
-        {/* Tassel accent - Light Blue */}
-        <path
-          d="M12 3L1 9L12 15L21 10.09V9L12 3Z"
-          fill="white"
-        />
-        <path
-          d="M7 12.5V17L12 19.5L17 17V12.5L12 15L7 12.5Z"
-          fill="#DBEAFE"
-          opacity="0.9"
-        />
-      </svg>
-    );
-  }
-
-  return null;
-}
-
-interface CategoryCardProps {
-  category: ServiceCategory & { shadowColor: string; gradient: string };
-  SecondaryIcon: any;
-  onClick: () => void;
-}
-
-function CategoryCard({ category, SecondaryIcon, onClick }: CategoryCardProps) {
-  const customImg = categoryImageMap[category.slug];
-  const categoryColor = getCategoryColor(category.slug);
-  
-  const isVehicleEmergency = category.slug === 'vehicle-emergency';
-  const [hasHovered, setHasHovered] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
-  const [canHover, setCanHover] = useState(false);
-  const [videoReady, setVideoReady] = useState(false);
-
-  useEffect(() => {
-    // Only enable hover video for devices capable of real hover interaction
-    const mediaQuery = window.matchMedia('(hover: hover) and (pointer: fine)');
-    setCanHover(mediaQuery.matches);
-    
-    const listener = (e: MediaQueryListEvent) => setCanHover(e.matches);
-    mediaQuery.addEventListener('change', listener);
-    return () => mediaQuery.removeEventListener('change', listener);
-  }, []);
-
-  const handleMouseEnter = () => {
-    if (isVehicleEmergency && canHover) {
-      setIsHovered(true);
-      setHasHovered(true);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    if (isVehicleEmergency) {
-      setIsHovered(false);
-    }
+  const handleClick = () => {
+    navigate(`/category/${categorySlug}`, {
+      state: { initialFilter: service.dbValue }
+    });
   };
 
   return (
-    <motion.button
-      variants={cardVariants}
-      whileHover="hover"
-      whileTap="tap"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onClick={onClick}
-      className="relative overflow-hidden bg-surface-card rounded-[var(--radius-lg)] p-5 text-left border border-border-light shadow-card transition-shadow group flex flex-col justify-between min-h-[160px]"
+    <motion.div 
+      onClick={handleClick}
+      whileHover={{ scale: 1.04, y: -2 }}
+      whileTap={{ scale: 0.98 }}
+      style={{ 
+        borderColor: `${categoryColor}25`,
+        boxShadow: `0 4px 12px rgba(26, 26, 46, 0.04)`
+      }}
+      className="relative overflow-hidden bg-surface-card rounded-[18px] text-left border shadow-sm transition-all duration-300 group flex flex-col justify-end w-[145px] h-[115px] sm:w-[155px] sm:h-[125px] shrink-0 cursor-pointer select-none"
     >
-      {customImg ? (
-        <>
-          {/* Background image covering the card */}
-          <div 
-            className="absolute inset-0 bg-cover bg-no-repeat transition-transform duration-500 group-hover:scale-105"
-            style={{ 
-              backgroundImage: `url(${customImg})`,
-              backgroundPosition: 'right -10px center'
-            }}
-          />
-          
-          {/* Hover video element (lazy-loaded on first hover, desktop only) */}
-          {isVehicleEmergency && hasHovered && canHover && (
-            <video
-              src={vehicleEmergencyVideo}
-              muted
-              loop
-              playsInline
-              preload="auto"
-              onCanPlay={() => setVideoReady(true)}
-              className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 z-0 pointer-events-none group-hover:scale-105"
-              style={{ 
-                objectPosition: 'right -10px center',
-                opacity: isHovered && videoReady ? 1 : 0
-              }}
-              ref={(el) => {
-                if (el) {
-                  if (isHovered) {
-                    el.play().catch(() => {});
-                  } else {
-                    el.pause();
-                  }
-                }
-              }}
-            />
-          )}
-          
-          {/* Gradient overlay to make text highly readable */}
-          <div className="absolute inset-0 bg-gradient-to-r from-white via-white/90 to-white/30 z-10" />
-          
-          {/* Card Content */}
-          <div className="relative z-20 flex flex-col h-full justify-between w-full">
-            <div>
-              <h3 className="text-sm font-display font-extrabold text-ink mb-1 leading-tight">
-                {category.title}
-              </h3>
-              <p className="text-xs text-ink-muted font-body leading-relaxed max-w-[70%]">
-                {category.description}
-              </p>
-            </div>
-            
-            {/* Sub-services pills */}
-            <div className="flex flex-wrap gap-1 mt-3">
-              {category.subServices.slice(0, 3).map((service) => (
-                <span
-                  key={service}
-                  className="px-2 py-0.5 text-[9px] font-body font-bold bg-white/95 rounded-[var(--radius-pill)] border shadow-sm"
-                  style={{
-                    color: categoryColor,
-                    borderColor: `${categoryColor}33`
-                  }}
-                >
-                  {service}
-                </span>
-              ))}
-            </div>
-          </div>
-        </>
-      ) : (
-        <>
-          {/* Background gradient accent */}
-          <div
-            className={`absolute -top-10 -right-10 w-24 h-24 rounded-full bg-gradient-to-br ${category.gradient} opacity-10 group-hover:opacity-20 transition-opacity duration-300`}
-          />
+      {/* Full-Cover Background Image */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+        style={{ backgroundImage: `url(${service.imageUrl})` }}
+      />
+      
+      {/* Bottom vertical gradient scrim for text readability */}
+      <div className="absolute inset-x-0 bottom-0 h-[65%] bg-gradient-to-t from-white via-white/80 to-transparent z-10 pointer-events-none" />
 
-          {/* Icons */}
-          <div className="relative flex items-center gap-2 mb-4">
-            <motion.div
-              variants={badgeVariants}
-              style={{
-                boxShadow: `0 6px 18px -2px ${category.shadowColor}`,
-              }}
-              className={`w-11 h-11 rounded-[var(--radius-md)] bg-gradient-to-br ${category.gradient} flex items-center justify-center`}
-            >
-              <CategoryCustomIcon slug={category.slug} />
-            </motion.div>
-            <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-surface border border-border-light flex items-center justify-center -ml-3 relative z-10">
-              <SecondaryIcon size={14} className="text-ink-muted" />
-            </div>
-          </div>
-
-          {/* Text */}
-          <h3 className="text-sm font-display font-bold text-ink mb-1 leading-tight">
-            {category.title}
-          </h3>
-          <p className="text-xs text-ink-muted font-body leading-relaxed">
-            {category.description}
-          </p>
-
-          {/* Sub-services pills */}
-          <div className="flex flex-wrap gap-1 mt-3">
-            {category.subServices.slice(0, 3).map((service) => (
-              <span
-                key={service}
-                className="px-2 py-0.5 text-[10px] font-body font-medium bg-surface rounded-[var(--radius-pill)] text-ink-muted border border-border-light"
-              >
-                {service}
-              </span>
-            ))}
-            {category.subServices.length > 3 && (
-              <span className="px-2 py-0.5 text-[10px] font-body font-medium text-brand">
-                +{category.subServices.length - 3} more
-              </span>
-            )}
-          </div>
-        </>
-      )}
-    </motion.button>
+      {/* Label and category dot at bottom */}
+      <div className="relative z-20 px-3 pb-2.5 pt-4">
+        <div className="flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: categoryColor }} />
+          <span className="text-[11px] sm:text-xs font-display font-extrabold text-ink leading-tight line-clamp-2">
+            {service.label}
+          </span>
+        </div>
+      </div>
+    </motion.div>
   );
 }
+
+const sectionVariants = {
+  hidden: { opacity: 0, y: 25 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: {
+      type: 'spring' as const,
+      stiffness: 100,
+      damping: 15
+    }
+  }
+};
 
 export default function CategoryGrid() {
   const navigate = useNavigate();
@@ -501,28 +253,45 @@ export default function CategoryGrid() {
           </div>
         </motion.div>
 
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="grid grid-cols-2 gap-4 [&>*:last-child:nth-child(odd)]:col-span-2 [&>*:last-child:nth-child(odd)]:sm:col-span-1 sm:grid-cols-3"
-        >
-          {categories.map((category) => {
-            const [, SecondaryIcon] = iconMap[category.icon] || [
-              null,
-              Wrench,
-            ];
+        <div className="space-y-8 mt-6">
+          {serviceSections.map((section) => (
+            <motion.div
+              variants={sectionVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-80px" }}
+              className="border-b border-border-light pb-8 last:border-0 last:pb-0"
+              key={section.slug}
+            >
+              {/* Section Header */}
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm sm:text-base font-display font-extrabold text-ink">
+                  {section.title}
+                </h3>
+                <button 
+                  onClick={() => navigate(`/category/${section.slug}`)}
+                  className="text-[11px] font-display font-bold text-brand hover:underline cursor-pointer"
+                >
+                  See All
+                </button>
+              </div>
 
-            return (
-              <CategoryCard
-                key={category.id}
-                category={category}
-                SecondaryIcon={SecondaryIcon}
-                onClick={() => navigate(`/category/${category.slug}`)}
-              />
-            );
-          })}
-        </motion.div>
+              {/* Scrollable Row / Grid Container */}
+              <div className="flex overflow-x-auto gap-4 pb-3 px-1 scrollbar-none sm:grid sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 sm:gap-6 sm:pb-0">
+                {section.services.map((service) => (
+                  <ServiceTile
+                    key={service.label}
+                    categorySlug={section.slug}
+                    service={service}
+                    gradient={section.gradient}
+                    shadowColor={section.shadowColor}
+                    categoryColor={section.color}
+                  />
+                ))}
+              </div>
+            </motion.div>
+          ))}
+        </div>
       </section>
 
       {/* City Change Modal */}

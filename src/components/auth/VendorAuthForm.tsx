@@ -72,7 +72,7 @@ export default function VendorAuthForm() {
       const { data: existingVendor, error: checkError } = await supabase
         .from('vendors')
         .select('id')
-        .eq('mobile_number', mobile)
+        .eq('phone_number', mobile)
         .maybeSingle();
 
       if (checkError) throw checkError;
@@ -95,13 +95,20 @@ export default function VendorAuthForm() {
       const user = signUpData.user;
       if (!user) throw new Error('User registration failed');
 
-      // 3. Insert vendor record
+      // 3. Insert vendor record with matching database columns and required defaults
       const { error: insertError } = await supabase.from('vendors').insert({
         auth_user_id: user.id,
-        full_name: fullName.trim(),
-        email: email.trim() || null,
-        mobile_number: mobile,
-        verification_status: 'pending',
+        owner_name: fullName.trim(),
+        phone_number: mobile,
+        name: 'Pending Shop Registration',
+        category: 'pending',
+        sub_service: 'pending',
+        address: 'Pending Shop Registration',
+        opening_hours: 'pending',
+        whatsapp_number: mobile,
+        latitude: 0,
+        longitude: 0,
+        is_verified: false
       });
 
       if (insertError) throw insertError;
