@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -97,28 +98,76 @@ const CATEGORIES = [
 ];
 
 // Helper to create a custom brand-matching teal pin marker
-const createTealMarkerIcon = () => {
-  const svgHtml = `
+const customPinIcon = L.divIcon({
+  html: `
     <div class="relative flex items-center justify-center">
-      <div class="absolute -top-10 flex flex-col items-center">
+      <div class="absolute -top-[38px] flex flex-col items-center">
         <!-- Pin Body -->
-        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white border-2 border-white shadow-lg" style="background-color: #0D9488;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+        <div class="w-9 h-9 rounded-full flex items-center justify-center text-white border-2 border-white shadow-lg" style="background-color: #0D9488;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
         </div>
         <!-- Pin Tip -->
-        <div class="w-2.5 h-2.5 rotate-45 -mt-1.5 border-r border-b border-white shadow-[1px_1px_1px_rgba(0,0,0,0.15)]" style="background-color: #0D9488;"></div>
+        <div class="w-3 h-3 rotate-45 -mt-[7px] border-r border-b border-white shadow-[1px_1px_1px_rgba(0,0,0,0.15)]" style="background-color: #0D9488;"></div>
         <!-- Ground Glow Pulse Shadow -->
-        <div class="w-5 h-2.5 bg-black/20 rounded-full blur-[1px] mt-1"></div>
+        <div class="w-5 h-2.5 bg-black/20 rounded-full blur-[1.5px] mt-[3px]"></div>
       </div>
     </div>
-  `;
-  return L.divIcon({
-    html: svgHtml,
-    className: 'custom-teal-pin',
-    iconSize: [32, 42],
-    iconAnchor: [16, 42],
-  });
-};
+  `,
+  className: 'custom-map-pin',
+  iconSize: [36, 36],
+  iconAnchor: [18, 36],
+});
+
+// React Leaflet Re-centering helper
+function MapRecenter({ lat, lng }: { lat: number; lng: number }) {
+  const map = useMap();
+  useEffect(() => {
+    map.invalidateSize();
+    map.setView([lat, lng], map.getZoom());
+    
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 450);
+    
+    return () => clearTimeout(timer);
+  }, [lat, lng, map]);
+  return null;
+}
+
+// React Leaflet Draggable Marker Component
+function DraggableMarker({
+  lat,
+  lng,
+  onPositionChange,
+  icon
+}: {
+  lat: number;
+  lng: number;
+  onPositionChange: (lat: number, lng: number) => void;
+  icon: L.DivIcon;
+}) {
+  const markerRef = useRef<L.Marker | null>(null);
+  
+  const eventHandlers = useState(() => ({
+    dragend() {
+      const marker = markerRef.current;
+      if (marker != null) {
+        const pos = marker.getLatLng();
+        onPositionChange(pos.lat, pos.lng);
+      }
+    },
+  }))[0];
+
+  return (
+    <Marker
+      draggable={true}
+      eventHandlers={eventHandlers}
+      position={[lat, lng]}
+      icon={icon}
+      ref={markerRef}
+    />
+  );
+}
 
 export default function VendorRegisterPage() {
   const navigate = useNavigate();
@@ -137,8 +186,8 @@ export default function VendorRegisterPage() {
     mobileNumber: '',
     homeAddress: '',
     shopName: '',
-    latitude: 12.9716,
-    longitude: 77.5946,
+    latitude: 27.6094,
+    longitude: 75.1398,
     shopAddress: '',
     shopPhoto: null,
     shopCategory: '',
@@ -164,9 +213,6 @@ export default function VendorRegisterPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Map references
-  const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<any>(null);
-  const markerRef = useRef<any>(null);
   const debounceTimerRef = useRef<any>(null);
 
   // OTP inputs ref for auto-focus
@@ -201,10 +247,9 @@ export default function VendorRegisterPage() {
     fetchVendorData();
   }, [user]);
 
-  // Request GPS permission and center location
+  // Request GPS permission and center location (Fallback to Sikar, Rajasthan: 27.6094, 75.1398)
   useEffect(() => {
     if (activeStep === 2) {
-      // Re-trigger location query
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
@@ -214,70 +259,18 @@ export default function VendorRegisterPage() {
               latitude,
               longitude
             }));
-            
-            if (mapRef.current && markerRef.current) {
-              mapRef.current.setView([latitude, longitude], 15);
-              markerRef.current.setLatLng([latitude, longitude]);
-              handleMarkerPositionChange(latitude, longitude);
-            }
+            handleMarkerPositionChange(latitude, longitude);
           },
           (error) => {
             console.warn('Geolocation permission error:', error);
-            // Default center is already Bangalore, so it's fine
+            // Default center is already Sikar, Rajasthan, so it's fine
             handleMarkerPositionChange(wizardData.latitude, wizardData.longitude);
           }
         );
+      } else {
+        handleMarkerPositionChange(wizardData.latitude, wizardData.longitude);
       }
     }
-  }, [activeStep]);
-
-  // Initialize Leaflet Map
-  useEffect(() => {
-    if (!mapContainerRef.current || activeStep !== 2) return;
-
-    if (!mapRef.current) {
-      const initialLat = wizardData.latitude;
-      const initialLon = wizardData.longitude;
-
-      const map = L.map(mapContainerRef.current, { zoomControl: false }).setView([initialLat, initialLon], 15);
-      mapRef.current = map;
-
-      L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap'
-      }).addTo(map);
-
-      const marker = L.marker([initialLat, initialLon], { 
-        draggable: true,
-        icon: createTealMarkerIcon()
-      }).addTo(map);
-      markerRef.current = marker;
-
-      marker.on('dragend', () => {
-        const pos = marker.getLatLng();
-        handleMarkerPositionChange(pos.lat, pos.lng);
-      });
-
-      // Initial reverse geocode
-      reverseGeocode(initialLat, initialLon);
-
-      // Force size invalidation after slide animation completes
-      setTimeout(() => {
-        if (mapRef.current) {
-          mapRef.current.invalidateSize();
-        }
-      }, 400);
-    }
-
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-        markerRef.current = null;
-      }
-    };
   }, [activeStep]);
 
   // Handle OTP Timer countdown
@@ -319,11 +312,12 @@ export default function VendorRegisterPage() {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((position) => {
         const { latitude, longitude } = position.coords;
-        if (mapRef.current && markerRef.current) {
-          mapRef.current.setView([latitude, longitude], 15);
-          markerRef.current.setLatLng([latitude, longitude]);
-          handleMarkerPositionChange(latitude, longitude);
-        }
+        setWizardData(prev => ({
+          ...prev,
+          latitude,
+          longitude
+        }));
+        handleMarkerPositionChange(latitude, longitude);
       });
     }
   };
@@ -1024,14 +1018,31 @@ export default function VendorRegisterPage() {
                   </span>
                   
                   {/* Leaflet container */}
-                  <div className="relative w-full rounded-2xl overflow-hidden border border-border-light/80 bg-zinc-100 shadow-inner z-10" style={{ height: '280px' }}>
-                    <div ref={mapContainerRef} className="w-full h-full" style={{ height: '280px' }} />
+                  <div className="relative w-full rounded-[20px] overflow-hidden border border-border-light/80 bg-zinc-100 shadow-inner z-10" style={{ height: '280px' }}>
+                    <MapContainer
+                      center={[wizardData.latitude, wizardData.longitude]}
+                      zoom={15}
+                      zoomControl={false}
+                      style={{ height: '280px', width: '100%' }}
+                    >
+                      <TileLayer
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      />
+                      <DraggableMarker
+                        lat={wizardData.latitude}
+                        lng={wizardData.longitude}
+                        onPositionChange={handleMarkerPositionChange}
+                        icon={customPinIcon}
+                      />
+                      <MapRecenter lat={wizardData.latitude} lng={wizardData.longitude} />
+                    </MapContainer>
                     
                     {/* Floating GPS Button */}
                     <button
                       type="button"
                       onClick={useCurrentLocation}
-                      className="absolute top-3 right-3 z-20 p-2 bg-white hover:bg-surface rounded-xl border border-border shadow-md cursor-pointer text-brand hover:text-brand-dark transition-colors flex items-center justify-center"
+                      className="absolute top-3 right-3 z-[400] p-2 bg-white hover:bg-surface rounded-xl border border-border shadow-md cursor-pointer text-brand hover:text-brand-dark transition-colors flex items-center justify-center"
                       title="Use My Current Location"
                     >
                       <Navigation size={14} fill="currentColor" />
