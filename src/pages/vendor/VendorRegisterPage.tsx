@@ -16,6 +16,8 @@ import {
   Plus,
   Trash2
 } from 'lucide-react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -94,35 +96,33 @@ const CATEGORIES = [
   }
 ];
 
-// Custom Hook to load Leaflet dynamically
-function useLeaflet() {
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    if ((window as any).L) {
-      setLoaded(true);
-      return;
-    }
-
-    const cssLink = document.createElement('link');
-    cssLink.rel = 'stylesheet';
-    cssLink.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    document.head.appendChild(cssLink);
-
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.async = true;
-    script.onload = () => setLoaded(true);
-    document.body.appendChild(script);
-  }, []);
-
-  return loaded;
-}
+// Helper to create a custom brand-matching teal pin marker
+const createTealMarkerIcon = () => {
+  const svgHtml = `
+    <div class="relative flex items-center justify-center">
+      <div class="absolute -top-10 flex flex-col items-center">
+        <!-- Pin Body -->
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white border-2 border-white shadow-lg" style="background-color: #0D9488;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+        </div>
+        <!-- Pin Tip -->
+        <div class="w-2.5 h-2.5 rotate-45 -mt-1.5 border-r border-b border-white shadow-[1px_1px_1px_rgba(0,0,0,0.15)]" style="background-color: #0D9488;"></div>
+        <!-- Ground Glow Pulse Shadow -->
+        <div class="w-5 h-2.5 bg-black/20 rounded-full blur-[1px] mt-1"></div>
+      </div>
+    </div>
+  `;
+  return L.divIcon({
+    html: svgHtml,
+    className: 'custom-teal-pin',
+    iconSize: [32, 42],
+    iconAnchor: [16, 42],
+  });
+};
 
 export default function VendorRegisterPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const leafletLoaded = useLeaflet();
 
   // Wizard state
   const [activeStep, setActiveStep] = useState(1);
@@ -233,19 +233,9 @@ export default function VendorRegisterPage() {
 
   // Initialize Leaflet Map
   useEffect(() => {
-    if (!leafletLoaded || !mapContainerRef.current || activeStep !== 2) return;
+    if (!mapContainerRef.current || activeStep !== 2) return;
 
     if (!mapRef.current) {
-      const L = (window as any).L;
-      
-      // Fix default Leaflet icon paths
-      delete L.Icon.Default.prototype._getIconUrl;
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-      });
-
       const initialLat = wizardData.latitude;
       const initialLon = wizardData.longitude;
 
@@ -259,7 +249,10 @@ export default function VendorRegisterPage() {
         attribution: '© OpenStreetMap'
       }).addTo(map);
 
-      const marker = L.marker([initialLat, initialLon], { draggable: true }).addTo(map);
+      const marker = L.marker([initialLat, initialLon], { 
+        draggable: true,
+        icon: createTealMarkerIcon()
+      }).addTo(map);
       markerRef.current = marker;
 
       marker.on('dragend', () => {
@@ -278,7 +271,7 @@ export default function VendorRegisterPage() {
         markerRef.current = null;
       }
     };
-  }, [leafletLoaded, activeStep]);
+  }, [activeStep]);
 
   // Handle OTP Timer countdown
   useEffect(() => {
@@ -1024,24 +1017,17 @@ export default function VendorRegisterPage() {
                   </span>
                   
                   {/* Leaflet container */}
-                  <div className="relative h-60 w-full rounded-2xl overflow-hidden border border-border-light/80 bg-zinc-100 shadow-inner z-10">
-                    {!leafletLoaded ? (
-                      <div className="absolute inset-0 flex items-center justify-center flex-col gap-2">
-                        <Loader2 className="animate-spin text-brand" />
-                        <span className="text-xs text-ink-muted font-body">Loading map modules...</span>
-                      </div>
-                    ) : (
-                      <div ref={mapContainerRef} className="w-full h-full" />
-                    )}
+                  <div className="relative w-full rounded-2xl overflow-hidden border border-border-light/80 bg-zinc-100 shadow-inner z-10" style={{ height: '280px' }}>
+                    <div ref={mapContainerRef} className="w-full h-full" style={{ height: '280px' }} />
                     
                     {/* Floating GPS Button */}
                     <button
                       type="button"
                       onClick={useCurrentLocation}
-                      className="absolute top-3 right-3 z-20 p-2.5 bg-white hover:bg-surface rounded-xl border border-border shadow-md cursor-pointer text-brand hover:text-brand-dark transition-colors flex items-center justify-center"
+                      className="absolute top-3 right-3 z-20 p-2 bg-white hover:bg-surface rounded-xl border border-border shadow-md cursor-pointer text-brand hover:text-brand-dark transition-colors flex items-center justify-center"
                       title="Use My Current Location"
                     >
-                      <Navigation size={16} fill="currentColor" />
+                      <Navigation size={14} fill="currentColor" />
                     </button>
                   </div>
 
