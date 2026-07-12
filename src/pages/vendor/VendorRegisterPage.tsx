@@ -540,13 +540,13 @@ export default function VendorRegisterPage() {
       const selfieBlob = base64ToBlob(wizardData.ownerPhoto!);
       const shopBlob = base64ToBlob(wizardData.shopPhoto!);
 
-      // 2. Upload to Supabase Storage
-      const selfiePath = `owner-selfies/${user.id}-${Date.now()}.jpg`;
-      const shopPath = `shop-fronts/${user.id}-${Date.now()}.jpg`;
+      // 2. Upload to Supabase Storage (structured under user.id folder for RLS policy compliance)
+      const selfiePath = `${user.id}/selfie-${Date.now()}.jpg`;
+      const shopPath = `${user.id}/shop-front-${Date.now()}.jpg`;
 
       // Try creating bucket in case it doesn't exist
       try {
-        await supabase.storage.createBucket('vendor-verification-photos', { public: true });
+        await supabase.storage.createBucket('vendor-verification-photos', { public: false });
       } catch (bucketErr) {
         console.log('Bucket may already exist:', bucketErr);
       }

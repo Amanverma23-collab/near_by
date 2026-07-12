@@ -144,3 +144,22 @@ INSERT INTO public.vendors (
     '[{"id": "r1", "reviewerName": "Aman S.", "rating": 5, "comment": "Sharma sir explains concepts clearly.", "daysAgo": 2}]'::jsonb,
     134
 );
+
+-- Storage Configuration for Verification Photos
+insert into storage.buckets (id, name, public)
+values ('vendor-verification-photos', 'vendor-verification-photos', false)
+on conflict (id) do nothing;
+
+create policy "Vendors can upload their own verification photos"
+on storage.objects for insert
+with check (
+  bucket_id = 'vendor-verification-photos' 
+  and auth.uid()::text = (storage.foldername(name))[1]
+);
+
+create policy "Vendors can view their own verification photos"
+on storage.objects for select
+using (
+  bucket_id = 'vendor-verification-photos' 
+  and auth.uid()::text = (storage.foldername(name))[1]
+);
