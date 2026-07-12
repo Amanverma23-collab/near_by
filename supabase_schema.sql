@@ -146,6 +146,9 @@ INSERT INTO public.vendors (
 );
 
 -- Storage Configuration for Verification Photos
+drop policy if exists "Vendors can upload their own verification photos" on storage.objects;
+drop policy if exists "Vendors can view their own verification photos" on storage.objects;
+
 insert into storage.buckets (id, name, public)
 values ('vendor-verification-photos', 'vendor-verification-photos', false)
 on conflict (id) do nothing;
