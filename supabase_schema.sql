@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS public.vendors (
     services_offered JSONB DEFAULT '[]', -- JSON array of {name, price}
     reviews JSONB DEFAULT '[]',          -- JSON array of {id, reviewerName, rating, comment, daysAgo}
     review_count INTEGER DEFAULT 0,
+    verification_requested_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

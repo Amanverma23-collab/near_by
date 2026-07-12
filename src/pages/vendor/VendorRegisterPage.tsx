@@ -10,29 +10,125 @@ import {
   X, 
   Loader2, 
   CheckCircle2, 
-  RefreshCw 
+  RefreshCw, 
+  MapPin, 
+  Navigation,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+
+interface ServiceItem {
+  name: string;
+  price: string;
+}
 
 interface WizardData {
   ownerPhoto: string | null;
   fullName: string;
   mobileNumber: string;
   homeAddress: string;
-  // Step 2 placeholder data
-  shopName?: string;
-  shopCategory?: string;
+  // Step 2
+  shopName: string;
+  latitude: number;
+  longitude: number;
+  shopAddress: string;
+  shopPhoto: string | null;
+  shopCategory: string;
+  subServices: string[];
+  servicesList: ServiceItem[];
+}
+
+// Category Configuration with Customer-side colors
+const CATEGORIES = [
+  {
+    id: 'vehicle-emergency',
+    name: 'Vehicle & Emergency',
+    color: 'orange',
+    themeClass: 'border-orange-500 bg-orange-50/50 text-orange-600',
+    selectedBg: 'bg-orange-500/10',
+    selectedBorder: 'border-orange-500',
+    badgeBg: 'bg-orange-500',
+    subServicesList: ['Mechanic', 'Towing', 'Puncture Repair', 'Fuel Delivery']
+  },
+  {
+    id: 'home-maintenance',
+    name: 'Home Maintenance',
+    color: 'emerald',
+    themeClass: 'border-emerald-500 bg-emerald-50/50 text-emerald-600',
+    selectedBg: 'bg-emerald-500/10',
+    selectedBorder: 'border-emerald-500',
+    badgeBg: 'bg-emerald-500',
+    subServicesList: ['Electrician', 'Plumber', 'AC Repair', 'Carpenter', 'Cleaning', 'Hardware Shop']
+  },
+  {
+    id: 'healthcare-wellness',
+    name: 'Healthcare & Wellness',
+    color: 'rose',
+    themeClass: 'border-rose-500 bg-rose-50/50 text-rose-600',
+    selectedBg: 'bg-rose-500/10',
+    selectedBorder: 'border-rose-500',
+    badgeBg: 'bg-rose-500',
+    subServicesList: ['Doctors', 'Clinics', 'Pharmacy', 'Lab Tests']
+  },
+  {
+    id: 'daily-needs',
+    name: 'Daily Needs & Hospitality',
+    color: 'purple',
+    themeClass: 'border-purple-500 bg-purple-50/50 text-purple-600',
+    selectedBg: 'bg-purple-500/10',
+    selectedBorder: 'border-purple-500',
+    badgeBg: 'bg-purple-500',
+    subServicesList: ['Laundry', 'Tiffin / Mess', 'PG / Hostel', 'Grocery', 'Restaurant']
+  },
+  {
+    id: 'education-student',
+    name: 'Education & Student Stay',
+    color: 'blue',
+    themeClass: 'border-blue-500 bg-blue-50/50 text-blue-600',
+    selectedBg: 'bg-blue-500/10',
+    selectedBorder: 'border-blue-500',
+    badgeBg: 'bg-blue-500',
+    subServicesList: ['Library', 'Coaching / Academy', 'Stationary', 'Book Store', 'Cyber Cafe']
+  }
+];
+
+// Custom Hook to load Leaflet dynamically
+function useLeaflet() {
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if ((window as any).L) {
+      setLoaded(true);
+      return;
+    }
+
+    const cssLink = document.createElement('link');
+    cssLink.rel = 'stylesheet';
+    cssLink.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(cssLink);
+
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.async = true;
+    script.onload = () => setLoaded(true);
+    document.body.appendChild(script);
+  }, []);
+
+  return loaded;
 }
 
 export default function VendorRegisterPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const leafletLoaded = useLeaflet();
 
   // Wizard state
   const [activeStep, setActiveStep] = useState(1);
   const [direction, setDirection] = useState(1); // 1 = forward, -1 = backward
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   // Form states
   const [wizardData, setWizardData] = useState<WizardData>({
@@ -40,6 +136,14 @@ export default function VendorRegisterPage() {
     fullName: '',
     mobileNumber: '',
     homeAddress: '',
+    shopName: '',
+    latitude: 12.9716,
+    longitude: 77.5946,
+    shopAddress: '',
+    shopPhoto: null,
+    shopCategory: '',
+    subServices: [],
+    servicesList: [{ name: '', price: '' }],
   });
 
   // Mobile change states
@@ -54,9 +158,16 @@ export default function VendorRegisterPage() {
 
   // Camera states
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [cameraMode, setCameraMode] = useState<'owner' | 'shop'>('owner');
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState('');
   const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Map references
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
+  const debounceTimerRef = useRef<any>(null);
 
   // OTP inputs ref for auto-focus
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -90,6 +201,85 @@ export default function VendorRegisterPage() {
     fetchVendorData();
   }, [user]);
 
+  // Request GPS permission and center location
+  useEffect(() => {
+    if (activeStep === 2) {
+      // Re-trigger location query
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            setWizardData(prev => ({
+              ...prev,
+              latitude,
+              longitude
+            }));
+            
+            if (mapRef.current && markerRef.current) {
+              mapRef.current.setView([latitude, longitude], 15);
+              markerRef.current.setLatLng([latitude, longitude]);
+              handleMarkerPositionChange(latitude, longitude);
+            }
+          },
+          (error) => {
+            console.warn('Geolocation permission error:', error);
+            // Default center is already Bangalore, so it's fine
+            handleMarkerPositionChange(wizardData.latitude, wizardData.longitude);
+          }
+        );
+      }
+    }
+  }, [activeStep]);
+
+  // Initialize Leaflet Map
+  useEffect(() => {
+    if (!leafletLoaded || !mapContainerRef.current || activeStep !== 2) return;
+
+    if (!mapRef.current) {
+      const L = (window as any).L;
+      
+      // Fix default Leaflet icon paths
+      delete L.Icon.Default.prototype._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      });
+
+      const initialLat = wizardData.latitude;
+      const initialLon = wizardData.longitude;
+
+      const map = L.map(mapContainerRef.current, { zoomControl: false }).setView([initialLat, initialLon], 15);
+      mapRef.current = map;
+
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+      }).addTo(map);
+
+      const marker = L.marker([initialLat, initialLon], { draggable: true }).addTo(map);
+      markerRef.current = marker;
+
+      marker.on('dragend', () => {
+        const pos = marker.getLatLng();
+        handleMarkerPositionChange(pos.lat, pos.lng);
+      });
+
+      // Initial reverse geocode
+      reverseGeocode(initialLat, initialLon);
+    }
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        markerRef.current = null;
+      }
+    };
+  }, [leafletLoaded, activeStep]);
+
   // Handle OTP Timer countdown
   useEffect(() => {
     if (otpTimer > 0) {
@@ -98,14 +288,56 @@ export default function VendorRegisterPage() {
     }
   }, [otpTimer]);
 
+  // Reverse geocoding (OpenStreetMap Nominatim)
+  const reverseGeocode = async (lat: number, lon: number) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`
+      );
+      const data = await response.json();
+      if (data && data.display_name) {
+        setWizardData(prev => ({ ...prev, shopAddress: data.display_name }));
+      }
+    } catch (err) {
+      console.error('Reverse geocoding error:', err);
+    }
+  };
+
+  const handleMarkerPositionChange = (lat: number, lon: number) => {
+    setWizardData(prev => ({ ...prev, latitude: lat, longitude: lon }));
+    
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    debounceTimerRef.current = setTimeout(() => {
+      reverseGeocode(lat, lon);
+    }, 1000);
+  };
+
+  const useCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((position) => {
+        const { latitude, longitude } = position.coords;
+        if (mapRef.current && markerRef.current) {
+          mapRef.current.setView([latitude, longitude], 15);
+          markerRef.current.setLatLng([latitude, longitude]);
+          handleMarkerPositionChange(latitude, longitude);
+        }
+      });
+    }
+  };
+
   // Camera handling
-  const openCamera = async () => {
+  const openCamera = async (mode: 'owner' | 'shop') => {
+    setCameraMode(mode);
     setCameraError('');
     setIsCameraOpen(true);
     try {
+      const facing = mode === 'owner' ? 'user' : 'environment';
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { 
-          facingMode: 'user', 
+          facingMode: facing, 
           width: { ideal: 640 }, 
           height: { ideal: 480 } 
         }
@@ -136,14 +368,41 @@ export default function VendorRegisterPage() {
       canvas.height = video.videoHeight || 480;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        // Draw video frame to canvas
+        // Mirror front camera (selfie)
+        if (cameraMode === 'owner') {
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+        }
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        setWizardData(prev => ({ ...prev, ownerPhoto: dataUrl }));
+        
+        if (cameraMode === 'owner') {
+          setWizardData(prev => ({ ...prev, ownerPhoto: dataUrl }));
+          triggerSuccessToast('Selfie captured successfully');
+        } else {
+          setWizardData(prev => ({ ...prev, shopPhoto: dataUrl }));
+          triggerSuccessToast('Shop front photo captured successfully');
+        }
         closeCamera();
-        triggerSuccessToast('Selfie captured successfully');
       }
     }
+  };
+
+  // Convert Base64 image to Blob
+  const base64ToBlob = (base64: string, contentType = 'image/jpeg') => {
+    const parts = base64.split(';base64,');
+    const byteCharacters = atob(parts[1]);
+    const byteArrays = [];
+    for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+      const slice = byteCharacters.slice(offset, offset + 512);
+      const byteNumbers = new Array(slice.length);
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      byteArrays.push(byteArray);
+    }
+    return new Blob(byteArrays, { type: contentType });
   };
 
   // OTP change mobile flow
@@ -181,7 +440,6 @@ export default function VendorRegisterPage() {
     newCode[index] = val.slice(-1);
     setOtpCode(newCode);
 
-    // Auto focus next field
     if (val && index < 5) {
       otpRefs.current[index + 1]?.focus();
     }
@@ -200,11 +458,7 @@ export default function VendorRegisterPage() {
     setVerifyingOtp(true);
     setOtpError('');
 
-    // Simulate OTP Verification
     setTimeout(() => {
-      // Test cases:
-      // Phone is +919783204194 and OTP is 123456
-      // For any other number in dev mode, we accept 123456 as the validation standard
       if (fullOtp === '123456') {
         setWizardData(prev => ({ ...prev, mobileNumber: newMobileNumber }));
         setIsChangingMobile(false);
@@ -218,13 +472,58 @@ export default function VendorRegisterPage() {
     }, 1000);
   };
 
-  // Validation step 1
+  // Category and sub-services selects
+  const handleCategorySelect = (categoryId: string) => {
+    setWizardData(prev => ({
+      ...prev,
+      shopCategory: categoryId,
+      subServices: [] // Reset sub-services on parent change
+    }));
+  };
+
+  const handleSubServiceToggle = (subService: string) => {
+    setWizardData(prev => {
+      const exists = prev.subServices.includes(subService);
+      const updated = exists 
+        ? prev.subServices.filter(s => s !== subService)
+        : [...prev.subServices, subService];
+      return { ...prev, subServices: updated };
+    });
+  };
+
+  // Services Repeatable list
+  const handleServiceChange = (idx: number, field: 'name' | 'price', val: string) => {
+    const updated = [...wizardData.servicesList];
+    updated[idx][field] = val;
+    setWizardData(prev => ({ ...prev, servicesList: updated }));
+  };
+
+  const handleAddServiceRow = () => {
+    setWizardData(prev => ({
+      ...prev,
+      servicesList: [...prev.servicesList, { name: '', price: '' }]
+    }));
+  };
+
+  const handleRemoveServiceRow = (idx: number) => {
+    const updated = wizardData.servicesList.filter((_, i) => i !== idx);
+    setWizardData(prev => ({ ...prev, servicesList: updated }));
+  };
+
+  // Step Validations
   const isStep1Valid = 
     wizardData.ownerPhoto !== null && 
     wizardData.fullName.trim() !== '' && 
     wizardData.mobileNumber.length === 10 && 
     !isChangingMobile &&
     wizardData.homeAddress.trim().length >= 10;
+
+  const isStep2Valid = 
+    wizardData.shopName.trim() !== '' && 
+    wizardData.shopAddress.trim() !== '' && 
+    wizardData.shopPhoto !== null && 
+    wizardData.shopCategory !== '' && 
+    wizardData.subServices.length >= 1;
 
   const handleNext = () => {
     if (!isStep1Valid) return;
@@ -235,6 +534,103 @@ export default function VendorRegisterPage() {
   const handleBack = () => {
     setDirection(-1);
     setActiveStep(1);
+  };
+
+  // Final Registration Submit Flow
+  const handleSubmit = async () => {
+    if (!isStep1Valid || !isStep2Valid || !user) return;
+    setSubmitting(true);
+
+    try {
+      // 1. Convert base64 photos to Blobs
+      const selfieBlob = base64ToBlob(wizardData.ownerPhoto!);
+      const shopBlob = base64ToBlob(wizardData.shopPhoto!);
+
+      // 2. Upload to Supabase Storage
+      const selfiePath = `owner-selfies/${user.id}-${Date.now()}.jpg`;
+      const shopPath = `shop-fronts/${user.id}-${Date.now()}.jpg`;
+
+      // Try creating bucket in case it doesn't exist
+      try {
+        await supabase.storage.createBucket('vendor-verification-photos', { public: true });
+      } catch (bucketErr) {
+        console.log('Bucket may already exist:', bucketErr);
+      }
+
+      // Upload selfie
+      const { error: selfieUploadError } = await supabase.storage
+        .from('vendor-verification-photos')
+        .upload(selfiePath, selfieBlob, { contentType: 'image/jpeg', upsert: true });
+
+      if (selfieUploadError) throw new Error(`Selfie upload failed: ${selfieUploadError.message}`);
+
+      // Upload shop photo
+      const { error: shopUploadError } = await supabase.storage
+        .from('vendor-verification-photos')
+        .upload(shopPath, shopBlob, { contentType: 'image/jpeg', upsert: true });
+
+      if (shopUploadError) throw new Error(`Shop photo upload failed: ${shopUploadError.message}`);
+
+      // Get public URLs
+      const { data: selfieUrlData } = supabase.storage.from('vendor-verification-photos').getPublicUrl(selfiePath);
+      const { data: shopUrlData } = supabase.storage.from('vendor-verification-photos').getPublicUrl(shopPath);
+      const selfieUrl = selfieUrlData?.publicUrl || '';
+      const shopUrl = shopUrlData?.publicUrl || '';
+
+      // Filter optional services list
+      const cleanServices = wizardData.servicesList
+        .filter(s => s.name.trim() !== '')
+        .map(s => ({ name: s.name.trim(), price: s.price.trim() }));
+
+      // 3. Update database row
+      const updatePayload: any = {
+        name: wizardData.shopName.trim(),
+        owner_name: wizardData.fullName.trim(),
+        phone_number: wizardData.mobileNumber,
+        category: wizardData.shopCategory,
+        sub_service: wizardData.subServices.join(', '),
+        address: wizardData.shopAddress.trim(),
+        latitude: wizardData.latitude,
+        longitude: wizardData.longitude,
+        shop_images: [shopUrl],
+        services_offered: cleanServices,
+        is_verified: false,
+        whatsapp_number: wizardData.mobileNumber, // sync WhatsApp
+      };
+
+      // Try setting verification_requested_at column
+      let dbError = null;
+      try {
+        const { error } = await supabase
+          .from('vendors')
+          .update({
+            ...updatePayload,
+            verification_requested_at: new Date().toISOString()
+          })
+          .eq('auth_user_id', user.id);
+        dbError = error;
+      } catch (err) {
+        dbError = err;
+      }
+
+      // If it fails (e.g. column doesn't exist), retry without it
+      if (dbError) {
+        console.warn('Failed with verification_requested_at, retrying without it...', dbError);
+        const { error: retryError } = await supabase
+          .from('vendors')
+          .update(updatePayload)
+          .eq('auth_user_id', user.id);
+        if (retryError) throw retryError;
+      }
+
+      // Redirect to Pending Verification screen
+      navigate('/vendor/pending');
+    } catch (err: any) {
+      console.error('Verification submission failed:', err);
+      alert('Failed to submit registration: ' + err.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Animation variants
@@ -270,8 +666,10 @@ export default function VendorRegisterPage() {
     }
   };
 
+  const selectedParentCategory = CATEGORIES.find(c => c.id === wizardData.shopCategory);
+
   return (
-    <div className="vendor-mode min-h-screen bg-surface flex flex-col font-body pb-20 sm:pb-8">
+    <div className="vendor-mode min-h-screen bg-surface flex flex-col font-body pb-24 sm:pb-8">
       {/* Header */}
       <header className="sticky top-0 z-40 w-full bg-white/80 backdrop-blur-md border-b border-border-light">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -309,8 +707,10 @@ export default function VendorRegisterPage() {
                 {activeStep === 1 ? 'Owner Details' : 'Shop Details'}
               </div>
             </div>
-            <div className="flex gap-1.5">
-              <div className={`w-6 h-2 rounded-full transition-all duration-300 ${activeStep === 1 ? 'bg-brand shadow-brand' : 'bg-brand'}`} />
+            <div className="flex gap-1.5 items-center">
+              <div className={`w-6 h-2 rounded-full transition-all duration-300 bg-brand flex items-center justify-center`}>
+                <Check size={8} className="text-white" strokeWidth={4} />
+              </div>
               <div className={`w-6 h-2 rounded-full transition-all duration-300 border ${activeStep === 2 ? 'bg-brand shadow-brand border-transparent' : 'bg-transparent border-border'}`} />
             </div>
           </div>
@@ -354,7 +754,7 @@ export default function VendorRegisterPage() {
                   
                   <div className="relative group">
                     <button
-                      onClick={openCamera}
+                      onClick={() => openCamera('owner')}
                       className={`w-36 h-36 rounded-full overflow-hidden border-2 flex flex-col items-center justify-center transition-all duration-300 relative cursor-pointer ${
                         wizardData.ownerPhoto 
                           ? 'border-brand' 
@@ -386,7 +786,7 @@ export default function VendorRegisterPage() {
                   
                   {wizardData.ownerPhoto && (
                     <button
-                      onClick={openCamera}
+                      onClick={() => openCamera('owner')}
                       className="text-xs font-display font-bold text-brand hover:text-brand-dark flex items-center gap-1 mt-1 cursor-pointer"
                     >
                       <RefreshCw size={12} />
@@ -410,9 +810,6 @@ export default function VendorRegisterPage() {
                     />
                     <Lock size={15} className="text-ink-muted" />
                   </div>
-                  <span className="text-[10px] text-ink-muted block mt-1">
-                    Contact support to request name updates.
-                  </span>
                 </motion.div>
 
                 {/* Field 3: Mobile Number (Read-Only / Edit inline with OTP) */}
@@ -474,7 +871,6 @@ export default function VendorRegisterPage() {
                           />
                         </div>
 
-                        {/* Verify Button (Shown once 10 digits entered) */}
                         {newMobileNumber.length === 10 && !otpSent && (
                           <div className="flex gap-2">
                             <button
@@ -492,7 +888,6 @@ export default function VendorRegisterPage() {
                           </div>
                         )}
 
-                        {/* OTP Boxes (Shown after clicking verify) */}
                         {otpSent && (
                           <motion.div
                             initial={{ opacity: 0, y: 10 }}
@@ -586,7 +981,7 @@ export default function VendorRegisterPage() {
                 </motion.button>
               </motion.div>
             ) : (
-              // Step 2 Placeholder screen (Shop Details)
+              // Step 2: Shop Details
               <motion.div
                 key="step-2"
                 custom={direction}
@@ -594,61 +989,293 @@ export default function VendorRegisterPage() {
                 initial="initial"
                 animate="animate"
                 exit="exit"
-                className="w-full bg-white rounded-3xl p-6 sm:p-8 border border-border-light shadow-card space-y-6 text-center"
+                className="w-full bg-white rounded-3xl p-6 sm:p-8 border border-border-light shadow-card space-y-6"
               >
-                <div className="mb-2">
+                <div className="text-center sm:text-left mb-2">
                   <h2 className="text-2xl font-display font-extrabold text-ink">
-                    Step 2: Shop Details
+                    Shop Details
                   </h2>
                   <p className="text-xs sm:text-sm text-ink-muted mt-1">
-                    Placeholder layout showing collected Step 1 data for state verification.
+                    Set up your public shop profile and pin your location so customers can find you.
                   </p>
                 </div>
 
-                <div className="bg-surface rounded-2xl p-5 border border-border-light/60 space-y-4 text-left">
-                  <div className="flex items-center gap-3 pb-3 border-b border-border-light">
-                    {wizardData.ownerPhoto ? (
-                      <img 
-                        src={wizardData.ownerPhoto} 
-                        alt="Captured Owner selfie" 
-                        className="w-12 h-12 rounded-full object-cover border border-brand"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded-full bg-border flex items-center justify-center">
-                        <Camera size={16} />
+                {/* Field 1: Shop Name */}
+                <motion.div variants={itemVariants} className="space-y-1.5">
+                  <label className="text-xs font-display font-bold text-ink-light block">
+                    Shop Name <span className="text-brand">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={wizardData.shopName}
+                    onChange={(e) => setWizardData(prev => ({ ...prev, shopName: e.target.value }))}
+                    placeholder="e.g. Sharma Auto Repair"
+                    className="w-full py-3 px-4 text-sm text-ink border border-border-light rounded-[var(--radius-md)] focus:border-brand focus:ring-2 focus:ring-brand-glow focus:outline-none transition-all placeholder:text-ink-muted bg-white"
+                  />
+                </motion.div>
+
+                {/* Field 2: Map Location Picker */}
+                <motion.div variants={itemVariants} className="space-y-1.5">
+                  <label className="text-xs font-display font-bold text-ink-light block">
+                    Pin Your Shop Location <span className="text-brand">*</span>
+                  </label>
+                  <span className="text-[11px] text-ink-muted block mt-0.5">
+                    Drag the pin to your exact shop location.
+                  </span>
+                  
+                  {/* Leaflet container */}
+                  <div className="relative h-60 w-full rounded-2xl overflow-hidden border border-border-light/80 bg-zinc-100 shadow-inner z-10">
+                    {!leafletLoaded ? (
+                      <div className="absolute inset-0 flex items-center justify-center flex-col gap-2">
+                        <Loader2 className="animate-spin text-brand" />
+                        <span className="text-xs text-ink-muted font-body">Loading map modules...</span>
                       </div>
+                    ) : (
+                      <div ref={mapContainerRef} className="w-full h-full" />
                     )}
-                    <div>
-                      <h4 className="text-sm font-display font-extrabold text-ink">
-                        {wizardData.fullName}
-                      </h4>
-                      <p className="text-xs text-ink-muted">+91 {wizardData.mobileNumber}</p>
+                    
+                    {/* Floating GPS Button */}
+                    <button
+                      type="button"
+                      onClick={useCurrentLocation}
+                      className="absolute top-3 right-3 z-20 p-2.5 bg-white hover:bg-surface rounded-xl border border-border shadow-md cursor-pointer text-brand hover:text-brand-dark transition-colors flex items-center justify-center"
+                      title="Use My Current Location"
+                    >
+                      <Navigation size={16} fill="currentColor" />
+                    </button>
+                  </div>
+
+                  {/* Geocoded Address Confirmation */}
+                  {wizardData.shopAddress && (
+                    <div className="p-3 bg-surface border border-border-light/60 rounded-xl flex gap-2 items-start mt-2">
+                      <MapPin className="text-brand shrink-0 mt-0.5" size={14} />
+                      <span className="text-xs text-ink leading-relaxed">
+                        {wizardData.shopAddress}
+                      </span>
                     </div>
+                  )}
+                </motion.div>
+
+                {/* Field 3: Live Shop Front Photo */}
+                <motion.div variants={itemVariants} className="space-y-1.5 flex flex-col">
+                  <span className="text-xs font-display font-bold text-ink-light block">
+                    Shop Front Photo <span className="text-brand">*</span>
+                  </span>
+                  
+                  <div className="w-full relative group">
+                    <button
+                      onClick={() => openCamera('shop')}
+                      className={`w-full aspect-[4/3] rounded-2xl overflow-hidden border-2 flex flex-col items-center justify-center transition-all duration-300 relative cursor-pointer ${
+                        wizardData.shopPhoto 
+                          ? 'border-brand' 
+                          : 'border-dashed border-border hover:border-brand bg-surface'
+                      }`}
+                    >
+                      {wizardData.shopPhoto ? (
+                        <>
+                          <img 
+                            src={wizardData.shopPhoto} 
+                            alt="Shop front preview" 
+                            className="w-full h-full object-cover"
+                          />
+                          {/* Success Badge */}
+                          <div className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-brand border-2 border-white flex items-center justify-center text-white shadow-md">
+                            <Check size={16} strokeWidth={3} />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center p-4 text-center">
+                          <Camera size={28} className="text-ink-muted group-hover:text-brand transition-colors mb-2" />
+                          <span className="text-xs font-display font-bold text-ink-muted group-hover:text-brand transition-colors">
+                            Take a live shop photo
+                          </span>
+                          <span className="text-[10px] text-ink-muted mt-1 leading-normal">
+                            Capture the full storefront clearly
+                          </span>
+                        </div>
+                      )}
+                    </button>
+                  </div>
+                  
+                  {wizardData.shopPhoto && (
+                    <button
+                      onClick={() => openCamera('shop')}
+                      className="text-xs font-display font-bold text-brand hover:text-brand-dark flex items-center gap-1 mt-1 cursor-pointer self-center"
+                    >
+                      <RefreshCw size={12} />
+                      <span>Retake Shop Photo</span>
+                    </button>
+                  )}
+                </motion.div>
+
+                {/* Field 4: Service Category Select */}
+                <motion.div variants={itemVariants} className="space-y-3">
+                  <label className="text-xs font-display font-bold text-ink-light block">
+                    What type of service do you provide? <span className="text-brand">*</span>
+                  </label>
+                  
+                  {/* Parent Categories list */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {CATEGORIES.map((cat) => {
+                      const isSelected = wizardData.shopCategory === cat.id;
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => handleCategorySelect(cat.id)}
+                          className={`p-4 rounded-2xl border text-left flex items-center justify-between cursor-pointer transition-all duration-300 relative ${
+                            isSelected 
+                              ? `${cat.selectedBorder} ${cat.selectedBg} ring-1 ring-offset-0 ring-${cat.color}-500 shadow-sm scale-[1.01]` 
+                              : 'border-border-light hover:border-border bg-white hover:bg-surface/50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            {/* Color Dot badge */}
+                            <div className={`w-3.5 h-3.5 rounded-full ${cat.badgeBg} shadow-sm shrink-0`} />
+                            <span className="text-xs sm:text-sm font-display font-extrabold text-ink leading-tight">
+                              {cat.name}
+                            </span>
+                          </div>
+
+                          {isSelected && (
+                            <div className={`w-5 h-5 rounded-full ${cat.badgeBg} text-white flex items-center justify-center shadow-md`}>
+                              <Check size={11} strokeWidth={4} />
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
 
-                  <div>
-                    <h5 className="text-xs font-display font-bold text-ink-light">Home Address:</h5>
-                    <p className="text-xs text-ink mt-1 font-body leading-relaxed bg-white p-3 rounded-lg border border-border-light">
-                      {wizardData.homeAddress}
-                    </p>
-                  </div>
-                </div>
+                  {/* Sub-services mapping Chips (Animated display) */}
+                  <AnimatePresence>
+                    {selectedParentCategory && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.35, ease: "easeInOut" }}
+                        className="p-4 bg-surface rounded-2xl border border-border-light mt-4 space-y-3 overflow-hidden"
+                      >
+                        <span className="text-[11px] font-display font-bold text-ink-light block">
+                          Select the specific sub-services you offer (Multi-select):
+                        </span>
 
-                <div className="flex gap-4">
+                        <div className="flex flex-wrap gap-2.5">
+                          {selectedParentCategory.subServicesList.map((sub) => {
+                            const isSubSelected = wizardData.subServices.includes(sub);
+                            return (
+                              <button
+                                key={sub}
+                                type="button"
+                                onClick={() => handleSubServiceToggle(sub)}
+                                className={`px-4 py-2 rounded-xl text-xs font-display font-bold cursor-pointer transition-all border flex items-center gap-1.5 ${
+                                  isSubSelected 
+                                    ? `bg-brand text-white border-transparent shadow-brand` 
+                                    : 'bg-white text-ink border-border-light hover:bg-surface-card hover:border-border'
+                                }`}
+                              >
+                                {isSubSelected && <Check size={12} strokeWidth={3} />}
+                                <span>{sub}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+
+                {/* Field 5: Services list (Optional Section) */}
+                <motion.div variants={itemVariants} className="space-y-3">
+                  <div className="flex items-center gap-1.5">
+                    <label className="text-xs font-display font-bold text-ink-light">
+                      Add Your Services
+                    </label>
+                    <span className="text-[10px] bg-border-light text-ink-muted px-2 py-0.5 rounded-md font-body">
+                      Optional
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-ink-muted block -mt-1 leading-normal">
+                    You can add this later too — but it helps customers know what you offer.
+                  </span>
+
+                  {/* Dynamic repeatable list */}
+                  <div className="space-y-3">
+                    <AnimatePresence>
+                      {wizardData.servicesList.map((service, index) => (
+                        <motion.div
+                          key={index}
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                          className="flex gap-2.5 items-center overflow-hidden"
+                        >
+                          <div className="flex-1 grid grid-cols-2 gap-2">
+                            <input
+                              type="text"
+                              value={service.name}
+                              onChange={(e) => handleServiceChange(index, 'name', e.target.value)}
+                              placeholder="e.g. Wiring Repair"
+                              className="py-2.5 px-3.5 text-xs text-ink border border-border-light rounded-xl focus:border-brand focus:ring-1 focus:ring-brand-glow focus:outline-none placeholder:text-ink-muted bg-white"
+                            />
+                            <input
+                              type="text"
+                              value={service.price}
+                              onChange={(e) => handleServiceChange(index, 'price', e.target.value)}
+                              placeholder="Price (optional)"
+                              className="py-2.5 px-3.5 text-xs text-ink border border-border-light rounded-xl focus:border-brand focus:ring-1 focus:ring-brand-glow focus:outline-none placeholder:text-ink-muted bg-white"
+                            />
+                          </div>
+
+                          {wizardData.servicesList.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveServiceRow(index)}
+                              className="p-2.5 text-red-500 hover:bg-red-50 rounded-xl cursor-pointer transition-colors border border-transparent hover:border-red-100 shrink-0"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
+
                   <button
-                    onClick={handleBack}
-                    className="flex-1 py-3.5 border border-border text-ink hover:text-brand font-display font-bold text-sm rounded-[var(--radius-md)] cursor-pointer hover:bg-surface transition-colors"
+                    type="button"
+                    onClick={handleAddServiceRow}
+                    className="text-xs font-display font-bold text-brand hover:text-brand-dark flex items-center gap-1 mt-1.5 cursor-pointer bg-transparent border-0"
                   >
-                    Back to Step 1
+                    <Plus size={14} />
+                    <span>Add Another Service</span>
+                  </button>
+                </motion.div>
+
+                {/* Submit Actions */}
+                <div className="flex gap-4 pt-4">
+                  <button
+                    type="button"
+                    onClick={handleBack}
+                    className="flex-1 py-4 border border-border text-ink hover:text-brand font-display font-bold text-sm rounded-[var(--radius-md)] cursor-pointer hover:bg-surface transition-colors"
+                  >
+                    Back
                   </button>
                   <button
-                    onClick={() => {
-                      alert('Registration wizard completed! Step 1 data is held in state: ' + JSON.stringify(wizardData));
-                      navigate('/dashboard');
-                    }}
-                    className="flex-1 py-3.5 bg-brand hover:bg-brand-dark text-white font-display font-extrabold rounded-[var(--radius-md)] shadow-brand text-sm cursor-pointer transition-colors"
+                    type="button"
+                    disabled={!isStep2Valid || submitting}
+                    onClick={handleSubmit}
+                    className="flex-1 py-4 bg-brand hover:bg-brand-dark disabled:bg-border-light disabled:text-ink-muted text-white font-display font-extrabold rounded-[var(--radius-md)] shadow-brand text-sm flex items-center justify-center gap-2 cursor-pointer transition-colors border border-accent/10 disabled:border-transparent disabled:shadow-none"
                   >
-                    Finish (Submit)
+                    {submitting ? (
+                      <>
+                        <Loader2 className="animate-spin" size={16} />
+                        <span>Submitting...</span>
+                      </>
+                    ) : (
+                      <span>Submit Verification</span>
+                    )}
                   </button>
                 </div>
               </motion.div>
@@ -657,17 +1284,31 @@ export default function VendorRegisterPage() {
         )}
       </main>
 
-      {/* Mobile Sticky Next Button */}
-      {activeStep === 1 && !loadingProfile && (
-        <div className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-border-light p-4 z-30 block sm:hidden shadow-elevated">
-          <motion.button
-            whileTap={{ scale: 0.98 }}
-            disabled={!isStep1Valid}
-            onClick={handleNext}
-            className="w-full py-4 bg-brand hover:bg-brand-dark disabled:bg-border-light disabled:text-ink-muted text-white font-display font-extrabold rounded-[var(--radius-md)] shadow-brand text-sm flex items-center justify-center gap-2 cursor-pointer transition-colors duration-200 border border-accent/10 disabled:border-transparent disabled:shadow-none"
+      {/* Mobile Sticky CTA bar for Step 2 */}
+      {activeStep === 2 && !loadingProfile && (
+        <div className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-border-light p-4 z-30 flex gap-3 sm:hidden shadow-elevated">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="px-4 py-3.5 border border-border text-ink font-display font-bold text-xs rounded-[var(--radius-md)] cursor-pointer"
           >
-            <span>Next: Shop Details</span>
-          </motion.button>
+            Back
+          </button>
+          <button
+            type="button"
+            disabled={!isStep2Valid || submitting}
+            onClick={handleSubmit}
+            className="flex-1 py-3.5 bg-brand hover:bg-brand-dark disabled:bg-border-light disabled:text-ink-muted text-white font-display font-extrabold rounded-[var(--radius-md)] shadow-brand text-xs flex items-center justify-center gap-2 cursor-pointer border border-accent/10 disabled:border-transparent disabled:shadow-none"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="animate-spin" size={14} />
+                <span>Submitting...</span>
+              </>
+            ) : (
+              <span>Submit Verification</span>
+            )}
+          </button>
         </div>
       )}
 
@@ -684,9 +1325,11 @@ export default function VendorRegisterPage() {
             <div className="w-full max-w-md flex justify-between items-center text-white mt-2">
               <div>
                 <h3 className="text-sm font-display font-bold uppercase tracking-wider text-brand-light">
-                  Owner Identity Verification
+                  {cameraMode === 'owner' ? 'Owner Identity Verification' : 'Shop Verification'}
                 </h3>
-                <p className="text-[11px] text-zinc-400 font-body">Center your face in the oval guide</p>
+                <p className="text-[11px] text-zinc-400 font-body">
+                  {cameraMode === 'owner' ? 'Center your face in the oval guide' : 'Center the shop front in the guide'}
+                </p>
               </div>
               <button
                 onClick={closeCamera}
@@ -703,7 +1346,7 @@ export default function VendorRegisterPage() {
                   <AlertCircle className="text-red-500 mx-auto" size={32} />
                   <p className="text-sm text-zinc-300">{cameraError}</p>
                   <button
-                    onClick={openCamera}
+                    onClick={() => openCamera(cameraMode)}
                     className="px-4 py-2 bg-zinc-800 text-white font-display font-bold text-xs rounded-xl hover:bg-zinc-700 cursor-pointer"
                   >
                     Retry Camera
@@ -716,12 +1359,21 @@ export default function VendorRegisterPage() {
                     autoPlay
                     playsInline
                     muted
-                    className="w-full h-full object-cover scale-x-[-1]" // Mirror front camera preview
+                    className={`w-full h-full object-cover ${cameraMode === 'owner' ? 'scale-x-[-1]' : ''}`}
                   />
-                  {/* Face Guide Oval Cutout Vignette */}
-                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                    <div className="w-[190px] h-[270px] rounded-[100px] border-2 border-dashed border-white/60 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]" />
-                  </div>
+                  {/* Vignette Cutouts */}
+                  {cameraMode === 'owner' ? (
+                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                      <div className="w-[190px] h-[270px] rounded-[100px] border-2 border-dashed border-white/60 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]" />
+                    </div>
+                  ) : (
+                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                      <div className="w-[285px] h-[210px] rounded-2xl border-2 border-dashed border-white/60 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]" />
+                      <span className="absolute bottom-6 text-white text-[10px] bg-black/60 px-3.5 py-1 rounded-full font-body font-bold uppercase tracking-wider">
+                        Frame the shop front
+                      </span>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -737,7 +1389,9 @@ export default function VendorRegisterPage() {
                 </button>
               )}
               <span className="text-[10px] text-zinc-500 font-body">
-                Captured selfies are only used for owner verification.
+                {cameraMode === 'owner' 
+                  ? 'Captured selfies are only used for owner verification.' 
+                  : 'Captured shop front photo will be shown on your profile.'}
               </span>
             </div>
           </motion.div>

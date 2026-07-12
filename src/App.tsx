@@ -10,6 +10,7 @@ import VendorDetailPage from './pages/VendorDetailPage';
 import ProfilePage from './pages/ProfilePage';
 import SettingsPage from './pages/SettingsPage';
 import VendorRegisterPage from './pages/vendor/VendorRegisterPage';
+import VendorPendingPage from './pages/vendor/VendorPendingPage';
 
 function AppRoutes() {
   return (
@@ -21,6 +22,7 @@ function AppRoutes() {
         <Route path="/category/:slug" element={<CategoryPage />} />
         <Route path="/vendor/:vendorId" element={<VendorDetailPage />} />
         <Route path="/vendor/register" element={<VendorRegisterPage />} />
+        <Route path="/vendor/pending" element={<VendorPendingPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
