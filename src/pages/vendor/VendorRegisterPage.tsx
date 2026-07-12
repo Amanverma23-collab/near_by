@@ -262,6 +262,13 @@ export default function VendorRegisterPage() {
 
       // Initial reverse geocode
       reverseGeocode(initialLat, initialLon);
+
+      // Force size invalidation after slide animation completes
+      setTimeout(() => {
+        if (mapRef.current) {
+          mapRef.current.invalidateSize();
+        }
+      }, 400);
     }
 
     return () => {
