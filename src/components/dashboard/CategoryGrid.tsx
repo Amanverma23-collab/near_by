@@ -142,31 +142,29 @@ function ServiceTile({ categorySlug, service, gradient, shadowColor, categoryCol
   return (
     <motion.div 
       onClick={handleClick}
-      whileHover={{ scale: 1.04, y: -2 }}
-      whileTap={{ scale: 0.98 }}
-      style={{ 
-        borderColor: `${categoryColor}25`,
-        boxShadow: `0 4px 12px rgba(26, 26, 46, 0.04)`
-      }}
-      className="relative overflow-hidden bg-surface-card rounded-[18px] text-left border shadow-sm transition-all duration-300 group flex flex-col justify-end w-[145px] h-[115px] sm:w-[155px] sm:h-[125px] shrink-0 cursor-pointer select-none"
+      whileHover={{ scale: 1.03, y: -2 }}
+      whileTap={{ scale: 0.97 }}
+      className="flex flex-col w-[135px] sm:w-[150px] shrink-0 cursor-pointer select-none group"
     >
-      {/* Full-Cover Background Image */}
+      {/* Clean Image Card */}
       <div 
-        className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-        style={{ backgroundImage: `url(${service.imageUrl})` }}
-      />
+        className="w-full h-[95px] sm:h-[105px] rounded-[16px] overflow-hidden relative border border-border-light/80 shadow-xs group-hover:shadow-md transition-all duration-300 bg-surface-card"
+        style={{ 
+          borderColor: `${categoryColor}25`,
+        }}
+      >
+        <div 
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+          style={{ backgroundImage: `url(${service.imageUrl})` }}
+        />
+      </div>
       
-      {/* Bottom vertical gradient scrim for text readability */}
-      <div className="absolute inset-x-0 bottom-0 h-[70%] bg-gradient-to-t from-white via-white/90 to-transparent z-10 pointer-events-none" />
-
-      {/* Label and category dot at bottom */}
-      <div className="relative z-20 px-3 pb-2 pt-3">
-        <div className="flex items-start gap-1.5 pt-1">
-          <span className="w-1.5 h-1.5 rounded-full shrink-0 mt-1" style={{ backgroundColor: categoryColor }} />
-          <span className="text-[11px] sm:text-xs font-display font-extrabold text-ink leading-snug line-clamp-2 pb-0.5">
-            {t(service.label)}
-          </span>
-        </div>
+      {/* Service Name Label Below Card */}
+      <div className="flex items-center gap-1.5 mt-2 px-0.5">
+        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: categoryColor }} />
+        <span className="text-[11px] sm:text-xs font-display font-extrabold text-ink leading-tight truncate group-hover:text-brand transition-colors">
+          {t(service.label)}
+        </span>
       </div>
     </motion.div>
   );
