@@ -1,8 +1,6 @@
-import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, Search, Heart, User } from 'lucide-react';
-import { Keyboard } from '@capacitor/keyboard';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 
@@ -11,101 +9,9 @@ export default function CustomerBottomNav() {
   const navigate = useNavigate();
   const { role } = useAuth();
   const { t } = useLanguage();
-  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
-
-  useEffect(() => {
-    const initialHeight = window.innerHeight;
-
-    // 1. Native Capacitor Keyboard Plugin Listeners
-    let showListener: any;
-    let hideListener: any;
-
-    try {
-      showListener = Keyboard.addListener('keyboardWillShow', () => setIsKeyboardOpen(true));
-      hideListener = Keyboard.addListener('keyboardWillHide', () => setIsKeyboardOpen(false));
-    } catch (e) {
-      console.warn('Capacitor Keyboard listener fallback to web events:', e);
-    }
-
-    // 2. DOM Focus / Blur capture listeners
-    const handleFocus = (e: Event) => {
-      const target = e.target as HTMLElement;
-      if (
-        target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.isContentEditable)
-      ) {
-        setIsKeyboardOpen(true);
-      }
-    };
-
-    const handleBlur = () => {
-      // Small delay to allow activeElement update
-      setTimeout(() => {
-        const active = document.activeElement as HTMLElement;
-        if (
-          !active ||
-          (active.tagName !== 'INPUT' &&
-            active.tagName !== 'TEXTAREA' &&
-            !active.isContentEditable)
-        ) {
-          setIsKeyboardOpen(false);
-        }
-      }, 100);
-    };
-
-    // 3. Window Resize & Visual Viewport Height Tracking
-    const handleResize = () => {
-      const currentHeight = window.innerHeight;
-      const visualHeight = window.visualViewport?.height || currentHeight;
-      if (currentHeight < initialHeight * 0.8 || visualHeight < initialHeight * 0.8) {
-        setIsKeyboardOpen(true);
-      } else {
-        const active = document.activeElement as HTMLElement;
-        if (
-          !active ||
-          (active.tagName !== 'INPUT' &&
-            active.tagName !== 'TEXTAREA' &&
-            !active.isContentEditable)
-        ) {
-          setIsKeyboardOpen(false);
-        }
-      }
-    };
-
-    // 4. Custom Window Event Listeners
-    const handleCustomHide = () => setIsKeyboardOpen(true);
-    const handleCustomShow = () => setIsKeyboardOpen(false);
-
-    document.addEventListener('focus', handleFocus, true);
-    document.addEventListener('blur', handleBlur, true);
-    window.addEventListener('resize', handleResize);
-    window.addEventListener('nearby_hide_nav', handleCustomHide);
-    window.addEventListener('nearby_show_nav', handleCustomShow);
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleResize);
-    }
-
-    return () => {
-      showListener?.remove?.();
-      hideListener?.remove?.();
-      document.removeEventListener('focus', handleFocus, true);
-      document.removeEventListener('blur', handleBlur, true);
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('nearby_hide_nav', handleCustomHide);
-      window.removeEventListener('nearby_show_nav', handleCustomShow);
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleResize);
-      }
-    };
-  }, []);
 
   // Only display for customer users
   if (role !== 'customer') return null;
-
-  // Hide when soft keyboard is visible
-  if (isKeyboardOpen) return null;
 
   // Paths where bottom nav should be hidden
   const hiddenPaths = ['/', '/location', '/vendor/register', '/vendor/pending', '/vendor/subscriptions'];

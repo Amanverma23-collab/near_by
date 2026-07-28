@@ -65,11 +65,8 @@ export default function SearchPage() {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onFocus={() => window.dispatchEvent(new Event('nearby_hide_nav'))}
-              onBlur={() => setTimeout(() => window.dispatchEvent(new Event('nearby_show_nav')), 150)}
               placeholder={t('search_placeholder')}
               className="w-full pl-10 pr-10 py-3 text-sm font-body bg-surface border-2 border-border-light rounded-2xl outline-none hover:border-ink-muted focus:border-brand transition-all shadow-xs"
-              autoFocus
             />
             {query && (
               <button
