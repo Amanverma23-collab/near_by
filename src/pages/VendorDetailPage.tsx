@@ -10,6 +10,7 @@ import { getEffectiveShopStatus } from '../utils/shopTiming';
 import { fetchCombinedVendors } from '../utils/vendorSync';
 import AddReviewModal from '../components/customer/AddReviewModal';
 import { getSavedReviews, saveNewReview } from '../utils/reviewStorage';
+import SaveHeartButton from '../components/ui/SaveHeartButton';
 
 /* ──────────────────── WhatsApp SVG Icon ──────────────────── */
 const WhatsAppIcon = ({ size = 16, className = '' }) => (
@@ -171,13 +172,16 @@ export default function VendorDetailPage() {
           <ArrowLeft size={18} />
         </motion.button>
 
-        {/* Verified badge overlay */}
-        {vendor.isVerified && (
-          <div className="absolute top-4 right-4 z-10 flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-pill)] bg-white/90 backdrop-blur-sm shadow-sm">
-            <BadgeCheck size={14} className="text-brand" />
-            <span className="text-[10px] font-display font-bold text-brand">Verified</span>
-          </div>
-        )}
+        {/* Heart Save / Verified badge overlay */}
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+          {vendor.isVerified && (
+            <div className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-pill)] bg-white/90 backdrop-blur-sm shadow-sm">
+              <BadgeCheck size={14} className="text-brand" />
+              <span className="text-[10px] font-display font-bold text-brand">Verified</span>
+            </div>
+          )}
+          <SaveHeartButton vendorId={vendor.id || vendorId || ''} size={18} className="bg-white/90 backdrop-blur-sm shadow-sm p-2" />
+        </div>
 
         {/* Prev / Next arrows (desktop) */}
         {vendor.shopImages.length > 1 && (

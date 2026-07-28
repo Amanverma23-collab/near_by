@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, X, MapPin, Star, BadgeCheck, Phone, ArrowRight, Sparkles, Filter } from 'lucide-react';
 import { dummyVendors, type Vendor } from '../data/dummyVendors';
 import { fetchCombinedVendors } from '../utils/vendorSync';
+import SaveHeartButton from '../components/ui/SaveHeartButton';
 import { useLanguage } from '../context/LanguageContext';
 
 const POPULAR_SEARCHES = [
@@ -152,11 +153,14 @@ export default function SearchPage() {
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-0.5 px-2 py-0.5 bg-[#FFFBEB] border border-[#FEF3C7] rounded-md shrink-0">
-                      <Star size={11} className="text-amber-500 fill-amber-500" />
-                      <span className="text-[10px] font-display font-bold text-amber-800">
-                        {vendor.rating.toFixed(1)}
-                      </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <SaveHeartButton vendorId={vendor.id} size={15} className="p-1.5" />
+                      <div className="flex items-center gap-0.5 px-2 py-0.5 bg-[#FFFBEB] border border-[#FEF3C7] rounded-md">
+                        <Star size={11} className="text-amber-500 fill-amber-500" />
+                        <span className="text-[10px] font-display font-bold text-amber-800">
+                          {vendor.rating.toFixed(1)}
+                        </span>
+                      </div>
                     </div>
                   </div>
 

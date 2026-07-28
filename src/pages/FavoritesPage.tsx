@@ -1,21 +1,37 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Heart, Trash2, MapPin, Star, BadgeCheck, Phone, ArrowRight, Bookmark } from 'lucide-react';
-import { dummyVendors, type Vendor } from '../data/dummyVendors';
+import { type Vendor } from '../data/dummyVendors';
+import { getSavedVendorsList, toggleSaveVendor } from '../utils/favoritesStorage';
+import SaveHeartButton from '../components/ui/SaveHeartButton';
 
 export default function FavoritesPage() {
   const navigate = useNavigate();
 
-  // Saved vendors state (defaults to first 3 dummy vendors for demo)
-  const [savedVendors, setSavedVendors] = useState<Vendor[]>([
-    dummyVendors[0],
-    dummyVendors[2],
-    dummyVendors[4],
-  ]);
+  const [savedVendors, setSavedVendors] = useState<Vendor[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadVendors = async () => {
+    const list = await getSavedVendorsList();
+    setSavedVendors(list);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadVendors();
+
+    const handleUpdate = () => {
+      loadVendors();
+    };
+
+    window.addEventListener('nearby_favorites_changed', handleUpdate);
+    return () => window.removeEventListener('nearby_favorites_changed', handleUpdate);
+  }, []);
 
   const handleRemoveFavorite = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    toggleSaveVendor(id);
     setSavedVendors((prev) => prev.filter((v) => v.id !== id));
   };
 

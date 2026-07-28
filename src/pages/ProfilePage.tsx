@@ -28,6 +28,7 @@ import { useLocation } from '../context/LocationContext';
 import { useLanguage } from '../context/LanguageContext';
 import { supabase } from '../lib/supabase';
 import { getAllUserReviews } from '../utils/reviewStorage';
+import { getSavedVendorsCount } from '../utils/favoritesStorage';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -57,8 +58,9 @@ export default function ProfilePage() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState(fullName);
 
-  // Dynamic Rating Count
+  // Dynamic Rating Count & Saved Shops Count
   const [ratingCount, setRatingCount] = useState(0);
+  const [savedShopsCount, setSavedShopsCount] = useState(0);
 
   // Quick Toggles
   const [notifications, setNotifications] = useState(true);
@@ -82,9 +84,16 @@ export default function ProfilePage() {
       console.error('Error loading stored profile:', err);
     }
 
-    // Load rating count
+    // Load rating count & saved shops count
     const allReviews = getAllUserReviews();
     setRatingCount(allReviews.length);
+    setSavedShopsCount(getSavedVendorsCount());
+
+    const handleFavChange = () => {
+      setSavedShopsCount(getSavedVendorsCount());
+    };
+    window.addEventListener('nearby_favorites_changed', handleFavChange);
+    return () => window.removeEventListener('nearby_favorites_changed', handleFavChange);
   }, []);
 
   const handleSaveProfile = (e: React.FormEvent) => {
@@ -290,7 +299,7 @@ export default function ProfilePage() {
               className="p-2.5 rounded-2xl bg-surface hover:bg-brand/5 border border-border-light transition-colors cursor-pointer space-y-0.5"
             >
               <Heart size={16} className="mx-auto text-rose-500 fill-rose-500" />
-              <div className="text-xs font-display font-extrabold text-ink">3 {t('saved')}</div>
+              <div className="text-xs font-display font-extrabold text-ink">{savedShopsCount} {t('saved')}</div>
               <span className="text-[9px] text-ink-muted font-bold">Shops</span>
             </div>
 
