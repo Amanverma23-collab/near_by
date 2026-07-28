@@ -153,14 +153,14 @@ export default function SearchPage() {
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <SaveHeartButton vendorId={vendor.id} size={15} className="p-1.5" />
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
                       <div className="flex items-center gap-0.5 px-2 py-0.5 bg-[#FFFBEB] border border-[#FEF3C7] rounded-md">
                         <Star size={11} className="text-amber-500 fill-amber-500" />
                         <span className="text-[10px] font-display font-bold text-amber-800">
                           {vendor.rating.toFixed(1)}
                         </span>
                       </div>
+                      <SaveHeartButton vendorId={vendor.id} size={15} className="p-1" />
                     </div>
                   </div>
 
