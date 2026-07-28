@@ -14,7 +14,7 @@ export default function Navbar() {
         transition={{ duration: 0.4, ease: 'easeOut' }}
         className="sticky top-0 z-40 backdrop-blur-nav bg-surface-card/80 border-b border-border-light"
       >
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between relative">
           {/* Logo */}
           <div className="flex items-center">
             <span className="text-xl font-extrabold font-display text-ink">

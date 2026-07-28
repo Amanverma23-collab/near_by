@@ -21,119 +21,73 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
     navigate('/', { replace: true });
   };
 
-  const menuItems = [
-    {
-      icon: UserCircle,
-      label: 'Profile',
-      onClick: () => {
-        navigate('/profile');
-        onClose();
-      },
-    },
-    {
-      icon: Settings,
-      label: 'Settings',
-      onClick: () => {
-        navigate('/settings');
-        onClose();
-      },
-    },
-  ];
-
   return (
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+          {/* Transparent Backdrop to close on outside click */}
+          <div
             onClick={onClose}
-            className="fixed inset-0 z-50 bg-ink/40"
+            className="fixed inset-0 z-40 bg-black/10"
           />
 
-          {/* Drawer */}
+          {/* Compact Dropdown Box under burger icon */}
           <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="fixed top-0 right-0 bottom-0 z-50 w-80 max-w-[85vw] bg-surface-card shadow-elevated flex flex-col"
+            initial={{ opacity: 0, scale: 0.95, y: -8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -8 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+            className="absolute top-14 right-4 z-50 w-56 bg-white rounded-2xl p-2 shadow-[0_12px_36px_rgba(0,0,0,0.16)] border border-border-light font-body"
           >
-            {/* Header */}
-            <div className="p-6 pb-4 border-b border-border-light">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-display font-bold text-ink">Menu</h3>
-                <motion.button
-                  whileTap={{ scale: 0.9 }}
-                  onClick={onClose}
-                  className="p-2 rounded-[var(--radius-sm)] hover:bg-border-light transition-colors"
-                >
-                  <X size={20} className="text-ink-muted" />
-                </motion.button>
+            {/* Header User Info */}
+            <div className="p-2 pb-2.5 mb-1 border-b border-border-light/70 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-brand-50 text-brand font-display font-extrabold text-xs flex items-center justify-center border border-brand/20 shrink-0">
+                {user?.phone?.slice(-2) || 'U'}
               </div>
-
-              {/* User info */}
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-brand-50 flex items-center justify-center">
-                  <span className="text-lg font-display font-bold text-brand">
-                    {user?.phone?.slice(-2) || 'U'}
-                  </span>
-                </div>
-                <div>
-                  <p className="text-sm font-display font-semibold text-ink">
-                    {user?.phone || 'User'}
-                  </p>
-                  <p className="text-xs text-ink-muted font-body capitalize">
-                    {role || 'Member'}
-                  </p>
-                </div>
+              <div className="overflow-hidden">
+                <p className="text-xs font-display font-extrabold text-ink truncate">
+                  {user?.phone || 'User Account'}
+                </p>
+                <p className="text-[10px] text-ink-muted capitalize">
+                  {role || 'Customer'}
+                </p>
               </div>
             </div>
 
-            {/* Menu Items */}
-            <div className="flex-1 p-4 space-y-1">
-              {menuItems.map((item, i) => (
-                <motion.button
-                  key={item.label}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.1 + i * 0.05 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={item.onClick}
-                  className="w-full flex items-center gap-3 p-3 rounded-[var(--radius-md)] hover:bg-brand-50 transition-colors group"
-                >
-                  <item.icon
-                    size={20}
-                    className="text-ink-muted group-hover:text-brand transition-colors"
-                  />
-                  <span className="flex-1 text-left text-base font-body font-medium text-ink">
-                    {item.label}
-                  </span>
-                  <ChevronRight
-                    size={16}
-                    className="text-ink-muted group-hover:text-brand transition-colors"
-                  />
-                </motion.button>
-              ))}
+            {/* Menu Links */}
+            <div className="space-y-0.5">
+              <button
+                onClick={() => {
+                  navigate('/profile');
+                  onClose();
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-display font-bold text-ink hover:bg-brand-50 hover:text-brand transition-colors cursor-pointer"
+              >
+                <UserCircle size={16} className="text-ink-muted" />
+                <span>Profile</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  navigate('/settings');
+                  onClose();
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-display font-bold text-ink hover:bg-brand-50 hover:text-brand transition-colors cursor-pointer"
+              >
+                <Settings size={16} className="text-ink-muted" />
+                <span>Settings</span>
+              </button>
             </div>
 
             {/* Logout */}
-            <div className="p-4 border-t border-border-light">
-              <motion.button
-                whileTap={{ scale: 0.98 }}
+            <div className="mt-1 pt-1 border-t border-border-light/70">
+              <button
                 onClick={handleLogout}
-                className="w-full flex items-center gap-3 p-3 rounded-[var(--radius-md)] hover:bg-error-light transition-colors group"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-display font-bold text-error hover:bg-error-light transition-colors cursor-pointer"
               >
-                <LogOut
-                  size={20}
-                  className="text-ink-muted group-hover:text-error transition-colors"
-                />
-                <span className="text-base font-body font-medium text-ink group-hover:text-error transition-colors">
-                  Logout
-                </span>
-              </motion.button>
+                <LogOut size={16} className="text-error" />
+                <span>Logout</span>
+              </button>
             </div>
           </motion.div>
         </>
