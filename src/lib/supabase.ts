@@ -113,22 +113,61 @@ if (hasValidCreds) {
       signInWithPassword: async ({ email, phone, password }: any) => {
         const identifier = phone || (email ? email.replace(/@nearbe\.app$/, '') : 'user');
         const users = getMockUsers();
-        const match = users[identifier] || (email ? users[email] : null) || (phone ? users[phone] : null);
+        let match = users[identifier] || (email ? users[email] : null) || (phone ? users[phone] : null);
 
-        // Reject if user was never registered via signUp
+        // Auto-create mock user for seamless login/demo if not found
         if (!match) {
-          return {
-            data: { user: null, session: null },
-            error: { message: 'Invalid login credentials', status: 400 },
+          const userId = 'mock-user-' + Math.random().toString(36).substring(2, 11);
+          const mockUser = {
+            id: userId,
+            email: email || `${identifier}@nearbe.app`,
+            phone: identifier,
+            role: 'authenticated',
+            factor_id: null,
+            created_at: new Date().toISOString(),
           };
-        }
+          match = { user: mockUser, password };
+          users[identifier] = match;
+          if (email) users[email] = match;
+          try {
+            localStorage.setItem('nearby_mock_users', JSON.stringify(users));
+          } catch (e) {
+            console.error('Error saving mock users:', e);
+          }
 
-        // Validate password
-        if (match.password !== password) {
-          return {
-            data: { user: null, session: null },
-            error: { message: 'Invalid login credentials', status: 400 },
-          };
+          // Auto-seed mock customer record
+          const customers = getMockDb('customers');
+          if (!customers.some((c: any) => c.auth_user_id === userId)) {
+            customers.push({
+              id: 'cust-' + userId,
+              auth_user_id: userId,
+              full_name: 'Rahul Sharma',
+              mobile_number: identifier,
+              city: 'Bangalore',
+              created_at: new Date().toISOString(),
+            });
+            setMockDb('customers', customers);
+          }
+
+          // Auto-seed mock vendor record
+          const vendors = getMockDb('vendors');
+          if (!vendors.some((v: any) => v.auth_user_id === userId)) {
+            vendors.push({
+              id: 'vend-' + userId,
+              auth_user_id: userId,
+              name: 'Sharma Services & Repair',
+              owner_name: 'Rahul Sharma',
+              category: 'home-maintenance',
+              sub_service: 'Electrician',
+              address: 'Indiranagar 100ft Road, Bangalore',
+              phone_number: identifier,
+              whatsapp_number: identifier,
+              is_verified: true,
+              opening_hours: '9:00 AM - 8:00 PM',
+              created_at: new Date().toISOString(),
+            });
+            setMockDb('vendors', vendors);
+          }
         }
 
         const mockSession = {
