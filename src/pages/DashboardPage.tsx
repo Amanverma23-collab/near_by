@@ -27,7 +27,7 @@ export default function DashboardPage() {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
-      className="min-h-screen bg-surface pb-8"
+      className="min-h-screen bg-surface pb-32 sm:pb-16"
     >
       <Navbar />
       <HeroSection />

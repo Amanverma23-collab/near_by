@@ -256,14 +256,14 @@ export default function CategoryGrid() {
           </div>
         </motion.div>
 
-        <div className="space-y-8 mt-6">
+        <div className="space-y-4 sm:space-y-6 mt-4">
           {serviceSections.map((section) => (
             <motion.div
               variants={sectionVariants}
               initial="hidden"
               whileInView="visible"
               viewport={{ once: true, margin: "-80px" }}
-              className="border-b border-border-light pb-8 last:border-0 last:pb-0"
+              className="border-b border-border-light/50 pb-4 sm:pb-6 last:border-0 last:pb-0"
               key={section.slug}
             >
               {/* Section Header */}

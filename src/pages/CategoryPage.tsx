@@ -111,7 +111,7 @@ export default function CategoryPage() {
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -10 }}
       transition={{ duration: 0.25 }}
-      className="min-h-screen bg-surface"
+      className="min-h-screen bg-surface pb-32 sm:pb-16"
     >
       {/* Sticky Header */}
       <div className="sticky top-0 z-40 backdrop-blur-nav bg-surface-card/85 border-b border-border-light">

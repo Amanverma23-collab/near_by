@@ -36,7 +36,7 @@ export default function FavoritesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-surface font-body pb-24">
+    <div className="min-h-screen bg-surface font-body pb-32 sm:pb-16">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-border-light p-4">
         <div className="max-w-md mx-auto flex items-center justify-between">

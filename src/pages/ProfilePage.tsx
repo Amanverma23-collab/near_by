@@ -162,7 +162,7 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-surface font-body pb-28">
+    <div className="min-h-screen bg-surface font-body pb-32 sm:pb-16">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-border-light">
         <div className="max-w-md mx-auto h-16 px-4 flex items-center justify-between">
