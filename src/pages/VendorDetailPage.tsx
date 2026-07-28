@@ -225,14 +225,22 @@ export default function VendorDetailPage() {
 
         {/* ═══════════ B — SHOP INFO HEADER ═══════════ */}
         <FadeInSection delay={0.05} className="mt-5 mb-5">
-          {/* Name + badge */}
-          <div className="flex items-start gap-1.5 mb-1">
-            <h1 className="text-lg sm:text-xl font-display font-extrabold text-ink leading-tight">
-              {vendor.name}
-            </h1>
-            {vendor.isVerified && (
-              <BadgeCheck size={20} className="text-brand shrink-0 mt-0.5" />
-            )}
+          {/* Name + badge + Save/Like Heart Button */}
+          <div className="flex justify-between items-start gap-3 mb-1">
+            <div className="flex items-start gap-1.5 min-w-0">
+              <h1 className="text-lg sm:text-xl font-display font-extrabold text-ink leading-tight">
+                {vendor.name}
+              </h1>
+              {vendor.isVerified && (
+                <BadgeCheck size={20} className="text-brand shrink-0 mt-0.5" />
+              )}
+            </div>
+
+            <SaveHeartButton
+              vendorId={vendor.id || vendorId || ''}
+              size={20}
+              className="p-2 bg-white border border-border-light shadow-xs shrink-0"
+            />
           </div>
 
           {/* Owner */}
