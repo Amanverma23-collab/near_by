@@ -369,20 +369,11 @@ export default function VendorAuthForm() {
               </button>
             </div>
 
-            {/* Single Row Login & Register Action Buttons */}
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            {/* Login Action Button */}
+            <div className="pt-2">
               <AnimatedButton type="submit" fullWidth size="lg" isLoading={loading}>
                 <span>Login</span>
                 <ArrowRight size={18} />
-              </AnimatedButton>
-              <AnimatedButton
-                fullWidth
-                size="lg"
-                variant="outline"
-                type="button"
-                onClick={toggleMode}
-              >
-                <span>Register</span>
               </AnimatedButton>
             </div>
           </motion.div>
@@ -483,20 +474,11 @@ export default function VendorAuthForm() {
               }
             />
 
-            {/* Single Row Register & Login Action Buttons */}
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            {/* Register Action Button */}
+            <div className="pt-2">
               <AnimatedButton type="submit" fullWidth size="lg" isLoading={loading}>
                 <span>Register</span>
                 <ArrowRight size={18} />
-              </AnimatedButton>
-              <AnimatedButton
-                fullWidth
-                size="lg"
-                variant="outline"
-                type="button"
-                onClick={toggleMode}
-              >
-                <span>Login</span>
               </AnimatedButton>
             </div>
           </motion.div>

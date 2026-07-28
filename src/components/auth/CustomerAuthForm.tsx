@@ -374,8 +374,8 @@ export default function CustomerAuthForm() {
               </button>
             </div>
 
-            {/* Single Row Login & Register Action Buttons */}
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            {/* Login Action Button */}
+            <div className="pt-2">
               <AnimatedButton
                 type="submit"
                 fullWidth
@@ -384,15 +384,6 @@ export default function CustomerAuthForm() {
               >
                 <span>Login</span>
                 <ArrowRight size={18} />
-              </AnimatedButton>
-              <AnimatedButton
-                fullWidth
-                size="lg"
-                variant="outline"
-                type="button"
-                onClick={toggleMode}
-              >
-                <span>Register</span>
               </AnimatedButton>
             </div>
           </motion.div>
@@ -479,8 +470,8 @@ export default function CustomerAuthForm() {
               }
             />
 
-            {/* Single Row Create Account & Login Action Buttons */}
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            {/* Register Action Button */}
+            <div className="pt-2">
               <AnimatedButton
                 fullWidth
                 size="lg"
@@ -489,15 +480,6 @@ export default function CustomerAuthForm() {
               >
                 <span>Register</span>
                 <ArrowRight size={18} />
-              </AnimatedButton>
-              <AnimatedButton
-                fullWidth
-                size="lg"
-                variant="outline"
-                type="button"
-                onClick={toggleMode}
-              >
-                <span>Login</span>
               </AnimatedButton>
             </div>
           </motion.div>
