@@ -70,6 +70,15 @@ export default function VendorAuthForm() {
     setLoading(true);
 
     try {
+      // Check if mobile number is already registered in mock user store
+      const mockUsers = JSON.parse(localStorage.getItem('nearby_mock_users') || '{}');
+      const pseudoEmail = getPseudoEmail(mobile);
+      if (mockUsers[mobile] || mockUsers[pseudoEmail]) {
+        setError('This mobile number is already registered. Please switch to Login mode to log in.');
+        setLoading(false);
+        return;
+      }
+
       // 1. Check if this number is already registered as a Customer
       const { data: existingCustomer } = await supabase
         .from('customers')
@@ -97,7 +106,6 @@ export default function VendorAuthForm() {
       }
 
       // 2. Register user with pseudo-email
-      const pseudoEmail = getPseudoEmail(mobile);
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: pseudoEmail,
         password: password,

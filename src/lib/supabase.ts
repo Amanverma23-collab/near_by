@@ -87,7 +87,7 @@ if (hasValidCreds) {
         if (users[identifier] || (email && users[email])) {
           return {
             data: { user: null, session: null },
-            error: new Error('An account with this mobile number already exists. Please login instead.')
+            error: new Error('This mobile number is already registered. Please switch to Login mode to log in.')
           };
         }
 
