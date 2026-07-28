@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, MapPin, Star, BadgeCheck, Phone, AlertCircle, Clock } from 'lucide-react';
-import { dummyVendors } from '../data/dummyVendors';
-import type { Vendor } from '../data/dummyVendors';
+import { dummyVendors, type Vendor } from '../data/dummyVendors';
+import { getEffectiveShopStatus } from '../utils/shopTiming';
+import { fetchCombinedVendors } from '../utils/vendorSync';
 
 const categoryNames: Record<string, string> = {
   'vehicle-emergency': 'Vehicle & Emergency Support',
@@ -46,18 +47,19 @@ function SkeletonCard() {
 }
 
 export default function CategoryPage() {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug } = useParams<{ slug: string; }>();
   const navigate = useNavigate();
   const location = useLocation();
   const [selectedFilter, setSelectedFilter] = useState(() => {
     return (location.state as { initialFilter?: string })?.initialFilter || 'All';
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [allVendors, setAllVendors] = useState<Vendor[]>(dummyVendors);
 
   const categoryName = categoryNames[slug || ''] || 'Services';
 
   // Filter vendors by category first
-  const categoryVendors = dummyVendors.filter((v) => v.category === slug);
+  const categoryVendors = allVendors.filter((v) => v.category === slug);
   const totalVerifiedCount = categoryVendors.filter((v) => v.isVerified).length;
 
   // Extract unique subServices for filter chips
@@ -75,10 +77,11 @@ export default function CategoryPage() {
     } else {
       setSelectedFilter('All');
     }
-    const timer = setTimeout(() => {
+
+    fetchCombinedVendors().then((vendors) => {
+      setAllVendors(vendors);
       setIsLoading(false);
-    }, 850); // Simulation loading time
-    return () => clearTimeout(timer);
+    });
   }, [slug, location.state]);
 
   // Motion Variants
@@ -238,16 +241,24 @@ export default function CategoryPage() {
                   </div>
 
                   {/* Operational Status & Hours */}
-                  <div className="flex items-center gap-1.5 text-[11px] font-body mb-4 border-t border-border-light/60 pt-3">
-                    <Clock size={12} className="text-ink-muted/80" />
-                    <div className="flex items-center gap-1">
-                      <div className={`w-1.5 h-1.5 rounded-full ${vendor.isOpenNow ? 'bg-emerald-500' : 'bg-rose-400'}`} />
-                      <span className={vendor.isOpenNow ? 'text-emerald-600 font-semibold' : 'text-rose-500 font-semibold'}>
-                        {vendor.isOpenNow ? 'Open Now' : 'Closed'}
-                      </span>
-                    </div>
-                    <span className="text-ink-muted">• {vendor.openingHours}</span>
-                  </div>
+                  {(() => {
+                    const status = getEffectiveShopStatus(vendor);
+                    return (
+                      <div className="flex items-center gap-1.5 text-[11px] font-body mb-4 border-t border-border-light/60 pt-3">
+                        <Clock size={12} className="text-ink-muted/80" />
+                        <div className="flex items-center gap-1">
+                          <div className={`w-1.5 h-1.5 rounded-full ${status.isOpen ? 'bg-emerald-500' : 'bg-rose-400'}`} />
+                          <span className={status.isOpen ? 'text-emerald-600 font-semibold' : 'text-rose-500 font-semibold'}>
+                            {status.isOpen ? 'Open Now' : 'Closed'}
+                          </span>
+                          {status.isManual && (
+                            <span className="font-mono text-[9px] px-1 bg-amber-100 text-amber-900 rounded font-bold">Manual</span>
+                          )}
+                        </div>
+                        <span className="text-ink-muted">• {status.openingTimeFormatted} – {status.closingTimeFormatted}</span>
+                      </div>
+                    );
+                  })()}
 
                   {/* Generous thumb-sized call / whatsapp action buttons */}
                   <div className="grid grid-cols-2 gap-3 mt-auto">

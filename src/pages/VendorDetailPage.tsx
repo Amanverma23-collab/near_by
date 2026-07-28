@@ -3,9 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, MapPin, Star, BadgeCheck, Phone, Clock,
-  ChevronLeft, ChevronRight, Navigation, ExternalLink,
+  ChevronLeft, ChevronRight, Navigation, ExternalLink, MessageSquare, Plus, Check,
 } from 'lucide-react';
-import { dummyVendors } from '../data/dummyVendors';
+import { dummyVendors, type Vendor } from '../data/dummyVendors';
+import { getEffectiveShopStatus } from '../utils/shopTiming';
+import { fetchCombinedVendors } from '../utils/vendorSync';
+import AddReviewModal from '../components/customer/AddReviewModal';
+import { getSavedReviews, saveNewReview } from '../utils/reviewStorage';
 
 /* ──────────────────── WhatsApp SVG Icon ──────────────────── */
 const WhatsAppIcon = ({ size = 16, className = '' }) => (
@@ -57,7 +61,27 @@ export default function VendorDetailPage() {
   const { vendorId } = useParams<{ vendorId: string }>();
   const navigate = useNavigate();
 
-  const vendor = dummyVendors.find((v) => v.id === vendorId);
+  const [allVendors, setAllVendors] = useState<Vendor[]>(dummyVendors);
+
+  useEffect(() => {
+    fetchCombinedVendors().then((vendors) => {
+      setAllVendors(vendors);
+    });
+  }, [vendorId]);
+
+  const vendor = allVendors.find((v) => v.id === vendorId) || dummyVendors.find((v) => v.id === vendorId);
+  const effectiveStatus = getEffectiveShopStatus(vendor || {});
+
+  const [isAddReviewOpen, setIsAddReviewOpen] = useState(false);
+  const [customReviews, setCustomReviews] = useState<any[]>([]);
+  const [reviewToast, setReviewToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (vendorId) {
+      const saved = getSavedReviews(vendorId);
+      setCustomReviews(saved);
+    }
+  }, [vendorId]);
 
   /* ── Gallery state ── */
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -239,11 +263,14 @@ export default function VendorDetailPage() {
             </div>
             <div className="flex items-center gap-1.5">
               <Clock size={12} className="text-ink-muted/80" />
-              <div className={`w-1.5 h-1.5 rounded-full ${vendor.isOpenNow ? 'bg-emerald-500' : 'bg-rose-400'}`} />
-              <span className={vendor.isOpenNow ? 'text-emerald-600 font-semibold' : 'text-rose-500 font-semibold'}>
-                {vendor.isOpenNow ? 'Open Now' : 'Closed'}
+              <div className={`w-1.5 h-1.5 rounded-full ${effectiveStatus.isOpen ? 'bg-emerald-500' : 'bg-rose-400'}`} />
+              <span className={effectiveStatus.isOpen ? 'text-emerald-600 font-semibold' : 'text-rose-500 font-semibold'}>
+                {effectiveStatus.isOpen ? 'Open Now' : 'Closed'}
               </span>
-              <span className="text-ink-muted">• {vendor.openingHours}</span>
+              {effectiveStatus.isManual && (
+                <span className="font-mono text-[9px] px-1 bg-amber-100 text-amber-900 rounded font-bold">Manual</span>
+              )}
+              <span className="text-ink-muted">• {effectiveStatus.openingTimeFormatted} – {effectiveStatus.closingTimeFormatted}</span>
             </div>
           </div>
         </FadeInSection>
@@ -330,51 +357,189 @@ export default function VendorDetailPage() {
           </div>
         </FadeInSection>
 
-        {/* ═══════════ F — REVIEWS SECTION ═══════════ */}
-        <FadeInSection delay={0.30} className="mb-8">
-          <div ref={reviewsSectionRef} className="scroll-mt-20">
-            <h3 className="text-sm font-display font-extrabold text-ink mb-3">Reviews</h3>
+        {/* ═══════════ F — REVIEWS SECTION (GOOGLE REVIEWS STYLE) ═══════════ */}
+        {(() => {
+          const allReviewsList = [...customReviews, ...(vendor.reviews || [])];
+          const totalReviewCount = (vendor.reviewCount || 0) + customReviews.length;
+          const avgRatingScore = (
+            allReviewsList.reduce((acc, r) => acc + r.rating, 0) / (allReviewsList.length || 1)
+          ).toFixed(1);
 
-            {/* Summary row */}
-            <div className="bg-surface-card rounded-[var(--radius-lg)] border border-border-light shadow-sm p-4 mb-4">
-              <div className="flex items-center gap-3">
-                <span className="text-3xl font-display font-extrabold text-ink">{vendor.rating.toFixed(1)}</span>
-                <div>
-                  <RatingStars rating={vendor.rating} size={16} />
-                  <p className="text-[10px] text-ink-muted font-body mt-0.5">Based on {vendor.reviewCount} reviews</p>
-                </div>
-              </div>
-            </div>
+          // 5-Star distribution calculations
+          const distribution = [5, 4, 3, 2, 1].map((star) => {
+            const count = allReviewsList.filter((r) => Math.floor(r.rating) === star).length;
+            const pct = totalReviewCount > 0 ? (count / allReviewsList.length) * 100 : 0;
+            return { star, count, pct };
+          });
 
-            {/* Individual reviews */}
-            <div className="space-y-3">
-              {vendor.reviews.map((review) => (
-                <motion.div
-                  key={review.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-surface-card rounded-[var(--radius-md)] border border-border-light p-3.5"
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs font-display font-bold text-ink">{review.reviewerName}</span>
-                    <span className="text-[10px] text-ink-muted font-body">
-                      {review.daysAgo === 0 ? 'Today' : review.daysAgo === 1 ? 'Yesterday' : `${review.daysAgo} days ago`}
-                    </span>
+          return (
+            <FadeInSection delay={0.30} className="mb-8">
+              <div ref={reviewsSectionRef} className="scroll-mt-20 space-y-4">
+                {/* Header title & write button */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-display font-extrabold text-ink leading-tight">
+                      Customer Reviews & Ratings
+                    </h3>
+                    <p className="text-[11px] text-ink-muted">
+                      Verified ratings from customers nearby
+                    </p>
                   </div>
-                  <RatingStars rating={review.rating} size={11} />
-                  <p className="text-xs text-ink-light font-body mt-2 leading-relaxed">{review.comment}</p>
-                </motion.div>
-              ))}
-            </div>
 
-            {/* View all link */}
-            {vendor.reviewCount > vendor.reviews.length && (
-              <button className="mt-3 text-xs font-display font-bold text-brand hover:underline cursor-pointer">
-                View all {vendor.reviewCount} reviews →
-              </button>
-            )}
-          </div>
-        </FadeInSection>
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => setIsAddReviewOpen(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-brand text-white font-display font-extrabold text-xs rounded-xl shadow-brand cursor-pointer hover:bg-brand-dark transition-all"
+                  >
+                    <Plus size={14} />
+                    <span>Rate & Review</span>
+                  </motion.button>
+                </div>
+
+                {/* Review Toast Success */}
+                <AnimatePresence>
+                  {reviewToast && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-bold flex items-center gap-2"
+                    >
+                      <Check size={16} className="text-emerald-600 shrink-0" />
+                      <span>{reviewToast}</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* ── GOOGLE REVIEWS BREAKDOWN CARD ── */}
+                <div className="bg-white rounded-3xl p-5 border border-border-light shadow-card space-y-4">
+                  <div className="flex flex-col sm:flex-row items-center gap-6">
+                    {/* Left Score */}
+                    <div className="text-center sm:text-left shrink-0">
+                      <div className="text-5xl font-extrabold font-display text-ink tracking-tight">
+                        {avgRatingScore}
+                      </div>
+                      <div className="flex items-center justify-center sm:justify-start gap-1 my-1.5">
+                        <RatingStars rating={Number(avgRatingScore)} size={18} />
+                      </div>
+                      <span className="text-xs text-ink-muted font-display font-bold">
+                        {totalReviewCount} verified ratings
+                      </span>
+                    </div>
+
+                    {/* Right Star Breakdown Bars */}
+                    <div className="flex-1 w-full space-y-1.5">
+                      {distribution.map(({ star, count, pct }) => (
+                        <div key={star} className="flex items-center gap-2.5 text-xs">
+                          <span className="w-3 font-bold text-ink-muted text-right font-mono">{star}</span>
+                          <Star size={12} className="text-amber-500 fill-amber-400 shrink-0" />
+                          <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden border border-gray-200/50">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${pct}%` }}
+                              transition={{ duration: 0.6, ease: 'easeOut' }}
+                              className="h-full bg-amber-400 rounded-full"
+                            />
+                          </div>
+                          <span className="w-5 text-[11px] text-ink-muted text-right font-mono font-bold">
+                            {count}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── INDIVIDUAL REVIEW CARDS ── */}
+                <div className="space-y-3 pt-1">
+                  {allReviewsList.map((review, idx) => {
+                    const avatarColor = [
+                      'bg-teal-500 text-white',
+                      'bg-amber-500 text-white',
+                      'bg-emerald-500 text-white',
+                      'bg-rose-500 text-white',
+                      'bg-indigo-500 text-white',
+                    ][idx % 5];
+
+                    return (
+                      <motion.div
+                        key={review.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className="bg-white rounded-2xl p-4 sm:p-5 border border-border-light shadow-xs space-y-3 relative"
+                      >
+                        {/* Header: User Avatar & Name */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-9 h-9 rounded-full ${avatarColor} font-display font-bold text-sm flex items-center justify-center shadow-xs`}>
+                              {(review.reviewerName || 'C')[0]}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <h4 className="text-sm font-display font-extrabold text-ink leading-tight">
+                                  {review.reviewerName}
+                                </h4>
+                                <span className="px-2 py-0.2 bg-teal-50 text-teal-700 text-[9px] font-display font-extrabold rounded-full border border-teal-100 uppercase tracking-wider">
+                                  Verified Customer
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-ink-muted font-body">
+                                📅 {review.daysAgo === 0 ? 'Today' : review.daysAgo === 1 ? 'Yesterday' : `${review.daysAgo || 1} days ago`}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Rating Stars */}
+                        <div className="flex items-center gap-1">
+                          <RatingStars rating={review.rating} size={14} />
+                        </div>
+
+                        {/* Comment text */}
+                        {review.comment && (
+                          <p className="text-xs text-ink-light font-body leading-relaxed">
+                            "{review.comment}"
+                          </p>
+                        )}
+
+                        {/* Review Photo Attachment */}
+                        {review.photoUrl && (
+                          <div className="pt-1">
+                            <div className="w-28 h-28 rounded-2xl overflow-hidden border border-border-light shadow-xs hover:opacity-90 transition-opacity">
+                              <img src={review.photoUrl} alt="Customer review" className="w-full h-full object-cover" />
+                            </div>
+                          </div>
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </div>
+
+                {/* Add Review Modal */}
+                <AddReviewModal
+                  vendorName={vendor.name}
+                  isOpen={isAddReviewOpen}
+                  onClose={() => setIsAddReviewOpen(false)}
+                  onSubmitReview={(newRev) => {
+                    const savedItem = saveNewReview(vendor.id || vendorId || 'v1', {
+                      reviewerName: newRev.reviewerName,
+                      rating: newRev.rating,
+                      comment: newRev.comment,
+                      photoUrl: newRev.photoUrl,
+                      vendorName: vendor.name,
+                    });
+
+                    setCustomReviews((prev) => [savedItem, ...prev]);
+                    setReviewToast('Thank you! Your rating & review has been published.');
+                    setTimeout(() => setReviewToast(null), 4000);
+                  }}
+                />
+              </div>
+            </FadeInSection>
+          );
+        })()}
       </div>
 
       {/* ═══════════ G — STICKY BOTTOM BAR (mobile) ═══════════ */}

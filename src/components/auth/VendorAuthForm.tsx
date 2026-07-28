@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Phone, User, Mail, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
 import PasswordInput from '../ui/PasswordInput';
@@ -8,6 +9,7 @@ import PasswordInput from '../ui/PasswordInput';
 type AuthMode = 'login' | 'register';
 
 export default function VendorAuthForm() {
+  const navigate = useNavigate();
   const [mode, setMode] = useState<AuthMode>('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,14 +70,25 @@ export default function VendorAuthForm() {
     setLoading(true);
 
     try {
-      // 1. Check if duplicate mobile number exists in vendors table
-      const { data: existingVendor, error: checkError } = await supabase
+      // 1. Check if this number is already registered as a Customer
+      const { data: existingCustomer } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('mobile_number', mobile)
+        .maybeSingle();
+
+      if (existingCustomer) {
+        setError('This number is already registered as a Customer. Please use a different number, or login via the Customer tab.');
+        setLoading(false);
+        return;
+      }
+
+      // 2. Check if duplicate mobile number exists in vendors table
+      const { data: existingVendor } = await supabase
         .from('vendors')
         .select('id')
         .eq('phone_number', mobile)
         .maybeSingle();
-
-      if (checkError) throw checkError;
 
       if (existingVendor) {
         setError('This number is already registered, please login instead');
@@ -92,28 +105,27 @@ export default function VendorAuthForm() {
 
       if (signUpError) throw signUpError;
 
-      const user = signUpData.user;
-      if (!user) throw new Error('User registration failed');
+      const user = signUpData?.user;
 
-      // 3. Insert vendor record with matching database columns and required defaults
-      const { error: insertError } = await supabase.from('vendors').insert({
-        auth_user_id: user.id,
-        owner_name: fullName.trim(),
-        phone_number: mobile,
-        name: 'Pending Shop Registration',
-        category: 'pending',
-        sub_service: 'pending',
-        address: 'Pending Shop Registration',
-        opening_hours: 'pending',
-        whatsapp_number: mobile,
-        latitude: 0,
-        longitude: 0,
-        is_verified: false
-      });
+      // 3. Insert vendor record
+      if (user) {
+        await supabase.from('vendors').insert({
+          auth_user_id: user.id,
+          owner_name: fullName.trim(),
+          phone_number: mobile,
+          name: 'Pending Shop Registration',
+          category: 'pending',
+          sub_service: 'pending',
+          address: 'Pending Shop Registration',
+          opening_hours: 'pending',
+          whatsapp_number: mobile,
+          latitude: 0,
+          longitude: 0,
+          is_verified: false
+        });
+      }
 
-      if (insertError) throw insertError;
-
-      // 4. Sign in to establish active session (if signUp didn't auto-signin)
+      // 4. Sign in to establish active session
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: pseudoEmail,
         password: password,
@@ -121,7 +133,10 @@ export default function VendorAuthForm() {
 
       if (signInError) throw signInError;
 
-      setSuccessMsg('Account created! Verification pending. Redirecting...');
+      setSuccessMsg('Vendor account created! Redirecting to shop details...');
+      setTimeout(() => {
+        navigate('/vendor/register', { replace: true });
+      }, 400);
     } catch (err: any) {
       console.error('Vendor Register Error:', err);
       setError(err.message || 'Failed to create account.');
@@ -146,17 +161,52 @@ export default function VendorAuthForm() {
 
     try {
       const pseudoEmail = getPseudoEmail(mobile);
-      const { error: loginError } = await supabase.auth.signInWithPassword({
+      const { data: authData, error: loginError } = await supabase.auth.signInWithPassword({
         email: pseudoEmail,
         password: password,
       });
 
       if (loginError) throw loginError;
+
+      // Role validation — confirm this user actually has a VENDOR record
+      const { data: vendorRecord } = await supabase
+        .from('vendors')
+        .select('id, is_verified, name')
+        .eq('auth_user_id', authData.user.id)
+        .maybeSingle();
+
+      if (!vendorRecord) {
+        // This account exists but is NOT a vendor — likely a customer account
+        await supabase.auth.signOut();
+        setError('This number is registered as a Customer. Please use the Customer tab to login.');
+        setLoading(false);
+        return;
+      }
+
+      // Redirect based on vendor profile status
+      if (vendorRecord.name !== 'Pending Shop Registration') {
+        if (vendorRecord.is_verified) {
+          navigate('/dashboard', { replace: true });
+        } else {
+          navigate('/vendor/pending', { replace: true });
+        }
+      } else {
+        navigate('/vendor/register', { replace: true });
+      }
     } catch (err: any) {
       console.error('Vendor Login Error:', err);
       setError(err.message || 'Invalid credentials.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (mode === 'login') {
+      handleLogin();
+    } else {
+      handleCreateAccount();
     }
   };
 
@@ -171,7 +221,7 @@ export default function VendorAuthForm() {
     'w-full pl-12 pr-4 py-3 text-base font-body bg-surface-card border-2 border-border rounded-[var(--radius-md)] transition-all duration-200 outline-none hover:border-ink-muted focus:border-brand focus:shadow-[0_0_0_3px_var(--color-brand-glow)]';
 
   return (
-    <div className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
       {/* Messages */}
       <AnimatePresence mode="wait">
         {error && (
@@ -248,7 +298,7 @@ export default function VendorAuthForm() {
                   setError(null);
                   setSuccessMsg('Forgot password feature coming soon!');
                 }}
-                className="text-sm text-brand font-medium hover:text-brand-dark transition-colors"
+                className="text-sm text-brand font-medium hover:text-brand-dark transition-colors cursor-pointer"
               >
                 Forgot Password?
               </button>
@@ -256,7 +306,7 @@ export default function VendorAuthForm() {
 
             {/* Login & Register Buttons */}
             <div className="flex flex-col gap-3">
-              <AnimatedButton fullWidth size="lg" isLoading={loading} onClick={handleLogin}>
+              <AnimatedButton type="submit" fullWidth size="lg" isLoading={loading}>
                 <span>Login</span>
                 <ArrowRight size={20} />
               </AnimatedButton>
@@ -370,7 +420,7 @@ export default function VendorAuthForm() {
 
             {/* Create Account & Login Buttons */}
             <div className="flex flex-col gap-3">
-              <AnimatedButton fullWidth size="lg" isLoading={loading} onClick={handleCreateAccount}>
+              <AnimatedButton type="submit" fullWidth size="lg" isLoading={loading}>
                 <span>Create Vendor Account</span>
                 <ArrowRight size={20} />
               </AnimatedButton>
@@ -387,6 +437,7 @@ export default function VendorAuthForm() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </form>
   );
 }
+

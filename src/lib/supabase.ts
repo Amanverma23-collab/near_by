@@ -3,6 +3,9 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 const rawUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const rawAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
+// Dev mode flag — set to true to bypass OTP and use local mock store during development
+export const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
+
 // Validate URL format
 const isValidUrl = (url: string): boolean => {
   if (!url) return false;
@@ -15,6 +18,7 @@ const isValidUrl = (url: string): boolean => {
 };
 
 const hasValidCreds =
+  !DEV_MODE &&
   rawUrl &&
   isValidUrl(rawUrl) &&
   !rawUrl.includes('your-supabase-url-here') &&
@@ -27,7 +31,7 @@ if (hasValidCreds) {
   supabaseClient = createClient(rawUrl, rawAnonKey);
 } else {
   console.warn(
-    '⚠️ NearBy: Valid Supabase credentials not found. Initializing Local Mock Client.'
+    '⚠️ NearBy: Dev Mode or missing Supabase backend. Initializing Local Mock Client.'
   );
 
   // Mock Auth Callback Listeners
@@ -50,6 +54,22 @@ if (hasValidCreds) {
     }
   };
 
+  const getMockDb = (table: string) => {
+    try {
+      return JSON.parse(localStorage.getItem(`nearby_mock_db_${table}`) || '[]');
+    } catch {
+      return [];
+    }
+  };
+
+  const setMockDb = (table: string, items: any[]) => {
+    try {
+      localStorage.setItem(`nearby_mock_db_${table}`, JSON.stringify(items));
+    } catch (e) {
+      console.error(`Failed to update mock db for ${table}`, e);
+    }
+  };
+
   supabaseClient = {
     auth: {
       getSession: async () => {
@@ -60,11 +80,13 @@ if (hasValidCreds) {
         const session = getSessionFromStorage();
         return { data: { user: session?.user || null }, error: null };
       },
-      signUp: async ({ phone, password }: any) => {
+      signUp: async ({ email, phone, password }: any) => {
+        const identifier = phone || (email ? email.replace(/@nearbe\.app$/, '') : 'user');
         const userId = 'mock-user-' + Math.random().toString(36).substring(2, 11);
         const mockUser = {
           id: userId,
-          phone,
+          email: email || `${identifier}@nearbe.app`,
+          phone: identifier,
           role: 'authenticated',
           factor_id: null,
           created_at: new Date().toISOString(),
@@ -78,26 +100,34 @@ if (hasValidCreds) {
           expires_at: Math.floor(Date.now() / 1000) + 3600,
         };
 
-        // Save user registration credentials
         const users = getMockUsers();
-        users[phone] = { user: mockUser, password };
+        users[identifier] = { user: mockUser, password };
+        if (email) users[email] = { user: mockUser, password };
         localStorage.setItem('nearby_mock_users', JSON.stringify(users));
-
-        // Save active session
         localStorage.setItem('nearby_mock_session', JSON.stringify(mockSession));
 
-        // Notify listeners
         authListeners.forEach((cb) => cb('SIGNED_IN', mockSession));
 
         return { data: { user: mockUser, session: mockSession }, error: null };
       },
-      signInWithPassword: async ({ phone, password }: any) => {
+      signInWithPassword: async ({ email, phone, password }: any) => {
+        const identifier = phone || (email ? email.replace(/@nearbe\.app$/, '') : 'user');
         const users = getMockUsers();
-        const match = users[phone];
-        if (!match || match.password !== password) {
+        const match = users[identifier] || (email ? users[email] : null) || (phone ? users[phone] : null);
+
+        // Reject if user was never registered via signUp
+        if (!match) {
           return {
             data: { user: null, session: null },
-            error: new Error('Invalid login credentials in Dev Mode.'),
+            error: { message: 'Invalid login credentials', status: 400 },
+          };
+        }
+
+        // Validate password
+        if (match.password !== password) {
+          return {
+            data: { user: null, session: null },
+            error: { message: 'Invalid login credentials', status: 400 },
           };
         }
 
@@ -116,11 +146,9 @@ if (hasValidCreds) {
         return { data: { user: match.user, session: mockSession }, error: null };
       },
       signInWithOtp: async ({ phone }: any) => {
-        console.log('Mock Auth: signInWithOtp triggered for phone:', phone);
         return { data: { user: null, session: null }, error: null };
       },
       verifyOtp: async ({ phone, token }: any) => {
-        console.log('Mock Auth: verifyOtp triggered for phone:', phone, 'with token:', token);
         const userId = 'mock-user-' + Math.random().toString(36).substring(2, 11);
         const mockUser = {
           id: userId,
@@ -144,22 +172,11 @@ if (hasValidCreds) {
         return { data: { user: mockUser, session: mockSession }, error: null };
       },
       updateUser: async ({ password }: any) => {
-        console.log('Mock Auth: updateUser (set password) triggered');
         const session = getSessionFromStorage();
-        if (!session || !session.user) {
-          return { data: { user: null }, error: new Error('Mock Auth: No active session found to update.') };
+        if (!session?.user) {
+          return { data: { user: null }, error: new Error('Mock Auth: No active session found.') };
         }
-
-        const updatedUser = { ...session.user };
-        const users = getMockUsers();
-        users[updatedUser.phone] = { user: updatedUser, password };
-        localStorage.setItem('nearby_mock_users', JSON.stringify(users));
-
-        const updatedSession = { ...session, user: updatedUser };
-        localStorage.setItem('nearby_mock_session', JSON.stringify(updatedSession));
-        authListeners.forEach((cb) => cb('SIGNED_IN', updatedSession));
-
-        return { data: { user: updatedUser }, error: null };
+        return { data: { user: session.user }, error: null };
       },
       signOut: async () => {
         localStorage.removeItem('nearby_mock_session');
@@ -168,7 +185,6 @@ if (hasValidCreds) {
       },
       onAuthStateChange: (callback: any) => {
         authListeners.add(callback);
-        // Execute immediately with current state
         const session = getSessionFromStorage();
         callback(session ? 'SIGNED_IN' : 'SIGNED_OUT', session);
 
@@ -185,52 +201,84 @@ if (hasValidCreds) {
     },
     from: (table: string) => {
       return {
-        select: (columns: string) => {
+        select: (columns: string = '*') => {
+          const createQuery = (col?: string, val?: any) => {
+            const getFiltered = () => {
+              const items = getMockDb(table);
+              if (!col) return items;
+              return items.filter((i: any) => i[col] === val);
+            };
+            return {
+              maybeSingle: async () => {
+                const items = getFiltered();
+                return { data: items[0] || null, error: null };
+              },
+              single: async () => {
+                const items = getFiltered();
+                return { data: items[0] || null, error: items[0] ? null : new Error('Not found') };
+              },
+              order: () => createQuery(col, val),
+              limit: () => createQuery(col, val),
+              then: (resolve: any) => resolve({ data: getFiltered(), error: null }),
+            };
+          };
+
           return {
-            eq: (col: string, val: any) => {
-              return {
-                maybeSingle: async () => {
-                  try {
-                    const items = JSON.parse(
-                      localStorage.getItem(`nearby_mock_db_${table}`) || '[]'
-                    );
-                    const item = items.find((i: any) => i[col] === val);
-                    return { data: item || null, error: null };
-                  } catch {
-                    return { data: null, error: null };
-                  }
-                },
-              };
+            eq: (col: string, val: any) => createQuery(col, val),
+            maybeSingle: async () => {
+              const items = getMockDb(table);
+              return { data: items[0] || null, error: null };
+            },
+            single: async () => {
+              const items = getMockDb(table);
+              return { data: items[0] || null, error: items[0] ? null : new Error('Not found') };
             },
           };
         },
         insert: async (data: any) => {
-          try {
-            const items = JSON.parse(
-              localStorage.getItem(`nearby_mock_db_${table}`) || '[]'
-            );
-            const newRecord = {
-              id: 'mock-record-' + Math.random().toString(36).substring(2, 11),
-              created_at: new Date().toISOString(),
-              ...data,
-            };
-            items.push(newRecord);
-            localStorage.setItem(`nearby_mock_db_${table}`, JSON.stringify(items));
-            return { data: newRecord, error: null };
-          } catch (err: any) {
-            return { data: null, error: err };
-          }
+          const items = getMockDb(table);
+          const records = Array.isArray(data) ? data : [data];
+          const newRecords = records.map((r) => ({
+            id: 'mock-id-' + Math.random().toString(36).substring(2, 11),
+            created_at: new Date().toISOString(),
+            ...r,
+          }));
+          items.push(...newRecords);
+          setMockDb(table, items);
+          return { data: Array.isArray(data) ? newRecords : newRecords[0], error: null };
+        },
+        update: (updateData: any) => {
+          return {
+            eq: async (col: string, val: any) => {
+              const items = getMockDb(table);
+              const updated = items.map((item: any) => {
+                if (item[col] === val) {
+                  return { ...item, ...updateData };
+                }
+                return item;
+              });
+              setMockDb(table, updated);
+              return { data: updateData, error: null };
+            },
+          };
         },
       };
+    },
+    storage: {
+      createBucket: async () => ({ data: null, error: null }),
+      from: (bucket: string) => ({
+        upload: async (path: string, file: any) => ({ data: { path }, error: null }),
+        getPublicUrl: (path: string) => ({
+          data: { publicUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&q=80&w=600' },
+        }),
+      }),
     },
   };
 }
 
 export const supabase = supabaseClient as SupabaseClient;
 
-// Dev mode flag — set to true to bypass OTP verification during development
-export const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
-
 // Default launch city (configurable, not hardcoded into logic)
 export const DEFAULT_CITY = 'Bangalore';
+
 

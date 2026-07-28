@@ -592,13 +592,14 @@ export default function VendorRegisterPage() {
         whatsapp_number: wizardData.mobileNumber, // sync WhatsApp
       };
 
-      // Try setting verification_requested_at column
+      // Try setting verification_requested_at and verification_status columns
       let dbError = null;
       try {
         const { error } = await supabase
           .from('vendors')
           .update({
             ...updatePayload,
+            verification_status: 'pending',
             verification_requested_at: new Date().toISOString()
           })
           .eq('auth_user_id', user.id);
@@ -607,9 +608,9 @@ export default function VendorRegisterPage() {
         dbError = err;
       }
 
-      // If it fails (e.g. column doesn't exist), retry without it
+      // If it fails (e.g. columns don't exist), retry without them
       if (dbError) {
-        console.warn('Failed with verification_requested_at, retrying without it...', dbError);
+        console.warn('Failed with verification columns, retrying without them...', dbError);
         const { error: retryError } = await supabase
           .from('vendors')
           .update(updatePayload)

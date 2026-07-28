@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS public.customers (
     full_name TEXT NOT NULL,
     mobile_number TEXT NOT NULL,
     city TEXT DEFAULT 'Bangalore',
+    avatar_url TEXT,
     latitude DOUBLE PRECISION,
     longitude DOUBLE PRECISION,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
@@ -58,6 +59,7 @@ CREATE TABLE IF NOT EXISTS public.vendors (
     reviews JSONB DEFAULT '[]',          -- JSON array of {id, reviewerName, rating, comment, daysAgo}
     review_count INTEGER DEFAULT 0,
     verification_requested_at TIMESTAMP WITH TIME ZONE,
+    verification_status TEXT DEFAULT NULL CHECK (verification_status IN ('pending', 'approved', 'rejected')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

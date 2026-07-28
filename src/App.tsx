@@ -11,6 +11,15 @@ import ProfilePage from './pages/ProfilePage';
 import SettingsPage from './pages/SettingsPage';
 import VendorRegisterPage from './pages/vendor/VendorRegisterPage';
 import VendorPendingPage from './pages/vendor/VendorPendingPage';
+import SubscriptionPlaceholder from './pages/vendor/SubscriptionPlaceholder';
+import PlanDetailPage from './pages/vendor/PlanDetailPage';
+import VendorServicesPage from './pages/vendor/VendorServicesPage';
+import SearchPage from './pages/SearchPage';
+import FavoritesPage from './pages/FavoritesPage';
+import MyRatingsPage from './pages/MyRatingsPage';
+import CustomerBottomNav from './components/navigation/CustomerBottomNav';
+
+import { LanguageProvider } from './context/LanguageContext';
 
 function AppRoutes() {
   return (
@@ -19,11 +28,17 @@ function AppRoutes() {
         <Route path="/" element={<AuthPage />} />
         <Route path="/location" element={<LocationPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/search" element={<SearchPage />} />
+        <Route path="/favorites" element={<FavoritesPage />} />
         <Route path="/category/:slug" element={<CategoryPage />} />
         <Route path="/vendor/:vendorId" element={<VendorDetailPage />} />
         <Route path="/vendor/register" element={<VendorRegisterPage />} />
         <Route path="/vendor/pending" element={<VendorPendingPage />} />
+        <Route path="/vendor/subscriptions" element={<SubscriptionPlaceholder />} />
+        <Route path="/vendor/plan/:planId" element={<PlanDetailPage />} />
+        <Route path="/vendor/services" element={<VendorServicesPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/my-ratings" element={<MyRatingsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -34,11 +49,14 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <LocationProvider>
-          <AppRoutes />
-        </LocationProvider>
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <LocationProvider>
+            <AppRoutes />
+            <CustomerBottomNav />
+          </LocationProvider>
+        </AuthProvider>
+      </LanguageProvider>
     </BrowserRouter>
   );
 }

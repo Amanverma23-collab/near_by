@@ -30,6 +30,7 @@ import {
   LocateFixed,
 } from 'lucide-react';
 import { useLocation } from '../../context/LocationContext';
+import { useLanguage } from '../../context/LanguageContext';
 import CitySelector from '../location/CitySelector';
 
 interface ServiceInfo {
@@ -130,6 +131,7 @@ interface ServiceTileProps {
 
 function ServiceTile({ categorySlug, service, gradient, shadowColor, categoryColor }: ServiceTileProps) {
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   const handleClick = () => {
     navigate(`/category/${categorySlug}`, {
@@ -155,14 +157,14 @@ function ServiceTile({ categorySlug, service, gradient, shadowColor, categoryCol
       />
       
       {/* Bottom vertical gradient scrim for text readability */}
-      <div className="absolute inset-x-0 bottom-0 h-[65%] bg-gradient-to-t from-white via-white/80 to-transparent z-10 pointer-events-none" />
+      <div className="absolute inset-x-0 bottom-0 h-[70%] bg-gradient-to-t from-white via-white/90 to-transparent z-10 pointer-events-none" />
 
       {/* Label and category dot at bottom */}
-      <div className="relative z-20 px-3 pb-2.5 pt-4">
-        <div className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: categoryColor }} />
-          <span className="text-[11px] sm:text-xs font-display font-extrabold text-ink leading-tight line-clamp-2">
-            {service.label}
+      <div className="relative z-20 px-3 pb-2 pt-3">
+        <div className="flex items-start gap-1.5 pt-1">
+          <span className="w-1.5 h-1.5 rounded-full shrink-0 mt-1" style={{ backgroundColor: categoryColor }} />
+          <span className="text-[11px] sm:text-xs font-display font-extrabold text-ink leading-snug line-clamp-2 pb-0.5">
+            {t(service.label)}
           </span>
         </div>
       </div>
@@ -186,6 +188,7 @@ const sectionVariants = {
 export default function CategoryGrid() {
   const navigate = useNavigate();
   const { location, setCityManually } = useLocation();
+  const { t } = useLanguage();
   const [cityModalOpen, setCityModalOpen] = useState(false);
 
   const handleCitySelect = (city: string) => {
@@ -233,10 +236,10 @@ export default function CategoryGrid() {
         >
           <div className="min-w-0">
             <h2 className="text-lg font-display font-bold text-ink truncate">
-              What do you need?
+              {t('what_do_you_need')}
             </h2>
             <p className="text-xs sm:text-sm text-ink-muted font-body mt-0.5 truncate">
-              Tap a category to find services
+              {t('tap_category')}
             </p>
           </div>
 
@@ -247,7 +250,7 @@ export default function CategoryGrid() {
               className="flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-brand-50 text-brand rounded-[var(--radius-pill)] transition-all text-[11px] font-display font-bold border border-brand/20 shadow-sm shrink-0 cursor-pointer"
             >
               <MapPin size={11} className="text-brand shrink-0" />
-              <span className="truncate max-w-[80px]">{location?.city || 'Set Location'}</span>
+              <span className="truncate max-w-[80px]">{location?.city || t('set_location')}</span>
               <ChevronDown size={11} className="text-brand/80 shrink-0" />
             </button>
           </div>
@@ -266,13 +269,13 @@ export default function CategoryGrid() {
               {/* Section Header */}
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm sm:text-base font-display font-extrabold text-ink">
-                  {section.title}
+                  {t(section.slug)}
                 </h3>
                 <button 
                   onClick={() => navigate(`/category/${section.slug}`)}
                   className="text-[11px] font-display font-bold text-brand hover:underline cursor-pointer"
                 >
-                  See All
+                  {t('see_all')}
                 </button>
               </div>
 

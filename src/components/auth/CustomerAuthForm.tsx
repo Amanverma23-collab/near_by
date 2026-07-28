@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Phone, User, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
 import PasswordInput from '../ui/PasswordInput';
@@ -8,6 +9,7 @@ import PasswordInput from '../ui/PasswordInput';
 type AuthMode = 'login' | 'register';
 
 export default function CustomerAuthForm() {
+  const navigate = useNavigate();
   const [mode, setMode] = useState<AuthMode>('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,14 +65,25 @@ export default function CustomerAuthForm() {
     setLoading(true);
 
     try {
-      // 1. Check if duplicate mobile number exists in customers table
-      const { data: existingCustomer, error: checkError } = await supabase
+      // 1. Check if this number is already registered as a Vendor
+      const { data: existingVendor } = await supabase
+        .from('vendors')
+        .select('id')
+        .eq('phone_number', mobile)
+        .maybeSingle();
+
+      if (existingVendor) {
+        setError('This number is already registered as a Vendor. Please use a different number, or login via the Vendor tab.');
+        setLoading(false);
+        return;
+      }
+
+      // 2. Check if duplicate mobile number exists in customers table
+      const { data: existingCustomer } = await supabase
         .from('customers')
         .select('id')
         .eq('mobile_number', mobile)
         .maybeSingle();
-
-      if (checkError) throw checkError;
 
       if (existingCustomer) {
         setError('This number is already registered, please login instead');
@@ -87,19 +100,18 @@ export default function CustomerAuthForm() {
 
       if (signUpError) throw signUpError;
 
-      const user = signUpData.user;
-      if (!user) throw new Error('User registration failed');
+      const user = signUpData?.user;
 
       // 3. Insert customer record
-      const { error: insertError } = await supabase.from('customers').insert({
-        auth_user_id: user.id,
-        full_name: fullName.trim(),
-        mobile_number: mobile,
-      });
+      if (user) {
+        await supabase.from('customers').insert({
+          auth_user_id: user.id,
+          full_name: fullName.trim(),
+          mobile_number: mobile,
+        });
+      }
 
-      if (insertError) throw insertError;
-
-      // 4. Sign in to establish active session (if signUp didn't auto-signin)
+      // 4. Sign in to establish active session
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: pseudoEmail,
         password: password,
@@ -108,6 +120,9 @@ export default function CustomerAuthForm() {
       if (signInError) throw signInError;
 
       setSuccessMsg('Account created! Redirecting...');
+      setTimeout(() => {
+        navigate('/location', { replace: true });
+      }, 300);
     } catch (err: any) {
       console.error('Customer Register Error:', err);
       setError(err.message || 'Failed to create account. Please try again.');
@@ -132,17 +147,44 @@ export default function CustomerAuthForm() {
 
     try {
       const pseudoEmail = getPseudoEmail(mobile);
-      const { error: loginError } = await supabase.auth.signInWithPassword({
+      const { data: authData, error: loginError } = await supabase.auth.signInWithPassword({
         email: pseudoEmail,
         password: password,
       });
 
       if (loginError) throw loginError;
+
+      // Role validation — confirm this user actually has a CUSTOMER record
+      const { data: customerRecord } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('auth_user_id', authData.user.id)
+        .maybeSingle();
+
+      if (!customerRecord) {
+        // This account exists but is NOT a customer — likely a vendor account
+        await supabase.auth.signOut();
+        setError('This number is registered as a Vendor. Please use the Vendor tab to login.');
+        setLoading(false);
+        return;
+      }
+
+      // Redirect upon successful customer authentication
+      navigate('/location', { replace: true });
     } catch (err: any) {
       console.error('Customer Login Error:', err);
       setError(err.message || 'Invalid credentials. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (mode === 'login') {
+      handleLogin();
+    } else {
+      handleCreateAccount();
     }
   };
 
@@ -154,7 +196,7 @@ export default function CustomerAuthForm() {
   };
 
   return (
-    <div className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
       {/* Error/Success Messages */}
       <AnimatePresence mode="wait">
         {error && (
@@ -236,7 +278,7 @@ export default function CustomerAuthForm() {
                   setError(null);
                   setSuccessMsg('Forgot password feature coming soon!');
                 }}
-                className="text-sm text-brand font-medium hover:text-brand-dark transition-colors"
+                className="text-sm text-brand font-medium hover:text-brand-dark transition-colors cursor-pointer"
               >
                 Forgot Password?
               </button>
@@ -245,10 +287,10 @@ export default function CustomerAuthForm() {
             {/* Login & Register Buttons */}
             <div className="flex flex-col gap-3">
               <AnimatedButton
+                type="submit"
                 fullWidth
                 size="lg"
                 isLoading={loading}
-                onClick={handleLogin}
               >
                 <span>Login</span>
                 <ArrowRight size={20} />
@@ -371,6 +413,6 @@ export default function CustomerAuthForm() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </form>
   );
 }

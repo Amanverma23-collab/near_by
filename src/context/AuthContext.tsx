@@ -32,16 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const determineRole = async (userId: string): Promise<UserRole> => {
-    // Check customers table first
-    const { data: customer } = await supabase
-      .from('customers')
-      .select('id')
-      .eq('auth_user_id', userId)
-      .maybeSingle();
-
-    if (customer) return 'customer';
-
-    // Check vendors table
+    // Check vendors table first
     const { data: vendor } = await supabase
       .from('vendors')
       .select('id')
@@ -50,6 +41,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (vendor) return 'vendor';
 
+    // Check customers table
+    const { data: customer } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('auth_user_id', userId)
+      .maybeSingle();
+
+    if (customer) return 'customer';
+
+    // No record in either table — role is unknown (don't default to customer)
     return null;
   };
 
