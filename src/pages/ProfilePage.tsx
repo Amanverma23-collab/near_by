@@ -40,7 +40,7 @@ export default function ProfilePage() {
   // Profile Form States
   const [isEditing, setIsEditing] = useState(false);
   const [fullName, setFullName] = useState(
-    user?.user_metadata?.full_name || 'Rahul Sharma'
+    localStorage.getItem('nearby_customer_name') || user?.user_metadata?.full_name || 'User Account'
   );
   const [email, setEmail] = useState(
     user?.email || 'rahul.sharma@example.com'

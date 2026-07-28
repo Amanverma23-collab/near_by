@@ -96,6 +96,12 @@ export default function CustomerAuthForm() {
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: pseudoEmail,
         password: password,
+        options: {
+          data: {
+            full_name: fullName.trim(),
+            role: 'customer'
+          }
+        }
       });
 
       if (signUpError) throw signUpError;
@@ -111,6 +117,9 @@ export default function CustomerAuthForm() {
         });
       }
 
+      localStorage.setItem('nearby_customer_name', fullName.trim());
+      localStorage.setItem('nearby_user_role', 'customer');
+
       // 4. Sign in to establish active session
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: pseudoEmail,
@@ -122,6 +131,7 @@ export default function CustomerAuthForm() {
       setSuccessMsg('Account created! Redirecting...');
       setTimeout(() => {
         navigate('/location', { replace: true });
+        window.location.reload();
       }, 300);
     } catch (err: any) {
       console.error('Customer Register Error:', err);
@@ -147,77 +157,43 @@ export default function CustomerAuthForm() {
 
     try {
       const pseudoEmail = getPseudoEmail(mobile);
-      let authData: any = null;
-      let loginError: any = null;
 
-      try {
-        const res = await supabase.auth.signInWithPassword({
-          email: pseudoEmail,
-          password: password,
-        });
-        authData = res.data;
-        loginError = res.error;
-      } catch (netErr: any) {
-        loginError = netErr;
-      }
-
-      // Fallback for network error / Failed to fetch on Vercel
-      if (loginError && (loginError.message?.includes('fetch') || loginError.message?.includes('NetworkError') || !authData?.user)) {
-        if (!loginError.message?.includes('fetch') && !loginError.message?.includes('NetworkError') && loginError.status === 400 && !loginError.message?.includes('credentials')) {
-          throw loginError;
-        }
-
-        // Handle network error or missing user gracefully with local session fallback
-        if (loginError.message?.includes('fetch') || loginError.message?.includes('NetworkError')) {
-          console.warn('Supabase fetch failed, executing fallback mock customer auth');
-          const userId = 'mock-user-' + mobile;
-          const mockUser = {
-            id: userId,
-            email: pseudoEmail,
-            phone: mobile,
-            role: 'authenticated',
-            user_metadata: { full_name: 'Rahul Sharma' },
-            created_at: new Date().toISOString(),
-          };
-          const mockSession = {
-            access_token: 'mock-token-' + userId,
-            token_type: 'bearer',
-            expires_in: 3600,
-            user: mockUser,
-          };
-          localStorage.setItem('nearby_mock_session', JSON.stringify(mockSession));
-          localStorage.setItem('nearby_customer_name', 'Rahul Sharma');
-          localStorage.setItem('nearby_user_role', 'customer');
-          navigate('/location', { replace: true });
-          window.location.reload();
-          return;
-        }
-
-        throw loginError;
-      }
-
-      localStorage.setItem('nearby_user_role', 'customer');
-
-      // Role validation — confirm or create customer record
-      let { data: customerRecord } = await supabase
-        .from('customers')
+      // Check if this number is registered ONLY as a Vendor
+      const { data: vendorRecord } = await supabase
+        .from('vendors')
         .select('id')
-        .eq('auth_user_id', authData.user.id)
+        .eq('phone_number', mobile)
         .maybeSingle();
 
-      if (!customerRecord) {
-        // If not registered as customer, auto-seed customer record for this user
-        const { data: newCust } = await supabase
-          .from('customers')
-          .insert({
-            auth_user_id: authData.user.id,
-            full_name: 'Customer ' + mobile.slice(-4),
-            mobile_number: mobile,
-          })
-          .select('id')
-          .maybeSingle();
-        customerRecord = newCust;
+      const { data: existingCust } = await supabase
+        .from('customers')
+        .select('id, full_name')
+        .eq('mobile_number', mobile)
+        .maybeSingle();
+
+      if (vendorRecord && !existingCust) {
+        setError('This mobile number is registered as a Vendor account. Please use the Vendor tab to log in.');
+        setLoading(false);
+        return;
       }
+
+      const { data: authData, error: signInErr } = await supabase.auth.signInWithPassword({
+        email: pseudoEmail,
+        password: password,
+      });
+
+      if (signInErr) {
+        throw signInErr;
+      }
+
+      if (!authData?.user) {
+        throw new Error('Login failed. Please check your credentials.');
+      }
+
+      // Preserve registered customer name
+      const customerName = existingCust?.full_name || authData.user.user_metadata?.full_name || 'Customer';
+      localStorage.setItem('nearby_customer_name', customerName);
+      localStorage.setItem('nearby_user_role', 'customer');
 
       // Redirect upon successful customer authentication
       navigate('/location', { replace: true });

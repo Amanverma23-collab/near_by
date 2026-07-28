@@ -80,17 +80,29 @@ if (hasValidCreds) {
         const session = getSessionFromStorage();
         return { data: { user: session?.user || null }, error: null };
       },
-      signUp: async ({ email, phone, password }: any) => {
+      signUp: async ({ email, phone, password, options }: any) => {
         const identifier = phone || (email ? email.replace(/@nearbe\.app$/, '') : 'user');
+        const users = getMockUsers();
+
+        if (users[identifier] || (email && users[email])) {
+          return {
+            data: { user: null, session: null },
+            error: new Error('An account with this mobile number already exists. Please login instead.')
+          };
+        }
+
         const userId = 'mock-user-' + Math.random().toString(36).substring(2, 11);
+        const fullName = options?.data?.full_name || options?.data?.owner_name || options?.data?.name || '';
+
         const mockUser = {
           id: userId,
           email: email || `${identifier}@nearbe.app`,
           phone: identifier,
           role: 'authenticated',
-          factor_id: null,
+          user_metadata: { full_name: fullName, ...options?.data },
           created_at: new Date().toISOString(),
         };
+
         const mockSession = {
           access_token: 'mock-access-token-' + userId,
           token_type: 'bearer',
@@ -100,11 +112,14 @@ if (hasValidCreds) {
           expires_at: Math.floor(Date.now() / 1000) + 3600,
         };
 
-        const users = getMockUsers();
         users[identifier] = { user: mockUser, password };
         if (email) users[email] = { user: mockUser, password };
         localStorage.setItem('nearby_mock_users', JSON.stringify(users));
         localStorage.setItem('nearby_mock_session', JSON.stringify(mockSession));
+
+        if (fullName) {
+          localStorage.setItem('nearby_customer_name', fullName);
+        }
 
         authListeners.forEach((cb) => cb('SIGNED_IN', mockSession));
 
@@ -115,39 +130,20 @@ if (hasValidCreds) {
         const users = getMockUsers();
         let match = users[identifier] || (email ? users[email] : null) || (phone ? users[phone] : null);
 
-        // Auto-create mock user for seamless login/demo if not found
+        // Strict Check 1: User Must Be Registered
         if (!match) {
-          const userId = 'mock-user-' + Math.random().toString(36).substring(2, 11);
-          const mockUser = {
-            id: userId,
-            email: email || `${identifier}@nearbe.app`,
-            phone: identifier,
-            role: 'authenticated',
-            factor_id: null,
-            created_at: new Date().toISOString(),
+          return {
+            data: { user: null, session: null },
+            error: new Error('No account found with this mobile number. Please register first.')
           };
-          match = { user: mockUser, password };
-          users[identifier] = match;
-          if (email) users[email] = match;
-          try {
-            localStorage.setItem('nearby_mock_users', JSON.stringify(users));
-          } catch (e) {
-            console.error('Error saving mock users:', e);
-          }
+        }
 
-          // Auto-seed mock customer record only
-          const customers = getMockDb('customers');
-          if (!customers.some((c: any) => c.auth_user_id === userId)) {
-            customers.push({
-              id: 'cust-' + userId,
-              auth_user_id: userId,
-              full_name: 'Customer ' + identifier.slice(-4),
-              mobile_number: identifier,
-              city: 'Bangalore',
-              created_at: new Date().toISOString(),
-            });
-            setMockDb('customers', customers);
-          }
+        // Strict Check 2: Password Match
+        if (match.password !== password) {
+          return {
+            data: { user: null, session: null },
+            error: new Error('Incorrect password. Please try again.')
+          };
         }
 
         const mockSession = {
@@ -160,6 +156,12 @@ if (hasValidCreds) {
         };
 
         localStorage.setItem('nearby_mock_session', JSON.stringify(mockSession));
+
+        const savedName = match.user.user_metadata?.full_name || match.user.user_metadata?.owner_name;
+        if (savedName) {
+          localStorage.setItem('nearby_customer_name', savedName);
+        }
+
         authListeners.forEach((cb) => cb('SIGNED_IN', mockSession));
 
         return { data: { user: match.user, session: mockSession }, error: null };
@@ -199,6 +201,7 @@ if (hasValidCreds) {
       },
       signOut: async () => {
         localStorage.removeItem('nearby_mock_session');
+        localStorage.removeItem('nearby_user_role');
         authListeners.forEach((cb) => cb('SIGNED_OUT', null));
         return { error: null };
       },

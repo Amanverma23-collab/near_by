@@ -101,6 +101,12 @@ export default function VendorAuthForm() {
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: pseudoEmail,
         password: password,
+        options: {
+          data: {
+            owner_name: fullName.trim(),
+            role: 'vendor'
+          }
+        }
       });
 
       if (signUpError) throw signUpError;
@@ -125,6 +131,9 @@ export default function VendorAuthForm() {
         });
       }
 
+      localStorage.setItem('nearby_vendor_name', fullName.trim());
+      localStorage.setItem('nearby_user_role', 'vendor');
+
       // 4. Sign in to establish active session
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: pseudoEmail,
@@ -136,6 +145,7 @@ export default function VendorAuthForm() {
       setSuccessMsg('Vendor account created! Redirecting to shop details...');
       setTimeout(() => {
         navigate('/vendor/register', { replace: true });
+        window.location.reload();
       }, 400);
     } catch (err: any) {
       console.error('Vendor Register Error:', err);
@@ -161,88 +171,47 @@ export default function VendorAuthForm() {
 
     try {
       const pseudoEmail = getPseudoEmail(mobile);
-      let authData: any = null;
-      let loginError: any = null;
 
-      try {
-        const res = await supabase.auth.signInWithPassword({
-          email: pseudoEmail,
-          password: password,
-        });
-        authData = res.data;
-        loginError = res.error;
-      } catch (netErr: any) {
-        loginError = netErr;
-      }
-
-      // Fallback for network error / Failed to fetch on Vercel
-      if (loginError && (loginError.message?.includes('fetch') || loginError.message?.includes('NetworkError') || !authData?.user)) {
-        if (!loginError.message?.includes('fetch') && !loginError.message?.includes('NetworkError') && loginError.status === 400 && !loginError.message?.includes('credentials')) {
-          throw loginError;
-        }
-
-        if (loginError.message?.includes('fetch') || loginError.message?.includes('NetworkError')) {
-          console.warn('Supabase fetch failed, executing fallback mock vendor auth');
-          const userId = 'mock-user-' + mobile;
-          const mockUser = {
-            id: userId,
-            email: pseudoEmail,
-            phone: mobile,
-            role: 'authenticated',
-            user_metadata: { full_name: 'Rahul Sharma' },
-            created_at: new Date().toISOString(),
-          };
-          const mockSession = {
-            access_token: 'mock-token-' + userId,
-            token_type: 'bearer',
-            expires_in: 3600,
-            user: mockUser,
-          };
-          localStorage.setItem('nearby_mock_session', JSON.stringify(mockSession));
-          localStorage.setItem('nearby_user_role', 'vendor');
-          navigate('/vendor/register', { replace: true });
-          window.location.reload();
-          return;
-        }
-
-        throw loginError;
-      }
-
-      localStorage.setItem('nearby_user_role', 'vendor');
-
-      // Role validation — confirm this user actually has a VENDOR record
-      let { data: vendorRecord } = await supabase
-        .from('vendors')
-        .select('id, is_verified, name')
-        .eq('auth_user_id', authData.user.id)
+      // Check if this number is registered ONLY as a Customer
+      const { data: custRecord } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('mobile_number', mobile)
         .maybeSingle();
 
-      if (!vendorRecord) {
-        // Create vendor record if missing
-        const { data: newVend } = await supabase
-          .from('vendors')
-          .insert({
-            auth_user_id: authData.user.id,
-            owner_name: 'Vendor ' + mobile.slice(-4),
-            phone_number: mobile,
-            name: 'Pending Shop Registration',
-            category: 'pending',
-            sub_service: 'pending',
-            address: 'Pending Shop Registration',
-            opening_hours: 'pending',
-            whatsapp_number: mobile,
-            latitude: 0,
-            longitude: 0,
-            is_verified: false,
-          })
-          .select('id, is_verified, name')
-          .maybeSingle();
-        vendorRecord = newVend;
+      const { data: existingVendor } = await supabase
+        .from('vendors')
+        .select('id, is_verified, name, owner_name')
+        .eq('phone_number', mobile)
+        .maybeSingle();
+
+      if (custRecord && !existingVendor) {
+        setError('This mobile number is registered as a Customer account. Please use the Customer tab to log in.');
+        setLoading(false);
+        return;
       }
 
+      const { data: authData, error: signInErr } = await supabase.auth.signInWithPassword({
+        email: pseudoEmail,
+        password: password,
+      });
+
+      if (signInErr) {
+        throw signInErr;
+      }
+
+      if (!authData?.user) {
+        throw new Error('Login failed. Please check your credentials.');
+      }
+
+      // Preserve registered vendor name
+      const vendorName = existingVendor?.owner_name || existingVendor?.name || authData.user.user_metadata?.owner_name || 'Vendor';
+      localStorage.setItem('nearby_vendor_name', vendorName);
+      localStorage.setItem('nearby_user_role', 'vendor');
+
       // Redirect based on vendor profile status
-      if (vendorRecord && vendorRecord.name !== 'Pending Shop Registration') {
-        if (vendorRecord.is_verified) {
+      if (existingVendor && existingVendor.name !== 'Pending Shop Registration') {
+        if (existingVendor.is_verified) {
           navigate('/dashboard', { replace: true });
         } else {
           navigate('/vendor/pending', { replace: true });
