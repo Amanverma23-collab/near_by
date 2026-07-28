@@ -32,16 +32,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const determineRole = async (userId: string): Promise<UserRole> => {
-    // Check vendors table first
-    const { data: vendor } = await supabase
-      .from('vendors')
-      .select('id')
-      .eq('auth_user_id', userId)
-      .maybeSingle();
+    const roleHint = localStorage.getItem('nearby_user_role');
 
-    if (vendor) return 'vendor';
+    if (roleHint === 'customer') {
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('auth_user_id', userId)
+        .maybeSingle();
+      if (customer) return 'customer';
+    }
 
-    // Check customers table
+    if (roleHint === 'vendor') {
+      const { data: vendor } = await supabase
+        .from('vendors')
+        .select('id')
+        .eq('auth_user_id', userId)
+        .maybeSingle();
+      if (vendor) return 'vendor';
+    }
+
+    // Default order check: customers first, then vendors
     const { data: customer } = await supabase
       .from('customers')
       .select('id')
@@ -50,7 +61,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (customer) return 'customer';
 
-    // No record in either table — role is unknown (don't default to customer)
+    const { data: vendor } = await supabase
+      .from('vendors')
+      .select('id')
+      .eq('auth_user_id', userId)
+      .maybeSingle();
+
+    if (vendor) return 'vendor';
+
     return null;
   };
 

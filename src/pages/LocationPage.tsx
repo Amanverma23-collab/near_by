@@ -8,6 +8,7 @@ import AnimatedButton from '../components/ui/AnimatedButton';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from '../context/LocationContext';
 import BrandLoader from '../components/ui/BrandLoader';
+import { getCurrentLocation } from '../utils/nativeGeolocation';
 
 export default function LocationPage() {
   const { session, role, loading: authLoading } = useAuth();
@@ -27,25 +28,8 @@ export default function LocationPage() {
     setDetecting(true);
     setError(null);
 
-    if (!('geolocation' in navigator)) {
-      setError('Geolocation is not supported by your browser');
-      setDenied(true);
-      setDetecting(false);
-      return;
-    }
-
     try {
-      const position = await new Promise<GeolocationPosition>(
-        (resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0,
-          });
-        }
-      );
-
-      const { latitude, longitude } = position.coords;
+      const { latitude, longitude } = await getCurrentLocation();
 
       // Reverse geocode with Nominatim
       let city = 'Unknown';

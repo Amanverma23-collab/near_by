@@ -21,6 +21,8 @@ import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { capturePhoto as captureNativePhoto } from '../../utils/nativeCamera';
+import { getCurrentLocation } from '../../utils/nativeGeolocation';
 
 interface ServiceItem {
   name: string;
@@ -247,29 +249,22 @@ export default function VendorRegisterPage() {
     fetchVendorData();
   }, [user]);
 
-  // Request GPS permission and center location (Fallback to Sikar, Rajasthan: 27.6094, 75.1398)
+  // Request GPS permission and center location
   useEffect(() => {
     if (activeStep === 2) {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const { latitude, longitude } = position.coords;
-            setWizardData(prev => ({
-              ...prev,
-              latitude,
-              longitude
-            }));
-            handleMarkerPositionChange(latitude, longitude);
-          },
-          (error) => {
-            console.warn('Geolocation permission error:', error);
-            // Default center is already Sikar, Rajasthan, so it's fine
-            handleMarkerPositionChange(wizardData.latitude, wizardData.longitude);
-          }
-        );
-      } else {
-        handleMarkerPositionChange(wizardData.latitude, wizardData.longitude);
-      }
+      getCurrentLocation()
+        .then(({ latitude, longitude }) => {
+          setWizardData((prev) => ({
+            ...prev,
+            latitude,
+            longitude,
+          }));
+          handleMarkerPositionChange(latitude, longitude);
+        })
+        .catch((error) => {
+          console.warn('Geolocation permission error:', error);
+          handleMarkerPositionChange(wizardData.latitude, wizardData.longitude);
+        });
     }
   }, [activeStep]);
 
@@ -308,24 +303,41 @@ export default function VendorRegisterPage() {
     }, 1000);
   };
 
-  const useCurrentLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((position) => {
-        const { latitude, longitude } = position.coords;
-        setWizardData(prev => ({
-          ...prev,
-          latitude,
-          longitude
-        }));
-        handleMarkerPositionChange(latitude, longitude);
-      });
+  const useCurrentLocation = async () => {
+    try {
+      const { latitude, longitude } = await getCurrentLocation();
+      setWizardData((prev) => ({
+        ...prev,
+        latitude,
+        longitude,
+      }));
+      handleMarkerPositionChange(latitude, longitude);
+    } catch (err) {
+      console.error('Error fetching current location:', err);
     }
   };
 
-  // Camera handling
+  // Camera handling (Capacitor Native Camera with WebRTC fallback)
   const openCamera = async (mode: 'owner' | 'shop') => {
     setCameraMode(mode);
     setCameraError('');
+
+    // Attempt Capacitor Native Camera
+    try {
+      const nativePhoto = await captureNativePhoto();
+      if (nativePhoto) {
+        if (mode === 'owner') {
+          setWizardData((prev) => ({ ...prev, ownerPhotoUrl: nativePhoto }));
+        } else {
+          setWizardData((prev) => ({ ...prev, shopPhotoUrl: nativePhoto }));
+        }
+        return;
+      }
+    } catch (err) {
+      console.warn('Native camera capture fallback to web camera:', err);
+    }
+
+    // WebRTC Fallback
     setIsCameraOpen(true);
     try {
       const facing = mode === 'owner' ? 'user' : 'environment';

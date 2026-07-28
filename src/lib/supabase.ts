@@ -135,38 +135,18 @@ if (hasValidCreds) {
             console.error('Error saving mock users:', e);
           }
 
-          // Auto-seed mock customer record
+          // Auto-seed mock customer record only
           const customers = getMockDb('customers');
           if (!customers.some((c: any) => c.auth_user_id === userId)) {
             customers.push({
               id: 'cust-' + userId,
               auth_user_id: userId,
-              full_name: 'Rahul Sharma',
+              full_name: 'Customer ' + identifier.slice(-4),
               mobile_number: identifier,
               city: 'Bangalore',
               created_at: new Date().toISOString(),
             });
             setMockDb('customers', customers);
-          }
-
-          // Auto-seed mock vendor record
-          const vendors = getMockDb('vendors');
-          if (!vendors.some((v: any) => v.auth_user_id === userId)) {
-            vendors.push({
-              id: 'vend-' + userId,
-              auth_user_id: userId,
-              name: 'Sharma Services & Repair',
-              owner_name: 'Rahul Sharma',
-              category: 'home-maintenance',
-              sub_service: 'Electrician',
-              address: 'Indiranagar 100ft Road, Bangalore',
-              phone_number: identifier,
-              whatsapp_number: identifier,
-              is_verified: true,
-              opening_hours: '9:00 AM - 8:00 PM',
-              created_at: new Date().toISOString(),
-            });
-            setMockDb('vendors', vendors);
           }
         }
 

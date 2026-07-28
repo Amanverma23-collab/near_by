@@ -187,6 +187,7 @@ export default function CustomerAuthForm() {
           };
           localStorage.setItem('nearby_mock_session', JSON.stringify(mockSession));
           localStorage.setItem('nearby_customer_name', 'Rahul Sharma');
+          localStorage.setItem('nearby_user_role', 'customer');
           navigate('/location', { replace: true });
           window.location.reload();
           return;
@@ -195,23 +196,32 @@ export default function CustomerAuthForm() {
         throw loginError;
       }
 
-      // Role validation — confirm this user actually has a CUSTOMER record
-      const { data: customerRecord } = await supabase
+      localStorage.setItem('nearby_user_role', 'customer');
+
+      // Role validation — confirm or create customer record
+      let { data: customerRecord } = await supabase
         .from('customers')
         .select('id')
         .eq('auth_user_id', authData.user.id)
         .maybeSingle();
 
       if (!customerRecord) {
-        // This account exists but is NOT a customer — likely a vendor account
-        await supabase.auth.signOut();
-        setError('This number is registered as a Vendor. Please use the Vendor tab to login.');
-        setLoading(false);
-        return;
+        // If not registered as customer, auto-seed customer record for this user
+        const { data: newCust } = await supabase
+          .from('customers')
+          .insert({
+            auth_user_id: authData.user.id,
+            full_name: 'Customer ' + mobile.slice(-4),
+            mobile_number: mobile,
+          })
+          .select('id')
+          .maybeSingle();
+        customerRecord = newCust;
       }
 
       // Redirect upon successful customer authentication
       navigate('/location', { replace: true });
+      window.location.reload();
     } catch (err: any) {
       console.error('Customer Login Error:', err);
       if (err.message?.includes('fetch')) {

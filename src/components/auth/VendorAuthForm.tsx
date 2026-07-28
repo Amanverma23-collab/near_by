@@ -199,6 +199,7 @@ export default function VendorAuthForm() {
             user: mockUser,
           };
           localStorage.setItem('nearby_mock_session', JSON.stringify(mockSession));
+          localStorage.setItem('nearby_user_role', 'vendor');
           navigate('/vendor/register', { replace: true });
           window.location.reload();
           return;
@@ -207,23 +208,40 @@ export default function VendorAuthForm() {
         throw loginError;
       }
 
+      localStorage.setItem('nearby_user_role', 'vendor');
+
       // Role validation — confirm this user actually has a VENDOR record
-      const { data: vendorRecord } = await supabase
+      let { data: vendorRecord } = await supabase
         .from('vendors')
         .select('id, is_verified, name')
         .eq('auth_user_id', authData.user.id)
         .maybeSingle();
 
       if (!vendorRecord) {
-        // This account exists but is NOT a vendor — likely a customer account
-        await supabase.auth.signOut();
-        setError('This number is registered as a Customer. Please use the Customer tab to login.');
-        setLoading(false);
-        return;
+        // Create vendor record if missing
+        const { data: newVend } = await supabase
+          .from('vendors')
+          .insert({
+            auth_user_id: authData.user.id,
+            owner_name: 'Vendor ' + mobile.slice(-4),
+            phone_number: mobile,
+            name: 'Pending Shop Registration',
+            category: 'pending',
+            sub_service: 'pending',
+            address: 'Pending Shop Registration',
+            opening_hours: 'pending',
+            whatsapp_number: mobile,
+            latitude: 0,
+            longitude: 0,
+            is_verified: false,
+          })
+          .select('id, is_verified, name')
+          .maybeSingle();
+        vendorRecord = newVend;
       }
 
       // Redirect based on vendor profile status
-      if (vendorRecord.name !== 'Pending Shop Registration') {
+      if (vendorRecord && vendorRecord.name !== 'Pending Shop Registration') {
         if (vendorRecord.is_verified) {
           navigate('/dashboard', { replace: true });
         } else {
@@ -232,6 +250,7 @@ export default function VendorAuthForm() {
       } else {
         navigate('/vendor/register', { replace: true });
       }
+      window.location.reload();
     } catch (err: any) {
       console.error('Vendor Login Error:', err);
       setError(err.message || 'Invalid credentials.');

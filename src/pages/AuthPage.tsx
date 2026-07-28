@@ -12,7 +12,12 @@ export default function AuthPage() {
   const [activeTab, setActiveTab] = useState<'customer' | 'vendor'>('customer');
 
   if (loading) return <BrandLoader />;
-  if (session && role) return <Navigate to="/location" replace />;
+  if (session && role) {
+    if (role === 'vendor') {
+      return <Navigate to="/vendor/register" replace />;
+    }
+    return <Navigate to="/location" replace />;
+  }
 
   return (
     <motion.div
