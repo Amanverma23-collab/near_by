@@ -207,7 +207,7 @@ export default function CategoryPage() {
                   className="bg-surface-card rounded-[var(--radius-lg)] p-4 border border-border-light shadow-sm flex flex-col text-left transition-all cursor-pointer"
                 >
                   {/* Top line: Name + verified badge + rating */}
-                  <div className="flex justify-between items-start gap-4 mb-2">
+                  <div className="flex justify-between items-start gap-3 mb-1.5">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <h2 className="text-sm sm:text-base font-display font-extrabold text-ink truncate leading-snug">
                         {vendor.name}
@@ -220,28 +220,30 @@ export default function CategoryPage() {
                       )}
                     </div>
 
-                    {/* Right side: Rating Pill on top, Save/Like Heart below */}
-                    <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      <div className="flex items-center gap-0.5 px-2 py-0.5 bg-[#FFFBEB] border border-[#FEF3C7] rounded-[var(--radius-sm)]">
-                        <Star size={11} className="text-amber-500 fill-amber-500" />
-                        <span className="text-[10px] font-display font-bold text-amber-800">
-                          {vendor.rating.toFixed(1)}
-                        </span>
-                      </div>
-                      <SaveHeartButton vendorId={vendor.id} size={15} className="p-1" />
+                    {/* Rating Pill */}
+                    <div className="flex items-center gap-0.5 px-2 py-0.5 bg-[#FFFBEB] border border-[#FEF3C7] rounded-[var(--radius-sm)] shrink-0">
+                      <Star size={11} className="text-amber-500 fill-amber-500" />
+                      <span className="text-[10px] font-display font-bold text-amber-800">
+                        {vendor.rating.toFixed(1)}
+                      </span>
                     </div>
                   </div>
 
-                  {/* SubService Pill and Location */}
-                  <div className="flex flex-wrap items-center gap-2 mb-3">
-                    <span className="inline-block px-2 py-0.5 bg-surface text-ink-muted border border-border-light rounded-[var(--radius-pill)] text-[9px] font-display font-semibold uppercase tracking-wider">
-                      {vendor.subService}
-                    </span>
+                  {/* SubService Pill, Location & Save Heart Button */}
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-block px-2 py-0.5 bg-surface text-ink-muted border border-border-light rounded-[var(--radius-pill)] text-[9px] font-display font-semibold uppercase tracking-wider">
+                        {vendor.subService}
+                      </span>
 
-                    <div className="flex items-center gap-1 text-[11px] text-ink-muted font-body">
-                      <MapPin size={12} className="text-brand" />
-                      <span>{vendor.distanceKm.toFixed(1)} km away</span>
+                      <div className="flex items-center gap-1 text-[11px] text-ink-muted font-body">
+                        <MapPin size={12} className="text-brand" />
+                        <span>{vendor.distanceKm.toFixed(1)} km away</span>
+                      </div>
                     </div>
+
+                    {/* Save / Like Heart Button positioned under the 4.6 Rating badge */}
+                    <SaveHeartButton vendorId={vendor.id} size={16} className="p-1.5" />
                   </div>
 
                   {/* Operational Status & Hours */}

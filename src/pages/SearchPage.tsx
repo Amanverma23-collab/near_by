@@ -148,12 +148,14 @@ export default function SearchPage() {
                         </h3>
                         {vendor.isVerified && <BadgeCheck size={16} className="text-brand shrink-0" />}
                       </div>
-                      <span className="inline-block px-2 py-0.5 bg-surface text-ink-muted border border-border-light rounded-full text-[9px] font-display font-semibold uppercase tracking-wider">
-                        {vendor.subService}
-                      </span>
+                      <div className="flex items-center justify-between">
+                        <span className="inline-block px-2 py-0.5 bg-surface text-ink-muted border border-border-light rounded-full text-[9px] font-display font-semibold uppercase tracking-wider">
+                          {vendor.subService}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    <div className="flex flex-col items-end gap-1 shrink-0">
                       <div className="flex items-center gap-0.5 px-2 py-0.5 bg-[#FFFBEB] border border-[#FEF3C7] rounded-md">
                         <Star size={11} className="text-amber-500 fill-amber-500" />
                         <span className="text-[10px] font-display font-bold text-amber-800">
