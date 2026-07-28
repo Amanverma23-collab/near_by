@@ -287,6 +287,32 @@ export default function VendorAuthForm() {
         )}
       </AnimatePresence>
 
+      {/* Sleek Horizontal Mode Switcher: Login | Register in 1 Row */}
+      <div className="grid grid-cols-2 bg-surface p-1 rounded-xl border border-border-light text-center font-display text-xs font-extrabold mb-2 shadow-inner">
+        <button
+          type="button"
+          onClick={() => { resetForm(); setMode('login'); }}
+          className={`py-2.5 rounded-lg transition-all cursor-pointer ${
+            mode === 'login'
+              ? 'bg-white text-brand shadow-xs border border-border-light/80'
+              : 'text-ink-muted hover:text-ink'
+          }`}
+        >
+          Login
+        </button>
+        <button
+          type="button"
+          onClick={() => { resetForm(); setMode('register'); }}
+          className={`py-2.5 rounded-lg transition-all cursor-pointer ${
+            mode === 'register'
+              ? 'bg-white text-brand shadow-xs border border-border-light/80'
+              : 'text-ink-muted hover:text-ink'
+          }`}
+        >
+          Register
+        </button>
+      </div>
+
       <AnimatePresence mode="wait">
         {mode === 'login' ? (
           /* ===== LOGIN FORM ===== */
@@ -343,11 +369,11 @@ export default function VendorAuthForm() {
               </button>
             </div>
 
-            {/* Login & Register Buttons */}
-            <div className="flex flex-col gap-3">
+            {/* Single Row Login & Register Action Buttons */}
+            <div className="grid grid-cols-2 gap-3 pt-2">
               <AnimatedButton type="submit" fullWidth size="lg" isLoading={loading}>
                 <span>Login</span>
-                <ArrowRight size={20} />
+                <ArrowRight size={18} />
               </AnimatedButton>
               <AnimatedButton
                 fullWidth
@@ -457,11 +483,11 @@ export default function VendorAuthForm() {
               }
             />
 
-            {/* Create Account & Login Buttons */}
-            <div className="flex flex-col gap-3">
+            {/* Single Row Register & Login Action Buttons */}
+            <div className="grid grid-cols-2 gap-3 pt-2">
               <AnimatedButton type="submit" fullWidth size="lg" isLoading={loading}>
-                <span>Create Vendor Account</span>
-                <ArrowRight size={20} />
+                <span>Register</span>
+                <ArrowRight size={18} />
               </AnimatedButton>
               <AnimatedButton
                 fullWidth
