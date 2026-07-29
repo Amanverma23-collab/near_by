@@ -54,13 +54,27 @@ export default function PlanDetailPage() {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 30);
 
+      const subData = {
+        auth_user_id: user.id,
+        subscription_status: 'trial',
+        subscription_expires_at: expiresAt.toISOString(),
+      };
+
+      // Update by auth_user_id
       await supabase
         .from('vendors')
-        .update({
-          subscription_status: 'trial',
-          subscription_expires_at: expiresAt.toISOString(),
-        })
+        .update(subData)
         .eq('auth_user_id', user.id);
+
+      // Fallback update by phone_number if available
+      const userPhone = user.phone || user.user_metadata?.phone_number;
+      if (userPhone) {
+        const cleanPhone = userPhone.replace(/\D/g, '').slice(-10);
+        await supabase
+          .from('vendors')
+          .update(subData)
+          .eq('phone_number', cleanPhone);
+      }
 
       navigate('/dashboard', { replace: true });
     } catch (err) {
@@ -71,8 +85,46 @@ export default function PlanDetailPage() {
     }
   };
 
-  const handleProceedPayment = () => {
-    alert(`Payment Gateway Integration (Razorpay/UPI)\n\nSelected Plan: ${plan.name} (${plan.duration})\nFinal Amount: ₹${finalPrice}\n\nRazorpay checkout will launch here in the next step.`);
+  const handleProceedPayment = async () => {
+    if (!user) {
+      navigate('/dashboard');
+      return;
+    }
+    setLoading(true);
+    try {
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + (plan.id === 'annual_pro' ? 365 : 30));
+
+      const status = plan.id === 'annual_pro' ? 'pro' : 'active';
+      const subData = {
+        auth_user_id: user.id,
+        subscription_status: status,
+        subscription_expires_at: expiresAt.toISOString(),
+      };
+
+      // Update by auth_user_id
+      await supabase
+        .from('vendors')
+        .update(subData)
+        .eq('auth_user_id', user.id);
+
+      // Fallback update by phone_number if available
+      const userPhone = user.phone || user.user_metadata?.phone_number;
+      if (userPhone) {
+        const cleanPhone = userPhone.replace(/\D/g, '').slice(-10);
+        await supabase
+          .from('vendors')
+          .update(subData)
+          .eq('phone_number', cleanPhone);
+      }
+
+      navigate('/dashboard', { replace: true });
+    } catch (err) {
+      console.error('Payment activation error:', err);
+      navigate('/dashboard', { replace: true });
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Motion variants
