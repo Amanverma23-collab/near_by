@@ -618,30 +618,61 @@ export default function VendorRegisterPage() {
         whatsapp_number: wizardData.mobileNumber, // sync WhatsApp
       };
 
-      // Try setting verification_requested_at and verification_status columns
-      let dbError = null;
-      try {
-        const { error } = await supabase
-          .from('vendors')
-          .update({
-            ...updatePayload,
-            verification_status: 'pending',
-            verification_requested_at: new Date().toISOString()
-          })
-          .eq('auth_user_id', user.id);
-        dbError = error;
-      } catch (err) {
-        dbError = err;
-      }
+      // Check if vendor row already exists by auth_user_id or phone_number
+      const { data: existingByAuth } = await supabase
+        .from('vendors')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .maybeSingle();
 
-      // If it fails (e.g. columns don't exist), retry without them
-      if (dbError) {
-        console.warn('Failed with verification columns, retrying without them...', dbError);
-        const { error: retryError } = await supabase
+      const { data: existingByPhone } = !existingByAuth && wizardData.mobileNumber
+        ? await supabase
+            .from('vendors')
+            .select('id')
+            .eq('phone_number', wizardData.mobileNumber)
+            .maybeSingle()
+        : { data: null };
+
+      const existingId = existingByAuth?.id || existingByPhone?.id;
+
+      const fullPayload = {
+        ...updatePayload,
+        auth_user_id: user.id,
+        verification_status: 'pending',
+        verification_requested_at: new Date().toISOString()
+      };
+
+      if (existingId) {
+        // UPDATE existing vendor record
+        const { error: updateErr } = await supabase
           .from('vendors')
-          .update(updatePayload)
-          .eq('auth_user_id', user.id);
-        if (retryError) throw retryError;
+          .update(fullPayload)
+          .eq('id', existingId);
+
+        if (updateErr) {
+          console.warn('Failed with verification columns, retrying basic update...', updateErr);
+          const { error: basicErr } = await supabase
+            .from('vendors')
+            .update(updatePayload)
+            .eq('id', existingId);
+          if (basicErr) throw basicErr;
+        }
+      } else {
+        // INSERT new vendor record if none existed
+        const { error: insertErr } = await supabase
+          .from('vendors')
+          .insert(fullPayload);
+
+        if (insertErr) {
+          console.warn('Failed with verification columns, retrying basic insert...', insertErr);
+          const { error: basicErr } = await supabase
+            .from('vendors')
+            .insert({
+              ...updatePayload,
+              auth_user_id: user.id
+            });
+          if (basicErr) throw basicErr;
+        }
       }
 
       // Redirect to Pending Verification screen
