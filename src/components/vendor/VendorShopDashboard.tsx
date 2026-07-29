@@ -31,6 +31,7 @@ import AnimatedCountUp from '../ui/AnimatedCountUp';
 import ShopTimingModal from './ShopTimingModal';
 import VendorReviewsModal from './VendorReviewsModal';
 import { getEffectiveShopStatus } from '../../utils/shopTiming';
+import { getSavedReviews, getAllUserReviews } from '../../utils/reviewStorage';
 
 interface VendorShopDashboardProps {
   vendor: any;
@@ -84,15 +85,24 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
   const localCalls = Number(localStorage.getItem(`nearby_calls_${vendor?.id}`) || 0);
   const localWa = Number(localStorage.getItem(`nearby_wa_${vendor?.id}`) || 0);
 
-  const reviewsList = Array.isArray(vendor?.reviews) ? vendor.reviews : [];
-  const realReviewCount = Number(vendor?.review_count || reviewsList.length || 0);
+  const cleanPhone = (vendor?.phone_number || '').replace(/\D/g, '').slice(-10);
+  const savedLocalReviews = getSavedReviews(vendor?.id || '')
+    .concat(cleanPhone ? getSavedReviews(cleanPhone) : [])
+    .concat(getAllUserReviews().filter(r => (vendor?.id && r.vendorId === vendor.id) || (vendor?.name && r.vendorName === vendor.name)));
 
-  let realRating = Number(vendor?.rating || 0);
-  if (reviewsList.length > 0) {
-    const sum = reviewsList.reduce((acc: number, r: any) => acc + Number(r.rating || 5), 0);
-    realRating = Math.round((sum / reviewsList.length) * 10) / 10;
-  } else if (!vendor?.rating) {
-    realRating = 0.0;
+  const uniqueMap = new Map();
+  (vendor?.reviews || []).forEach((r: any) => uniqueMap.set(r.id || r.created_at || Math.random(), r));
+  savedLocalReviews.forEach((r: any) => uniqueMap.set(r.id || r.created_at || Math.random(), r));
+
+  const allVendorReviews = Array.from(uniqueMap.values());
+  const realReviewCount = allVendorReviews.length;
+
+  let realRating = 0.0;
+  if (realReviewCount > 0) {
+    const sum = allVendorReviews.reduce((acc: number, r: any) => acc + Number(r.rating || 5), 0);
+    realRating = Math.round((sum / realReviewCount) * 10) / 10;
+  } else if (vendor?.rating) {
+    realRating = Number(vendor.rating);
   }
 
   const stats = {
@@ -622,7 +632,9 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
 
       {/* Customer Reviews Modal (Google Style) */}
       <VendorReviewsModal
+        vendorId={vendor?.id}
         vendorName={vendor?.name || 'Your Shop'}
+        vendorReviews={allVendorReviews}
         isOpen={isReviewsModalOpen}
         onClose={() => setIsReviewsModalOpen(false)}
       />

@@ -1,3 +1,5 @@
+import { supabase } from '../lib/supabase';
+
 export interface SavedReview {
   id: string;
   vendorId: string;
@@ -27,7 +29,7 @@ export function getSavedReviews(vendorId: string): SavedReview[] {
 }
 
 /**
- * Persists a new customer review into localStorage so it remains after page refresh
+ * Persists a new customer review into localStorage & Supabase so it remains and syncs to shop owner
  */
 export function saveNewReview(
   vendorId: string,
@@ -51,8 +53,41 @@ export function saveNewReview(
 
   try {
     localStorage.setItem(`nearby_reviews_${vendorId}`, JSON.stringify(updated));
+    if (reviewData.vendorName) {
+      localStorage.setItem(`nearby_reviews_${reviewData.vendorName}`, JSON.stringify(updated));
+    }
   } catch (err) {
     console.error('Error saving new review to localStorage:', err);
+  }
+
+  // Async update to Supabase vendors table if possible
+  if (vendorId) {
+    const avgRating = Math.round((updated.reduce((acc, r) => acc + r.rating, 0) / updated.length) * 10) / 10;
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('vendors')
+          .update({
+            reviews: updated,
+            review_count: updated.length,
+            rating: avgRating,
+          })
+          .eq('id', vendorId);
+
+        if (error && reviewData.vendorName) {
+          await supabase
+            .from('vendors')
+            .update({
+              reviews: updated,
+              review_count: updated.length,
+              rating: avgRating,
+            })
+            .eq('name', reviewData.vendorName);
+        }
+      } catch (e) {
+        console.warn('Supabase review sync notice:', e);
+      }
+    })();
   }
 
   return newReviewItem;
