@@ -60,11 +60,21 @@ export default function PlanDetailPage() {
         subscription_expires_at: expiresAt.toISOString(),
       };
 
+      // Save to localStorage as guaranteed offline/immediate fallback
+      localStorage.setItem(`nearby_subscription_${user.id}`, JSON.stringify({
+        status: 'trial',
+        expiresAt: expiresAt.toISOString(),
+      }));
+
       // Update by auth_user_id
-      await supabase
+      const { error: err1 } = await supabase
         .from('vendors')
         .update(subData)
         .eq('auth_user_id', user.id);
+
+      if (err1) {
+        console.warn('Supabase subscription_status update warn:', err1);
+      }
 
       // Fallback update by phone_number if available
       const userPhone = user.phone || user.user_metadata?.phone_number;
@@ -102,11 +112,21 @@ export default function PlanDetailPage() {
         subscription_expires_at: expiresAt.toISOString(),
       };
 
+      // Save to localStorage as guaranteed offline/immediate fallback
+      localStorage.setItem(`nearby_subscription_${user.id}`, JSON.stringify({
+        status: status,
+        expiresAt: expiresAt.toISOString(),
+      }));
+
       // Update by auth_user_id
-      await supabase
+      const { error: err1 } = await supabase
         .from('vendors')
         .update(subData)
         .eq('auth_user_id', user.id);
+
+      if (err1) {
+        console.warn('Supabase subscription_status update warn:', err1);
+      }
 
       // Fallback update by phone_number if available
       const userPhone = user.phone || user.user_metadata?.phone_number;

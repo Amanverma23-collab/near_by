@@ -60,6 +60,8 @@ CREATE TABLE IF NOT EXISTS public.vendors (
     review_count INTEGER DEFAULT 0,
     verification_requested_at TIMESTAMP WITH TIME ZONE,
     verification_status TEXT DEFAULT NULL CHECK (verification_status IN ('pending', 'approved', 'rejected')),
+    subscription_status TEXT DEFAULT NULL,
+    subscription_expires_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

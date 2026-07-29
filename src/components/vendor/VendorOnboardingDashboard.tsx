@@ -106,6 +106,23 @@ export default function VendorOnboardingDashboard() {
           };
         }
 
+        // Merge localStorage subscription fallback if present
+        const localSubStr = localStorage.getItem(`nearby_subscription_${user.id}`);
+        if (localSubStr) {
+          try {
+            const localSub = JSON.parse(localSubStr);
+            if (localSub?.status) {
+              bestVendor = {
+                ...bestVendor,
+                subscription_status: localSub.status,
+                subscription_expires_at: localSub.expiresAt || bestVendor.subscription_expires_at,
+              };
+            }
+          } catch (e) {
+            console.error('Error parsing local subscription:', e);
+          }
+        }
+
         setVendor(bestVendor);
       } else {
         setVendor(null);
