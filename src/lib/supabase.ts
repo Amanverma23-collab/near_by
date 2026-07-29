@@ -1,9 +1,8 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const rawUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const rawAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || 'https://rvgimglpwcbyuzmttfln.supabase.co';
+const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2Z2ltZ2xwd2NieXV6bXR0ZmxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NzQwMzcsImV4cCI6MjA5OTM1MDAzN30.jeb1tSBS9RxEuJW5OXKd81yl8sGwu_ENsA79kyDbou8';
 
-// Dev mode flag — set to true to bypass OTP and use local mock store during development
 export const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
 // Validate URL format
@@ -18,17 +17,16 @@ const isValidUrl = (url: string): boolean => {
 };
 
 const hasValidCreds =
-  !DEV_MODE &&
-  rawUrl &&
-  isValidUrl(rawUrl) &&
-  !rawUrl.includes('your-supabase-url-here') &&
-  rawAnonKey &&
-  !rawAnonKey.includes('your-supabase-anon-key-here');
+  SUPABASE_URL &&
+  isValidUrl(SUPABASE_URL) &&
+  !SUPABASE_URL.includes('your-supabase-url-here') &&
+  SUPABASE_ANON_KEY &&
+  !SUPABASE_ANON_KEY.includes('your-supabase-anon-key-here');
 
 let supabaseClient: any;
 
 if (hasValidCreds) {
-  supabaseClient = createClient(rawUrl, rawAnonKey);
+  supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 } else {
   console.warn(
     '⚠️ NearBy: Dev Mode or missing Supabase backend. Initializing Local Mock Client.'
