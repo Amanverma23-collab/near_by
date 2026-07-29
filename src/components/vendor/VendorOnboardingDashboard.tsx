@@ -73,11 +73,22 @@ export default function VendorOnboardingDashboard() {
   const fetchVendorStatus = async () => {
     if (!user) return;
     try {
-      const { data } = await supabase
+      let { data } = await supabase
         .from('vendors')
         .select('*')
         .eq('auth_user_id', user.id)
         .maybeSingle();
+
+      if (!data && user.phone) {
+        const cleanPhone = user.phone.replace(/\D/g, '').slice(-10);
+        const { data: dataByPhone } = await supabase
+          .from('vendors')
+          .select('*')
+          .eq('phone_number', cleanPhone)
+          .maybeSingle();
+        data = dataByPhone;
+      }
+
       if (data) {
         setVendor(data);
       }
@@ -182,7 +193,7 @@ export default function VendorOnboardingDashboard() {
   }
 
   // STATE B: Verification Pending
-  if (vendor && vendor.verification_status === 'pending') {
+  if (vendor && (vendor.verification_status === 'pending' || (!vendor.is_verified && vendor.name && vendor.name !== 'Pending Shop Registration'))) {
     const displayCategory = categoryNames[vendor.category] || vendor.category || 'N/A';
     const shopFrontImage = vendor.shop_images?.[0] || 'https://picsum.photos/seed/shop/300/200';
 
