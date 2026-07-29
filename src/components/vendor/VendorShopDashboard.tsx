@@ -79,13 +79,28 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
     }
   }
 
-  // Placeholder stats object reading from database or defaults
+  // Real stats computation from vendor record or local tracking
+  const localViews = Number(localStorage.getItem(`nearby_views_${vendor?.id}`) || 0);
+  const localCalls = Number(localStorage.getItem(`nearby_calls_${vendor?.id}`) || 0);
+  const localWa = Number(localStorage.getItem(`nearby_wa_${vendor?.id}`) || 0);
+
+  const reviewsList = Array.isArray(vendor?.reviews) ? vendor.reviews : [];
+  const realReviewCount = Number(vendor?.review_count || reviewsList.length || 0);
+
+  let realRating = Number(vendor?.rating || 0);
+  if (reviewsList.length > 0) {
+    const sum = reviewsList.reduce((acc: number, r: any) => acc + Number(r.rating || 5), 0);
+    realRating = Math.round((sum / reviewsList.length) * 10) / 10;
+  } else if (!vendor?.rating) {
+    realRating = 0.0;
+  }
+
   const stats = {
-    views: 142,
-    callClicks: 38,
-    whatsappClicks: 51,
-    rating: 4.8,
-    reviewCount: 12,
+    views: Number(vendor?.profile_views || vendor?.views_count || localViews || 0),
+    callClicks: Number(vendor?.call_clicks || vendor?.calls_count || localCalls || 0),
+    whatsappClicks: Number(vendor?.whatsapp_clicks || vendor?.whatsapp_count || localWa || 0),
+    rating: realRating > 0 ? realRating : 0.0,
+    reviewCount: realReviewCount,
   };
 
   const handleCopyReferral = () => {
@@ -316,7 +331,7 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
               <div className="text-2xl sm:text-3xl font-extrabold font-display text-ink">
                 <AnimatedCountUp end={stats.views} />
               </div>
-              <span className="text-[10px] text-emerald-600 font-bold">↑ +24% vs last week</span>
+              <span className="text-[10px] text-teal-600 font-bold">Live customer views</span>
             </div>
 
             {/* Call Clicks */}

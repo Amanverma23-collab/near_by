@@ -99,8 +99,31 @@ export default function VendorDetailPage() {
     if (vendorId) {
       const saved = getSavedReviews(vendorId);
       setCustomReviews(saved);
+
+      // Track real profile view
+      const viewKey = `nearby_views_${vendorId}`;
+      const currentViews = Number(localStorage.getItem(viewKey) || 0);
+      localStorage.setItem(viewKey, String(currentViews + 1));
     }
   }, [vendorId]);
+
+  const handleCallClick = () => {
+    const targetId = vendor?.id || vendorId;
+    if (targetId) {
+      const key = `nearby_calls_${targetId}`;
+      const current = Number(localStorage.getItem(key) || 0);
+      localStorage.setItem(key, String(current + 1));
+    }
+  };
+
+  const handleWhatsAppClick = () => {
+    const targetId = vendor?.id || vendorId;
+    if (targetId) {
+      const key = `nearby_wa_${targetId}`;
+      const current = Number(localStorage.getItem(key) || 0);
+      localStorage.setItem(key, String(current + 1));
+    }
+  };
 
   /* ── Gallery state ── */
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -588,6 +611,7 @@ export default function VendorDetailPage() {
         <div className="max-w-md mx-auto grid grid-cols-3 gap-2">
           <a
             href={`tel:${vendor.phoneNumber}`}
+            onClick={handleCallClick}
             className="flex items-center justify-center gap-1.5 bg-brand hover:bg-brand-dark text-white py-2.5 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors shadow-sm shadow-brand/10 cursor-pointer"
           >
             <Phone size={15} />
@@ -596,6 +620,7 @@ export default function VendorDetailPage() {
 
           <a
             href={`https://wa.me/91${vendor.whatsappNumber}?text=${waMsg}`}
+            onClick={handleWhatsAppClick}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-1.5 border border-[#25D366]/40 hover:bg-[#25D366]/5 text-[#128C7E] py-2.5 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors cursor-pointer"
