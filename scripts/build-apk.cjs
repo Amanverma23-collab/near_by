@@ -15,7 +15,7 @@ const androidDir = path.join(__dirname, '..', 'android');
 
 console.log('🚀 Testing Android Studio4 JDK...');
 
-const res = spawnSync(javaExe, ['-jar', jarPath, 'assembleDebug'], {
+const res = spawnSync(javaExe, ['-jar', jarPath, 'clean', 'assembleDebug'], {
   cwd: androidDir,
   env,
   stdio: 'inherit'

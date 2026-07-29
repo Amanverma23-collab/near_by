@@ -21,6 +21,7 @@ import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useBackButton } from '../../hooks/useBackButton';
 import { capturePhoto as captureNativePhoto } from '../../utils/nativeCamera';
 import { getCurrentLocation } from '../../utils/nativeGeolocation';
 
@@ -219,6 +220,19 @@ export default function VendorRegisterPage() {
 
   // OTP inputs ref for auto-focus
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Hardware Back Button handling
+  useBackButton(() => {
+    if (isCameraOpen) {
+      closeCamera();
+    } else if (isChangingMobile) {
+      handleCancelMobileChange();
+    } else if (activeStep === 2) {
+      handleBack();
+    } else {
+      navigate('/dashboard');
+    }
+  }, true);
 
   // Fetch prefilled data from vendors table
   useEffect(() => {

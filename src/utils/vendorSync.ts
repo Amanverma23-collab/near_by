@@ -54,16 +54,12 @@ export async function fetchCombinedVendors(): Promise<Vendor[]> {
         };
       });
 
-      // Filter out duplicates if dummy ID matches real ID
-      const realIds = new Set(realVendors.map((v) => v.id));
-      const filteredDummy = dummyVendors.filter((d) => !realIds.has(d.id));
-
-      // Put real registered vendors at the TOP
-      return [...realVendors, ...filteredDummy];
+      // Return real registered vendors
+      return realVendors;
     }
   } catch (err) {
     console.error('Error fetching registered vendors for customer app:', err);
   }
 
-  return dummyVendors;
+  return [];
 }

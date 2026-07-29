@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { X, UserCircle, Settings, LogOut, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLocation } from '../../context/LocationContext';
+import { useBackButton } from '../../hooks/useBackButton';
 
 interface ProfileDrawerProps {
   isOpen: boolean;
@@ -13,6 +14,8 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
   const { signOut, user, role } = useAuth();
   const { clearLocation } = useLocation();
   const navigate = useNavigate();
+
+  useBackButton(onClose, isOpen);
 
   const handleLogout = async () => {
     await signOut();

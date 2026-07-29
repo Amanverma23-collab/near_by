@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Star, Flag, Check, AlertCircle, MessageSquare } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useBackButton } from '../../hooks/useBackButton';
 
 export interface ReviewItem {
   id: string;
@@ -67,6 +68,8 @@ export default function VendorReviewsModal({
   const [reportingReview, setReportingReview] = useState<ReviewItem | null>(null);
   const [reportReason, setReportReason] = useState<string>('Fake or Spam Review');
   const [reportSubmittedMsg, setReportSubmittedMsg] = useState<string | null>(null);
+
+  useBackButton(onClose, isOpen);
 
   if (!isOpen) return null;
 

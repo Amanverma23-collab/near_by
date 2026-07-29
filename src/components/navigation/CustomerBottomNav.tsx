@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Home, Search, Heart, User } from 'lucide-react';
+import { Home, Search, Heart, User, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 
@@ -9,9 +10,23 @@ export default function CustomerBottomNav() {
   const navigate = useNavigate();
   const { role } = useAuth();
   const { t } = useLanguage();
+  const [isChatOpen, setIsChatOpen] = useState(false);
+
+  useEffect(() => {
+    const handleChatState = (e: any) => {
+      setIsChatOpen(!!e.detail?.isOpen);
+    };
+    window.addEventListener('chatModalStateChange', handleChatState);
+    return () => {
+      window.removeEventListener('chatModalStateChange', handleChatState);
+    };
+  }, []);
 
   // Only display for customer users
   if (role !== 'customer') return null;
+
+  // Hide when chat box is open
+  if (isChatOpen) return null;
 
   // Paths where bottom nav should be hidden
   const hiddenPaths = ['/', '/location', '/vendor/register', '/vendor/pending', '/vendor/subscriptions'];
@@ -31,6 +46,12 @@ export default function CustomerBottomNav() {
       path: '/search',
     },
     {
+      id: 'chats',
+      label: 'Chats',
+      icon: MessageSquare,
+      path: '/chats',
+    },
+    {
       id: 'saved',
       label: t('saved'),
       icon: Heart,
@@ -47,7 +68,7 @@ export default function CustomerBottomNav() {
   return (
     <div className="fixed bottom-4 inset-x-0 z-50 flex justify-center px-4 pointer-events-none font-body">
       {/* Light Theme Floating Navbar Island */}
-      <nav className="pointer-events-auto w-full max-w-[360px] bg-white text-ink rounded-full p-2.5 px-3 shadow-[0_12px_36px_rgba(0,0,0,0.12)] border border-gray-200/80 relative flex items-center justify-between select-none">
+      <nav className="pointer-events-auto w-full max-w-[420px] bg-white text-ink rounded-full p-2.5 px-3 shadow-[0_12px_36px_rgba(0,0,0,0.12)] border border-gray-200/80 relative flex items-center justify-between select-none">
         {tabs.map((tab) => {
           const IconComponent = tab.icon;
           const isActive =

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Star, Camera, Check, AlertCircle, Sparkles, Image as ImageIcon } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useBackButton } from '../../hooks/useBackButton';
 
 interface AddReviewModalProps {
   vendorName: string;
@@ -32,6 +33,8 @@ export default function AddReviewModal({
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+
+  useBackButton(onClose, isOpen);
 
   if (!isOpen) return null;
 

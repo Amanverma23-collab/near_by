@@ -122,63 +122,85 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
             </span>
           </div>
 
-          {/* Profile Menu Dropdown Button */}
-          <div className="relative">
+          {/* Top Header Actions */}
+          <div className="flex items-center gap-2">
+            {/* Quick Chats Icon Button */}
             <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border-light bg-surface hover:bg-surface-card transition-colors cursor-pointer text-xs font-display font-bold text-ink"
+              onClick={() => navigate('/chats')}
+              className="p-2 rounded-full border border-border-light bg-surface hover:bg-brand/10 hover:text-brand transition-colors cursor-pointer text-ink-muted"
+              title="Customer Chats"
             >
-              <div className="w-6 h-6 rounded-full bg-brand/15 text-brand flex items-center justify-center font-bold text-xs">
-                {vendor?.owner_name?.[0]?.toUpperCase() || 'V'}
-              </div>
-              <span className="hidden sm:inline">{vendor?.owner_name || 'Vendor Profile'}</span>
-              <Menu size={16} className="text-ink-muted" />
+              <MessageCircle size={18} />
             </button>
 
-            {/* Dropdown Menu */}
-            <AnimatePresence>
-              {menuOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute right-0 mt-2 w-52 bg-white rounded-2xl border border-border-light shadow-card p-2 z-50 space-y-1"
-                >
-                  <button
-                    onClick={() => {
-                      setMenuOpen(false);
-                      navigate('/profile');
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-display font-bold text-ink hover:bg-surface rounded-xl transition-colors cursor-pointer text-left"
+            {/* Profile Menu Dropdown Button */}
+            <div className="relative">
+              <button
+                onClick={() => setMenuOpen(!menuOpen)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border-light bg-surface hover:bg-surface-card transition-colors cursor-pointer text-xs font-display font-bold text-ink"
+              >
+                <div className="w-6 h-6 rounded-full bg-brand/15 text-brand flex items-center justify-center font-bold text-xs">
+                  {vendor?.owner_name?.[0]?.toUpperCase() || 'V'}
+                </div>
+                <span className="hidden sm:inline">{vendor?.owner_name || 'Vendor Profile'}</span>
+                <Menu size={16} className="text-ink-muted" />
+              </button>
+
+              {/* Dropdown Menu */}
+              <AnimatePresence>
+                {menuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 mt-2 w-52 bg-white rounded-2xl border border-border-light shadow-card p-2 z-50 space-y-1"
                   >
-                    <User size={15} className="text-brand" />
-                    <span>Profile</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setMenuOpen(false);
-                      navigate('/settings');
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-display font-bold text-ink hover:bg-surface rounded-xl transition-colors cursor-pointer text-left"
-                  >
-                    <Settings size={15} className="text-brand" />
-                    <span>Settings</span>
-                  </button>
-                  <hr className="border-border-light my-1" />
-                  <button
-                    onClick={() => {
-                      setMenuOpen(false);
-                      signOut();
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-display font-bold text-error hover:bg-error-light/50 rounded-xl transition-colors cursor-pointer text-left"
-                  >
-                    <LogOut size={15} />
-                    <span>Logout</span>
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false);
+                        navigate('/chats');
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-display font-bold text-ink hover:bg-surface rounded-xl transition-colors cursor-pointer text-left"
+                    >
+                      <MessageCircle size={15} className="text-brand" />
+                      <span>Customer Chats</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false);
+                        navigate('/profile');
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-display font-bold text-ink hover:bg-surface rounded-xl transition-colors cursor-pointer text-left"
+                    >
+                      <User size={15} className="text-brand" />
+                      <span>Profile</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false);
+                        navigate('/settings');
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-display font-bold text-ink hover:bg-surface rounded-xl transition-colors cursor-pointer text-left"
+                    >
+                      <Settings size={15} className="text-brand" />
+                      <span>Settings</span>
+                    </button>
+                    <hr className="border-border-light my-1" />
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false);
+                        signOut();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-display font-bold text-error hover:bg-error-light/50 rounded-xl transition-colors cursor-pointer text-left"
+                    >
+                      <LogOut size={15} />
+                      <span>Logout</span>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
       </header>
@@ -365,6 +387,30 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
           </h2>
 
           <div className="bg-white rounded-3xl border border-border-light shadow-card divide-y divide-border-light/60 overflow-hidden">
+            {/* Customer Chats & Inquiries */}
+            <motion.div
+              whileHover={{ backgroundColor: 'var(--color-surface)' }}
+              whileTap={{ scale: 0.995 }}
+              onClick={() => navigate('/chats')}
+              className="p-4 sm:p-5 flex items-center justify-between cursor-pointer transition-colors bg-brand/5"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-brand/15 text-brand rounded-2xl border border-brand/20">
+                  <MessageCircle size={20} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-display font-extrabold text-ink">Customer Chats & Inquiries</h3>
+                    <span className="px-2 py-0.5 rounded-full bg-brand text-white font-display font-extrabold text-[10px]">
+                      Live
+                    </span>
+                  </div>
+                  <p className="text-xs text-ink-muted mt-0.5">View & reply to customer messages, voice notes & locations</p>
+                </div>
+              </div>
+              <ChevronRight size={18} className="text-ink-muted shrink-0" />
+            </motion.div>
+
             {/* Edit Shop Details */}
             <motion.div
               whileHover={{ backgroundColor: 'var(--color-surface)' }}

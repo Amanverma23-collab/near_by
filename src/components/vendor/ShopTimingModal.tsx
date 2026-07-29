@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clock, Check, RefreshCw, Power, Sparkles, ShieldCheck } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { getEffectiveShopStatus, formatTime12H } from '../../utils/shopTiming';
+import { useBackButton } from '../../hooks/useBackButton';
 
 interface ShopTimingModalProps {
   vendor: any;
@@ -38,6 +39,8 @@ export default function ShopTimingModal({
   const [savingHours, setSavingHours] = useState(false);
   const [togglingManual, setTogglingManual] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  useBackButton(onClose, isOpen);
 
   if (!isOpen) return null;
 

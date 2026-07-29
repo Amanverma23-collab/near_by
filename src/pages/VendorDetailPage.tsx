@@ -11,6 +11,9 @@ import { fetchCombinedVendors } from '../utils/vendorSync';
 import AddReviewModal from '../components/customer/AddReviewModal';
 import { getSavedReviews, saveNewReview } from '../utils/reviewStorage';
 import SaveHeartButton from '../components/ui/SaveHeartButton';
+import ChatBoxModal from '../components/chat/ChatBoxModal';
+import { getOrCreateConversation } from '../utils/chatStorage';
+import type { ChatConversation } from '../utils/chatStorage';
 
 /* ──────────────────── WhatsApp SVG Icon ──────────────────── */
 const WhatsAppIcon = ({ size = 16, className = '' }) => (
@@ -76,6 +79,21 @@ export default function VendorDetailPage() {
   const [isAddReviewOpen, setIsAddReviewOpen] = useState(false);
   const [customReviews, setCustomReviews] = useState<any[]>([]);
   const [reviewToast, setReviewToast] = useState<string | null>(null);
+
+  const [activeChatConv, setActiveChatConv] = useState<ChatConversation | null>(null);
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+
+  const handleStartChat = () => {
+    if (!vendor) return;
+    const conv = getOrCreateConversation({
+      vendorId: vendor.id || vendorId || 'v-1',
+      vendorName: vendor.name,
+      vendorShopPhoto: vendor.shopImages?.[0],
+      vendorSubService: vendor.subService,
+    });
+    setActiveChatConv(conv);
+    setIsChatModalOpen(true);
+  };
 
   useEffect(() => {
     if (vendorId) {
@@ -289,31 +307,42 @@ export default function VendorDetailPage() {
 
         {/* ═══════════ C — ACTION BUTTONS ═══════════ */}
         <FadeInSection delay={0.12} className="mb-6">
-          <div className="grid grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-4 gap-2">
             {/* Call */}
             <a
               href={`tel:${vendor.phoneNumber}`}
-              className="flex items-center justify-center gap-1.5 bg-brand hover:bg-brand-dark text-white py-3 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors shadow-sm shadow-brand/10 cursor-pointer"
+              className="flex items-center justify-center gap-1 bg-brand hover:bg-brand-dark text-white py-3 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors shadow-sm shadow-brand/10 cursor-pointer"
             >
-              <Phone size={15} />
+              <Phone size={14} />
               <span>Call</span>
             </a>
+
             {/* WhatsApp */}
             <a
               href={`https://wa.me/91${vendor.whatsappNumber}?text=${waMsg}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1.5 border border-[#25D366]/40 hover:bg-[#25D366]/5 text-[#128C7E] py-3 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors cursor-pointer"
+              className="flex items-center justify-center gap-1 border border-[#25D366]/40 hover:bg-[#25D366]/5 text-[#128C7E] py-3 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors cursor-pointer"
             >
-              <WhatsAppIcon size={15} className="text-[#25D366]" />
+              <WhatsAppIcon size={14} className="text-[#25D366]" />
               <span>WhatsApp</span>
             </a>
+
+            {/* In-App Direct Chat */}
+            <button
+              onClick={handleStartChat}
+              className="flex items-center justify-center gap-1 border border-brand/40 bg-brand/5 hover:bg-brand/10 text-brand py-3 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors cursor-pointer shadow-xs"
+            >
+              <MessageSquare size={14} />
+              <span>Chat</span>
+            </button>
+
             {/* View on Map */}
             <a
               href={`https://www.google.com/maps?q=${vendor.latitude},${vendor.longitude}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1.5 border border-border-light hover:border-brand/30 hover:text-brand text-ink-muted py-3 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors cursor-pointer"
+              className="flex items-center justify-center gap-1 border border-border-light hover:border-brand/30 hover:text-brand text-ink-muted py-3 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors cursor-pointer"
             >
               <Navigation size={14} />
               <span>Map</span>
@@ -555,26 +584,43 @@ export default function VendorDetailPage() {
       </div>
 
       {/* ═══════════ G — STICKY BOTTOM BAR (mobile) ═══════════ */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 sm:hidden bg-surface-card/95 backdrop-blur-nav border-t border-border-light px-4 py-3">
-        <div className="max-w-md mx-auto grid grid-cols-2 gap-3">
+      <div className="fixed bottom-0 left-0 right-0 z-50 sm:hidden bg-surface-card/95 backdrop-blur-nav border-t border-border-light px-4 py-2.5">
+        <div className="max-w-md mx-auto grid grid-cols-3 gap-2">
           <a
             href={`tel:${vendor.phoneNumber}`}
-            className="flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white py-3 rounded-[var(--radius-md)] text-sm font-display font-bold transition-colors shadow-sm shadow-brand/10 cursor-pointer"
+            className="flex items-center justify-center gap-1.5 bg-brand hover:bg-brand-dark text-white py-2.5 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors shadow-sm shadow-brand/10 cursor-pointer"
           >
-            <Phone size={16} />
+            <Phone size={15} />
             <span>Call</span>
           </a>
+
           <a
             href={`https://wa.me/91${vendor.whatsappNumber}?text=${waMsg}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 border-2 border-[#25D366]/40 hover:bg-[#25D366]/5 text-[#128C7E] py-3 rounded-[var(--radius-md)] text-sm font-display font-bold transition-colors cursor-pointer"
+            className="flex items-center justify-center gap-1.5 border border-[#25D366]/40 hover:bg-[#25D366]/5 text-[#128C7E] py-2.5 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors cursor-pointer"
           >
-            <WhatsAppIcon size={16} className="text-[#25D366]" />
+            <WhatsAppIcon size={15} className="text-[#25D366]" />
             <span>WhatsApp</span>
           </a>
+
+          <button
+            onClick={handleStartChat}
+            className="flex items-center justify-center gap-1.5 border border-brand/40 bg-brand/10 text-brand py-2.5 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors cursor-pointer shadow-xs"
+          >
+            <MessageSquare size={15} />
+            <span>Chat</span>
+          </button>
         </div>
       </div>
+
+      {/* Chat Box Modal */}
+      <ChatBoxModal
+        conversation={activeChatConv}
+        currentUserRole="customer"
+        isOpen={isChatModalOpen}
+        onClose={() => setIsChatModalOpen(false)}
+      />
     </motion.div>
   );
 }

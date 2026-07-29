@@ -3,8 +3,8 @@ import { fetchCombinedVendors } from './vendorSync';
 
 const STORAGE_KEY = 'nearby_saved_vendor_ids';
 
-// Default initial saved vendor IDs for demo mode if none exist yet
-const DEFAULT_SAVED_IDS = [dummyVendors[0]?.id || 've-1', dummyVendors[2]?.id || 'hm-1', dummyVendors[4]?.id || 'hm-3'];
+// Default initial saved vendor IDs if none exist yet
+const DEFAULT_SAVED_IDS: string[] = [];
 
 /**
  * Gets all saved vendor IDs from localStorage
