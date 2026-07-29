@@ -185,11 +185,12 @@ export default function VendorAuthForm() {
         .eq('mobile_number', mobile)
         .maybeSingle();
 
-      const { data: existingVendor } = await supabase
+      const { data: vendorRows } = await supabase
         .from('vendors')
-        .select('id, is_verified, name, owner_name')
-        .eq('phone_number', mobile)
-        .maybeSingle();
+        .select('id, is_verified, verification_status, name, owner_name')
+        .eq('phone_number', mobile);
+
+      const existingVendor = vendorRows?.find(v => v.name && v.name !== 'Pending Shop Registration') || vendorRows?.[0];
 
       if (custRecord && !existingVendor) {
         setError('This mobile number is registered as a Customer account. Please use the Customer tab to log in.');
@@ -210,21 +211,21 @@ export default function VendorAuthForm() {
         throw new Error('Login failed. Please check your credentials.');
       }
 
+      // Re-query vendor rows including auth_user_id now that user is authenticated
+      const { data: authenticatedVendors } = await supabase
+        .from('vendors')
+        .select('id, is_verified, verification_status, name, owner_name')
+        .or(`auth_user_id.eq.${authData.user.id},phone_number.eq.${mobile}`);
+
+      const realVendor = authenticatedVendors?.find(v => v.name && v.name !== 'Pending Shop Registration') || authenticatedVendors?.[0];
+
       // Preserve registered vendor name
-      const vendorName = existingVendor?.owner_name || existingVendor?.name || authData.user.user_metadata?.owner_name || 'Vendor';
+      const vendorName = realVendor?.owner_name || realVendor?.name || authData.user.user_metadata?.owner_name || 'Vendor';
       localStorage.setItem('nearby_vendor_name', vendorName);
       localStorage.setItem('nearby_user_role', 'vendor');
 
-      // Redirect based on vendor profile status
-      if (existingVendor && existingVendor.name !== 'Pending Shop Registration') {
-        if (existingVendor.is_verified) {
-          navigate('/dashboard', { replace: true });
-        } else {
-          navigate('/vendor/pending', { replace: true });
-        }
-      } else {
-        navigate('/vendor/register', { replace: true });
-      }
+      // Navigate to /dashboard where VendorOnboardingDashboard checks exact state (Subscribed/Verified/Pending/Register)
+      navigate('/dashboard', { replace: true });
     } catch (err: any) {
       console.error('Vendor Login Error:', err);
       setError(err.message || 'Invalid credentials.');

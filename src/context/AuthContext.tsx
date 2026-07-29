@@ -47,12 +47,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (roleHint === 'vendor') {
-        const { data: vendor } = await supabase
+        const { data: vendorRows } = await supabase
           .from('vendors')
           .select('id')
           .eq('auth_user_id', u.id)
-          .maybeSingle();
-        if (vendor) return 'vendor';
+          .limit(1);
+        if (vendorRows && vendorRows.length > 0) return 'vendor';
       }
 
       // Default order check: customers first, then vendors
@@ -64,13 +64,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (customer) return 'customer';
 
-      const { data: vendor } = await supabase
+      const { data: vendorRows } = await supabase
         .from('vendors')
         .select('id')
         .eq('auth_user_id', u.id)
-        .maybeSingle();
+        .limit(1);
 
-      if (vendor) return 'vendor';
+      if (vendorRows && vendorRows.length > 0) return 'vendor';
     } catch (err) {
       console.warn('Error determining user role from database:', err);
     }

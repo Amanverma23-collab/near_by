@@ -14,7 +14,7 @@ export default function AuthPage() {
   if (loading) return <BrandLoader />;
   if (session && role) {
     if (role === 'vendor') {
-      return <Navigate to="/vendor/register" replace />;
+      return <Navigate to="/dashboard" replace />;
     }
     return <Navigate to="/location" replace />;
   }

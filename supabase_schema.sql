@@ -75,6 +75,11 @@ CREATE POLICY "Allow vendors to manage their own business details"
     ON public.vendors FOR ALL
     USING (auth.uid() = auth_user_id);
 
+CREATE POLICY "Allow update access to vendors for approval"
+    ON public.vendors FOR UPDATE
+    USING (true)
+    WITH CHECK (true);
+
 
 -- ==========================================
 -- 3. SEED DUMMY DATA FOR TESTING

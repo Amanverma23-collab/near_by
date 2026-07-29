@@ -73,24 +73,42 @@ export default function VendorOnboardingDashboard() {
   const fetchVendorStatus = async () => {
     if (!user) return;
     try {
-      let { data } = await supabase
+      // 1. Search vendors by auth_user_id
+      let { data: vendors, error } = await supabase
         .from('vendors')
         .select('*')
-        .eq('auth_user_id', user.id)
-        .maybeSingle();
+        .eq('auth_user_id', user.id);
 
-      if (!data && user.phone) {
+      // 2. Fallback to phone_number search if auth_user_id query returns empty
+      if ((!vendors || vendors.length === 0) && user.phone) {
         const cleanPhone = user.phone.replace(/\D/g, '').slice(-10);
-        const { data: dataByPhone } = await supabase
+        const { data: vendorsByPhone } = await supabase
           .from('vendors')
           .select('*')
-          .eq('phone_number', cleanPhone)
-          .maybeSingle();
-        data = dataByPhone;
+          .eq('phone_number', cleanPhone);
+        vendors = vendorsByPhone;
       }
 
-      if (data) {
-        setVendor(data);
+      if (vendors && vendors.length > 0) {
+        // Prioritize a record with a real shop name over placeholder 'Pending Shop Registration'
+        // And prioritize a verified record over an unverified one
+        let bestVendor = vendors.find(v => v.name && v.name !== 'Pending Shop Registration' && v.is_verified)
+          || vendors.find(v => v.name && v.name !== 'Pending Shop Registration')
+          || vendors[0];
+
+        // Check if ANY row for this user was verified by admin
+        const anyVerified = vendors.some(v => v.is_verified || v.verification_status === 'approved');
+        if (anyVerified) {
+          bestVendor = {
+            ...bestVendor,
+            is_verified: true,
+            verification_status: 'approved'
+          };
+        }
+
+        setVendor(bestVendor);
+      } else {
+        setVendor(null);
       }
     } catch (err) {
       console.error('Error fetching vendor status:', err);
@@ -187,18 +205,25 @@ export default function VendorOnboardingDashboard() {
     return <BrandLoader />;
   }
 
+  // Helper flags for vendor state matching
+  const isShopRegistered = Boolean(vendor && vendor.name && vendor.name !== 'Pending Shop Registration');
+  const isVerified = Boolean(vendor && (vendor.is_verified || vendor.verification_status === 'approved'));
+
   // STATE D: Subscribed / Active Live Dashboard
   if (vendor && (vendor.subscription_status === 'trial' || vendor.subscription_status === 'active' || vendor.subscription_status === 'pro')) {
     return <VendorShopDashboard vendor={vendor} onRefreshVendor={fetchVendorStatus} />;
   }
 
-  // STATE B: Verification Pending
-  if (vendor && (vendor.verification_status === 'pending' || (!vendor.is_verified && vendor.name && vendor.name !== 'Pending Shop Registration'))) {
+  // STATE C: Verified / Approved (Ready for Subscription selection)
+  if (isShopRegistered && isVerified) {
     const displayCategory = categoryNames[vendor.category] || vendor.category || 'N/A';
     const shopFrontImage = vendor.shop_images?.[0] || 'https://picsum.photos/seed/shop/300/200';
 
     return (
-      <div className="vendor-mode min-h-screen bg-surface pb-16 flex flex-col font-body">
+      <div className="vendor-mode min-h-screen bg-surface pb-16 flex flex-col font-body relative overflow-hidden">
+        {/* Confetti Lite Effect */}
+        <ConfettiLite />
+
         {/* Header */}
         <header className="sticky top-0 z-40 w-full bg-white/80 backdrop-blur-md border-b border-border-light">
           <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -221,95 +246,99 @@ export default function VendorOnboardingDashboard() {
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 max-w-2xl mx-auto px-4 py-8 sm:py-12 w-full flex flex-col gap-6">
+        <main className="flex-1 max-w-2xl mx-auto px-4 py-8 sm:py-12 w-full flex flex-col gap-6 z-10">
           <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-3xl border border-border-light shadow-card p-6 sm:p-8 space-y-6"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 150, damping: 18 }}
+            className="bg-white rounded-3xl border border-border-light shadow-card p-6 sm:p-8 space-y-8 text-center"
           >
-            {/* Status Banner */}
-            <div className="bg-teal-50/50 border border-teal-100/50 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-3 text-left w-full sm:w-auto">
-                <div className="p-2.5 bg-teal-100/60 text-teal-600 rounded-xl">
-                  <Clock size={20} className="animate-pulse" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-display font-extrabold text-teal-950">
-                    Verification Pending
-                  </h3>
-                  <p className="text-xs text-teal-700/80 mt-0.5">
-                    Your request is under review.
-                  </p>
-                </div>
-              </div>
-              
-              <div className="w-full sm:w-auto flex justify-center">
-                <VerificationTimer requestedAt={vendor.verification_requested_at} />
-              </div>
+            {/* Celebrating checkmark Icon with Pulse and scale effect */}
+            <div className="relative w-20 h-20 mx-auto">
+              <motion.div
+                initial={{ scale: 0.6, opacity: 0 }}
+                animate={{ scale: [0.6, 1.15, 1], opacity: 1 }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
+                className="w-20 h-20 bg-teal-500 text-white rounded-full flex items-center justify-center shadow-lg border border-teal-400"
+              >
+                <ShieldCheck size={42} />
+              </motion.div>
+              <motion.div
+                className="absolute inset-0 rounded-full border-2 border-teal-500/30"
+                animate={{
+                  scale: [1, 1.4, 1],
+                  opacity: [0.6, 0, 0.6],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              />
+            </div>
+
+            {/* Heading & Subtext */}
+            <div className="space-y-3">
+              <h2 className="text-3xl font-display font-extrabold text-ink">
+                You're Verified! 🎉
+              </h2>
+              <p className="text-sm text-ink-muted max-w-md mx-auto leading-relaxed">
+                Your shop is approved. Choose a subscription plan to go live and start attracting customers nearby.
+              </p>
             </div>
 
             <hr className="border-border-light" />
 
-            {/* Submitted Shop Details */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-ink/75 font-display font-extrabold text-xs uppercase tracking-wider">
-                <Info size={14} className="text-brand" />
-                Submitted Shop Details
+            {/* Shop summary card */}
+            <div className="space-y-4 text-left">
+              <div className="text-xs font-display font-extrabold text-ink-muted uppercase tracking-wider pl-1">
+                Approved Shop Listing Details
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center gap-5 p-5 bg-surface/50 border border-border-light/60 rounded-2xl">
+              <div className="flex flex-col sm:flex-row items-center gap-5 p-5 bg-teal-50/20 border border-teal-500/10 rounded-2xl">
                 <img
                   src={shopFrontImage}
                   alt={vendor.name}
-                  className="w-28 h-28 object-cover rounded-xl border border-border-light shadow-sm bg-surface-card"
+                  className="w-24 h-24 object-cover rounded-xl border border-border-light shadow-sm bg-surface-card"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = 'https://picsum.photos/seed/shop/300/200';
                   }}
                 />
-                <div className="text-center sm:text-left flex-1 space-y-2">
+                <div className="text-center sm:text-left flex-1 space-y-1.5">
                   <div>
                     <span className="text-[10px] font-display font-bold px-2 py-0.5 rounded-full bg-brand/10 text-brand uppercase tracking-wider">
                       {displayCategory}
                     </span>
                   </div>
-                  <h4 className="text-lg font-display font-extrabold text-ink leading-tight">
+                  <h4 className="text-base font-display font-extrabold text-ink leading-tight">
                     {vendor.name}
                   </h4>
                   <p className="text-xs text-ink-muted leading-relaxed">
                     {vendor.address}
                   </p>
-                  <p className="text-xs text-ink-muted">
-                    Owner: <span className="font-semibold text-ink-light">{vendor.owner_name}</span>
-                  </p>
                 </div>
               </div>
             </div>
 
-            <div className="p-4 bg-surface rounded-xl border border-border-light text-left text-xs text-ink-muted leading-relaxed">
-              We are verifying your storefront and identity details. No further actions are required at this stage. You will gain full access to your business dashboard once approved.
+            {/* Action CTA */}
+            <div>
+              <motion.button
+                whileHover={{ scale: 1.02, boxShadow: "0 8px 24px rgba(13, 148, 136, 0.25)" }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => navigate('/vendor/subscriptions')}
+                className="w-full py-4 bg-brand hover:bg-brand-dark text-white font-display font-extrabold rounded-[var(--radius-md)] border-2 border-amber-400 hover:border-amber-500 shadow-[0_4px_14px_rgba(245,158,11,0.12)] text-sm cursor-pointer transition-all duration-300"
+              >
+                Continue to Subscription Plans
+              </motion.button>
             </div>
           </motion.div>
-
-          {/* 🛠️ TEMPORARY DEV UTILITY — Remove once real Admin Dashboard is built. */}
-          <DevApproveButton
-            userId={user?.id || ''}
-            onApproved={async () => {
-              // Re-fetch vendor data so the dashboard re-renders as State C
-              const { data } = await supabase
-                .from('vendors')
-                .select('*')
-                .eq('auth_user_id', user!.id)
-                .maybeSingle();
-              if (data) setVendor(data);
-            }}
-          />
         </main>
       </div>
     );
   }
 
-  // STATE C: Verified / Approved
-  if (vendor && vendor.verification_status === 'approved') {
+  // STATE B: Verification Pending
+  if (isShopRegistered && !isVerified) {
     const displayCategory = categoryNames[vendor.category] || vendor.category || 'N/A';
     const shopFrontImage = vendor.shop_images?.[0] || 'https://picsum.photos/seed/shop/300/200';
 

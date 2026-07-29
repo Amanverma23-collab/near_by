@@ -25,7 +25,7 @@ export default function DevApproveButton({ userId, onApproved }: DevApproveButto
   const handleApprove = async () => {
     setApproving(true);
     try {
-      // Simulate admin approval: flip both verification fields
+      // 1. Update all rows matching auth_user_id
       await supabase
         .from('vendors')
         .update({
@@ -33,6 +33,21 @@ export default function DevApproveButton({ userId, onApproved }: DevApproveButto
           verification_status: 'approved',
         })
         .eq('auth_user_id', userId);
+
+      // 2. Also update by phone_number to ensure any unlinked/duplicate rows get verified & linked
+      const { data: userData } = await supabase.auth.getUser();
+      const userPhone = userData?.user?.phone || userData?.user?.user_metadata?.phone_number;
+      if (userPhone) {
+        const cleanPhone = userPhone.replace(/\D/g, '').slice(-10);
+        await supabase
+          .from('vendors')
+          .update({
+            auth_user_id: userId,
+            is_verified: true,
+            verification_status: 'approved',
+          })
+          .eq('phone_number', cleanPhone);
+      }
 
       onApproved();
     } catch (err) {

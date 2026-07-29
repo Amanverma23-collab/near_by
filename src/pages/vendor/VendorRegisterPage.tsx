@@ -562,34 +562,9 @@ export default function VendorRegisterPage() {
     setSubmitting(true);
 
     try {
-      // 1. Convert base64 photos to Blobs
-      const selfieBlob = base64ToBlob(wizardData.ownerPhoto!);
-      const shopBlob = base64ToBlob(wizardData.shopPhoto!);
-
-      // 2. Upload to Supabase Storage (structured under user.id folder for RLS policy compliance)
-      const selfiePath = `${user.id}/selfie-${Date.now()}.jpg`;
-      const shopPath = `${user.id}/shop-front-${Date.now()}.jpg`;
-
-      let shopUrl = wizardData.shopPhoto || 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&q=80&w=600';
-
-      try {
-        try {
-          await supabase.storage.createBucket('vendor-verification-photos', { public: true });
-        } catch {}
-
-        const { error: shopUploadError } = await supabase.storage
-          .from('vendor-verification-photos')
-          .upload(shopPath, shopBlob, { contentType: 'image/jpeg', upsert: true });
-
-        if (!shopUploadError) {
-          const { data: shopUrlData } = supabase.storage.from('vendor-verification-photos').getPublicUrl(shopPath);
-          if (shopUrlData?.publicUrl) {
-            shopUrl = shopUrlData.publicUrl;
-          }
-        }
-      } catch (storageErr) {
-        console.warn('Storage upload error, continuing with fallback shop photo:', storageErr);
-      }
+      // Always store the real captured base64 photo data directly so real camera photos show in Admin Dashboard
+      const shopUrl = wizardData.shopPhoto || 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&q=80&w=600';
+      const selfieUrl = wizardData.ownerPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=600';
 
       // Filter optional services list
       const cleanServices = wizardData.servicesList
@@ -606,28 +581,27 @@ export default function VendorRegisterPage() {
         address: wizardData.shopAddress.trim(),
         latitude: wizardData.latitude,
         longitude: wizardData.longitude,
-        shop_images: [shopUrl],
+        shop_images: [shopUrl, selfieUrl],
         services_offered: cleanServices,
         is_verified: false,
         whatsapp_number: wizardData.mobileNumber, // sync WhatsApp
       };
 
-      // Check if vendor row already exists by auth_user_id or phone_number
-      const { data: existingByAuth } = await supabase
+      // Check if vendor row already exists by auth_user_id or phone_number (safely without maybeSingle)
+      const { data: authVendors } = await supabase
         .from('vendors')
         .select('id')
-        .eq('auth_user_id', user.id)
-        .maybeSingle();
+        .eq('auth_user_id', user.id);
 
-      const { data: existingByPhone } = !existingByAuth && wizardData.mobileNumber
+      const { data: phoneVendors } = (!authVendors || authVendors.length === 0) && wizardData.mobileNumber
         ? await supabase
             .from('vendors')
             .select('id')
             .eq('phone_number', wizardData.mobileNumber)
-            .maybeSingle()
         : { data: null };
 
-      const existingId = existingByAuth?.id || existingByPhone?.id;
+      const existingVendors = (authVendors && authVendors.length > 0) ? authVendors : (phoneVendors || []);
+      const existingId = existingVendors.length > 0 ? existingVendors[0].id : null;
 
       const fullPayload = {
         ...updatePayload,

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { ShieldCheck, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import VerificationTimer from '../../components/vendor/VerificationTimer';
@@ -10,21 +11,26 @@ export default function VendorPendingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [requestedAt, setRequestedAt] = useState<string | null>(null);
+  const [isApproved, setIsApproved] = useState<boolean>(false);
 
   useEffect(() => {
     if (!user) return;
-    const fetchRequestedTime = async () => {
+    const fetchRequestedTimeAndStatus = async () => {
       try {
-        const { data, error } = await supabase
+        const { data: vendors } = await supabase
           .from('vendors')
-          .select('verification_requested_at')
-          .eq('auth_user_id', user.id)
-          .maybeSingle();
+          .select('verification_requested_at, is_verified, verification_status')
+          .eq('auth_user_id', user.id);
 
-        if (data?.verification_requested_at) {
-          setRequestedAt(data.verification_requested_at);
+        if (vendors && vendors.some(v => v.is_verified || v.verification_status === 'approved')) {
+          setIsApproved(true);
+          return;
+        }
+
+        const validTime = vendors?.find(v => v.verification_requested_at)?.verification_requested_at;
+        if (validTime) {
+          setRequestedAt(validTime);
         } else {
-          // Fallback to now if not set
           setRequestedAt(new Date().toISOString());
         }
       } catch (err) {
@@ -32,7 +38,10 @@ export default function VendorPendingPage() {
         setRequestedAt(new Date().toISOString());
       }
     };
-    fetchRequestedTime();
+
+    fetchRequestedTimeAndStatus();
+    const interval = setInterval(fetchRequestedTimeAndStatus, 3000);
+    return () => clearInterval(interval);
   }, [user]);
 
   // Framer Motion Variants
@@ -108,78 +117,116 @@ export default function VendorPendingPage() {
 
       {/* Main Content */}
       <main className="flex-1 max-w-md w-full mx-auto px-4 py-12 flex flex-col items-center justify-center text-center">
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="show"
-          className="bg-white rounded-3xl p-8 border border-border-light shadow-card space-y-6 w-full"
-        >
-          {/* Animated SVG Checkmark Icon inside Breathing Ring */}
-          <motion.div variants={itemVariants} className="py-2">
+        <AnimatePresence mode="wait">
+          {isApproved ? (
             <motion.div
-              variants={ringVariants}
-              animate="animate"
-              className="w-20 h-20 bg-teal-50 rounded-full flex items-center justify-center border border-teal-500/20 mx-auto"
+              key="approved"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl p-8 border border-border-light shadow-card space-y-6 w-full"
             >
-              <svg
-                className="w-10 h-10 text-teal-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={3}
-              >
-                <motion.path
-                  variants={pathVariants}
-                  initial="hidden"
-                  animate="visible"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
+              {/* Celebrating Shield Badge */}
+              <div className="relative w-20 h-20 mx-auto py-2">
+                <motion.div
+                  initial={{ scale: 0.6, opacity: 0 }}
+                  animate={{ scale: [0.6, 1.15, 1], opacity: 1 }}
+                  transition={{ duration: 0.6, ease: "easeOut" }}
+                  className="w-20 h-20 bg-teal-500 text-white rounded-full flex items-center justify-center shadow-lg border border-teal-400 mx-auto"
+                >
+                  <ShieldCheck size={42} />
+                </motion.div>
+              </div>
+
+              {/* Heading */}
+              <div className="space-y-2">
+                <h2 className="text-2xl font-display font-extrabold text-ink">
+                  You're Verified! 🎉
+                </h2>
+                <p className="text-sm text-ink-muted leading-relaxed">
+                  Your shop is approved. Choose a subscription plan to go live and start attracting customers nearby.
+                </p>
+              </div>
+
+              {/* Action Button: NEXT */}
+              <div>
+                <motion.button
+                  whileHover={{ scale: 1.02, boxShadow: "0 8px 24px rgba(13, 148, 136, 0.25)" }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => navigate('/vendor/subscriptions')}
+                  className="w-full py-4 bg-brand hover:bg-brand-dark text-white font-display font-extrabold rounded-2xl border-2 border-amber-400 hover:border-amber-500 shadow-brand text-sm cursor-pointer transition-all flex items-center justify-center gap-2"
+                >
+                  <span>Next: Choose Subscription Plan</span>
+                  <ArrowRight size={18} />
+                </motion.button>
+              </div>
             </motion.div>
-          </motion.div>
-
-          {/* Heading */}
-          <motion.div variants={itemVariants} className="space-y-2">
-            <h2 className="text-2xl font-display font-extrabold text-ink">
-              Request Submitted!
-            </h2>
-            <p className="text-sm text-ink-muted leading-relaxed">
-              Your vendor verification request has been successfully received. Our team is currently reviewing your owner identity details and shop profile.
-            </p>
-          </motion.div>
-
-          {/* Reusable Countdown Timer Card */}
-          <motion.div variants={itemVariants} className="flex justify-center w-full">
-            <VerificationTimer requestedAt={requestedAt} />
-          </motion.div>
-
-          {/* Info Box */}
-          <motion.div variants={itemVariants} className="p-4 bg-surface rounded-2xl border border-border-light text-left">
-            <h4 className="text-xs font-display font-extrabold text-ink">
-              Verification in Progress
-            </h4>
-            <p className="text-[10px] text-ink-muted mt-0.5 leading-relaxed">
-              Verification usually takes less than 2 hours. We will notify you once your shop listing goes live.
-            </p>
-          </motion.div>
-
-          {/* Action Button */}
-          <motion.div variants={itemVariants}>
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="w-full py-3.5 bg-brand hover:bg-brand-dark text-white font-display font-extrabold rounded-[var(--radius-md)] shadow-brand text-sm cursor-pointer transition-colors border border-accent/10"
+          ) : (
+            <motion.div
+              key="pending"
+              variants={containerVariants}
+              initial="hidden"
+              animate="show"
+              className="bg-white rounded-3xl p-8 border border-border-light shadow-card space-y-6 w-full"
             >
-              Go to Dashboard
-            </button>
-          </motion.div>
-        </motion.div>
+              {/* Animated SVG Checkmark Icon inside Breathing Ring */}
+              <motion.div variants={itemVariants} className="py-2">
+                <motion.div
+                  variants={ringVariants}
+                  animate="animate"
+                  className="w-20 h-20 bg-teal-50 rounded-full flex items-center justify-center border border-teal-500/20 mx-auto"
+                >
+                  <svg
+                    className="w-10 h-10 text-teal-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={3}
+                  >
+                    <motion.path
+                      variants={pathVariants}
+                      initial="hidden"
+                      animate="visible"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                </motion.div>
+              </motion.div>
+
+              {/* Heading */}
+              <motion.div variants={itemVariants} className="space-y-2">
+                <h2 className="text-2xl font-display font-extrabold text-ink">
+                  Request Submitted!
+                </h2>
+                <p className="text-sm text-ink-muted leading-relaxed">
+                  Your vendor verification request has been successfully received. Our team is currently reviewing your owner identity details and shop profile.
+                </p>
+              </motion.div>
+
+              {/* Reusable Countdown Timer Card */}
+              <motion.div variants={itemVariants} className="flex justify-center w-full">
+                <VerificationTimer requestedAt={requestedAt} />
+              </motion.div>
+
+              {/* Info Box */}
+              <motion.div variants={itemVariants} className="p-4 bg-surface rounded-2xl border border-border-light text-left">
+                <h4 className="text-xs font-display font-extrabold text-ink">
+                  Verification in Progress
+                </h4>
+                <p className="text-[10px] text-ink-muted mt-0.5 leading-relaxed">
+                  Verification usually takes less than 2 hours. We will notify you once your shop listing goes live.
+                </p>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* 🛠️ TEMPORARY DEV UTILITY — Remove once real Admin Dashboard is built. */}
         <DevApproveButton
           userId={user?.id || ''}
-          onApproved={() => navigate('/dashboard', { replace: true })}
+          onApproved={() => setIsApproved(true)}
         />
       </main>
     </div>
