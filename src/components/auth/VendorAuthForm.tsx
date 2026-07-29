@@ -150,10 +150,8 @@ export default function VendorAuthForm() {
 
       if (signInError) throw signInError;
 
-      setSuccessMsg('Vendor account created! Redirecting to shop details...');
       setTimeout(() => {
         navigate('/vendor/register', { replace: true });
-        window.location.reload();
       }, 400);
     } catch (err: any) {
       console.error('Vendor Register Error:', err);
@@ -227,7 +225,6 @@ export default function VendorAuthForm() {
       } else {
         navigate('/vendor/register', { replace: true });
       }
-      window.location.reload();
     } catch (err: any) {
       console.error('Vendor Login Error:', err);
       setError(err.message || 'Invalid credentials.');

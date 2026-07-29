@@ -136,10 +136,8 @@ export default function CustomerAuthForm() {
 
       if (signInError) throw signInError;
 
-      setSuccessMsg('Account created! Redirecting...');
       setTimeout(() => {
         navigate('/location', { replace: true });
-        window.location.reload();
       }, 300);
     } catch (err: any) {
       console.error('Customer Register Error:', err);
@@ -205,7 +203,6 @@ export default function CustomerAuthForm() {
 
       // Redirect upon successful customer authentication
       navigate('/location', { replace: true });
-      window.location.reload();
     } catch (err: any) {
       console.error('Customer Login Error:', err);
       if (err.message?.includes('fetch')) {
@@ -227,7 +224,6 @@ export default function CustomerAuthForm() {
         localStorage.setItem('nearby_mock_session', JSON.stringify(mockSession));
         setTimeout(() => {
           navigate('/location', { replace: true });
-          window.location.reload();
         }, 500);
         return;
       }

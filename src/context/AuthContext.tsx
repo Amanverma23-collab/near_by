@@ -31,79 +31,96 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<UserRole>(null);
   const [loading, setLoading] = useState(true);
 
-  const determineRole = async (userId: string): Promise<UserRole> => {
-    const roleHint = localStorage.getItem('nearby_user_role');
+  const determineRole = async (u: User): Promise<UserRole> => {
+    const roleHint =
+      (localStorage.getItem('nearby_user_role') as UserRole) ||
+      (u.user_metadata?.role as UserRole);
 
-    if (roleHint === 'customer') {
+    try {
+      if (roleHint === 'customer') {
+        const { data: customer } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('auth_user_id', u.id)
+          .maybeSingle();
+        if (customer) return 'customer';
+      }
+
+      if (roleHint === 'vendor') {
+        const { data: vendor } = await supabase
+          .from('vendors')
+          .select('id')
+          .eq('auth_user_id', u.id)
+          .maybeSingle();
+        if (vendor) return 'vendor';
+      }
+
+      // Default order check: customers first, then vendors
       const { data: customer } = await supabase
         .from('customers')
         .select('id')
-        .eq('auth_user_id', userId)
+        .eq('auth_user_id', u.id)
         .maybeSingle();
-      if (customer) return 'customer';
-    }
 
-    if (roleHint === 'vendor') {
+      if (customer) return 'customer';
+
       const { data: vendor } = await supabase
         .from('vendors')
         .select('id')
-        .eq('auth_user_id', userId)
+        .eq('auth_user_id', u.id)
         .maybeSingle();
+
       if (vendor) return 'vendor';
+    } catch (err) {
+      console.warn('Error determining user role from database:', err);
     }
 
-    // Default order check: customers first, then vendors
-    const { data: customer } = await supabase
-      .from('customers')
-      .select('id')
-      .eq('auth_user_id', userId)
-      .maybeSingle();
-
-    if (customer) return 'customer';
-
-    const { data: vendor } = await supabase
-      .from('vendors')
-      .select('id')
-      .eq('auth_user_id', userId)
-      .maybeSingle();
-
-    if (vendor) return 'vendor';
-
-    return null;
+    // Fallback: If user is logged in, return roleHint or default to 'customer'
+    return roleHint || 'customer';
   };
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-
-      if (session?.user) {
-        const userRole = await determineRole(session.user.id);
-        setRole(userRole);
+    // Helper to process session
+    const processSession = async (activeSession: Session | null) => {
+      let finalSession = activeSession;
+      if (!finalSession) {
+        const rawMock = localStorage.getItem('nearby_mock_session');
+        if (rawMock) {
+          try {
+            finalSession = JSON.parse(rawMock);
+          } catch {}
+        }
       }
 
-      setLoading(false);
-    }).catch((err) => {
-      console.error('Error fetching initial auth session:', err);
-      setLoading(false);
-    });
+      setSession(finalSession);
+      setUser(finalSession?.user ?? null);
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-
-      if (session?.user) {
-        const userRole = await determineRole(session.user.id);
+      if (finalSession?.user) {
+        const userRole = await determineRole(finalSession.user);
         setRole(userRole);
       } else {
         setRole(null);
       }
 
       setLoading(false);
+    };
+
+    // Get initial session
+    supabase.auth
+      .getSession()
+      .then(async ({ data: { session } }) => {
+        await processSession(session);
+      })
+      .catch(async (err) => {
+        console.error('Error fetching initial auth session:', err);
+        await processSession(null);
+      });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      await processSession(session);
     });
 
     return () => {
@@ -112,7 +129,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    localStorage.removeItem('nearby_mock_session');
+    localStorage.removeItem('nearby_user_role');
+    try {
+      await supabase.auth.signOut();
+    } catch {}
     setSession(null);
     setUser(null);
     setRole(null);
