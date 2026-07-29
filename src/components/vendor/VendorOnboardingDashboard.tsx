@@ -85,7 +85,7 @@ export default function VendorOnboardingDashboard() {
         const { data: vendorsByPhone } = await supabase
           .from('vendors')
           .select('*')
-          .eq('phone_number', cleanPhone);
+          .or(`phone_number.eq.${cleanPhone},phone_number.eq.+91${cleanPhone}`);
         vendors = vendorsByPhone;
       }
 
@@ -106,8 +106,13 @@ export default function VendorOnboardingDashboard() {
           };
         }
 
-        // Merge localStorage subscription fallback if present
-        const localSubStr = localStorage.getItem(`nearby_subscription_${user.id}`);
+        // Merge localStorage subscription fallback if present (check user.id, vendor.id, phone)
+        const cleanPhone = (user.phone || bestVendor.phone_number || '').replace(/\D/g, '').slice(-10);
+        const localSubStr =
+          localStorage.getItem(`nearby_subscription_${user.id}`) ||
+          (bestVendor.id ? localStorage.getItem(`nearby_subscription_${bestVendor.id}`) : null) ||
+          (cleanPhone ? localStorage.getItem(`nearby_subscription_${cleanPhone}`) : null);
+
         if (localSubStr) {
           try {
             const localSub = JSON.parse(localSubStr);
@@ -226,9 +231,17 @@ export default function VendorOnboardingDashboard() {
   const isShopRegistered = Boolean(vendor && vendor.name && vendor.name !== 'Pending Shop Registration');
   const isVerified = Boolean(vendor && (vendor.is_verified || vendor.verification_status === 'approved'));
 
-  // STATE D: Subscribed / Active Live Dashboard
-  if (vendor && (vendor.subscription_status === 'trial' || vendor.subscription_status === 'active' || vendor.subscription_status === 'pro')) {
-    return <VendorShopDashboard vendor={vendor} onRefreshVendor={fetchVendorStatus} />;
+  // Effective subscription status (verified shops auto-default to trial if missing)
+  const effectiveSubStatus = vendor?.subscription_status || (isVerified ? 'trial' : null);
+
+  // STATE D: Subscribed / Active Live Dashboard (Or Verified Trial)
+  if (vendor && isShopRegistered && (effectiveSubStatus === 'trial' || effectiveSubStatus === 'active' || effectiveSubStatus === 'pro')) {
+    const vendorWithSub = {
+      ...vendor,
+      subscription_status: effectiveSubStatus,
+      subscription_expires_at: vendor.subscription_expires_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    };
+    return <VendorShopDashboard vendor={vendorWithSub} onRefreshVendor={fetchVendorStatus} />;
   }
 
   // STATE C: Verified / Approved (Ready for Subscription selection)

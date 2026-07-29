@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Star, Flag, Check, AlertCircle, MessageSquare } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
 import { useBackButton } from '../../hooks/useBackButton';
+import { getSavedReviews } from '../../utils/reviewStorage';
 
 export interface ReviewItem {
   id: string;
@@ -16,55 +16,29 @@ export interface ReviewItem {
 interface VendorReviewsModalProps {
   vendorId?: string;
   vendorName?: string;
+  vendorReviews?: any[];
   isOpen: boolean;
   onClose: () => void;
 }
 
-// Sample Google-style reviews data with timestamps
-const DEFAULT_REVIEWS: ReviewItem[] = [
-  {
-    id: 'rev-1',
-    reviewerName: 'Rahul Sharma',
-    rating: 5,
-    comment: 'Awesome service! Dinesh ji was very polite and fixed my tyre puncture in under 10 minutes. Very fair pricing.',
-    created_at: '2026-07-27T19:30:00Z',
-  },
-  {
-    id: 'rev-2',
-    reviewerName: 'Priya Verma',
-    rating: 5,
-    comment: 'Super fast response on WhatsApp. Arrived at my location within 15 minutes. Highly recommended for emergency repairs!',
-    created_at: '2026-07-26T14:15:00Z',
-  },
-  {
-    id: 'rev-3',
-    reviewerName: 'Amit Patel',
-    rating: 4,
-    comment: 'Good experience. Clean shop and original spare parts. Price was reasonable.',
-    created_at: '2026-07-24T11:45:00Z',
-  },
-  {
-    id: 'rev-4',
-    reviewerName: 'Vikram Singh',
-    rating: 5,
-    comment: 'Honest person, did not charge extra even though it was late evening. Will definitely visit again.',
-    created_at: '2026-07-22T21:10:00Z',
-  },
-  {
-    id: 'rev-5',
-    reviewerName: 'Sneha Kulkarni',
-    rating: 4,
-    comment: 'Prompt and helpful behavior. Located right next to metro pillar.',
-    created_at: '2026-07-20T16:05:00Z',
-  },
-];
-
 export default function VendorReviewsModal({
+  vendorId = '',
   vendorName = 'Your Shop',
+  vendorReviews = [],
   isOpen,
   onClose,
 }: VendorReviewsModalProps) {
-  const [reviews, setReviews] = useState<ReviewItem[]>(DEFAULT_REVIEWS);
+  // Read real customer reviews from props or localStorage
+  const savedReviews = vendorId ? getSavedReviews(vendorId) : [];
+  const initialReviews: ReviewItem[] = (vendorReviews.length > 0 ? vendorReviews : savedReviews).map((r: any, idx: number) => ({
+    id: r.id || `rev-real-${idx}`,
+    reviewerName: r.reviewerName || r.reviewer_name || 'Customer',
+    rating: Number(r.rating || 5),
+    comment: r.comment || '',
+    created_at: r.created_at || new Date().toISOString(),
+  }));
+
+  const [reviews, setReviews] = useState<ReviewItem[]>(initialReviews);
   const [reportingReview, setReportingReview] = useState<ReviewItem | null>(null);
   const [reportReason, setReportReason] = useState<string>('Fake or Spam Review');
   const [reportSubmittedMsg, setReportSubmittedMsg] = useState<string | null>(null);
@@ -75,9 +49,9 @@ export default function VendorReviewsModal({
 
   // Calculate statistics
   const totalReviews = reviews.length;
-  const avgRating = (
-    reviews.reduce((acc, r) => acc + r.rating, 0) / (totalReviews || 1)
-  ).toFixed(1);
+  const avgRating = totalReviews > 0
+    ? (reviews.reduce((acc, r) => acc + r.rating, 0) / totalReviews).toFixed(1)
+    : '0.0';
 
   // Distribution counts (5★ down to 1★)
   const distribution = [5, 4, 3, 2, 1].map((star) => {
@@ -90,7 +64,6 @@ export default function VendorReviewsModal({
     e.preventDefault();
     if (!reportingReview) return;
 
-    // Mark as reported locally
     setReviews((prev) =>
       prev.map((r) => (r.id === reportingReview.id ? { ...r, isReported: true } : r))
     );
@@ -224,8 +197,17 @@ export default function VendorReviewsModal({
                 All Customer Reviews ({totalReviews})
               </h3>
 
-              <div className="space-y-4">
-                {reviews.map((rev) => (
+              {reviews.length === 0 ? (
+                <div className="p-8 text-center bg-surface rounded-2xl border border-border-light space-y-2">
+                  <MessageSquare size={36} className="mx-auto text-ink-muted/50" />
+                  <h4 className="text-sm font-display font-extrabold text-ink">No Customer Reviews Yet</h4>
+                  <p className="text-xs text-ink-muted leading-relaxed max-w-xs mx-auto">
+                    When nearby customers rate and review your shop on NearBy, their feedback will appear here in real-time.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {reviews.map((rev) => (
                   <div
                     key={rev.id}
                     className="p-4 bg-white rounded-2xl border border-border-light shadow-xs space-y-2.5 relative"
@@ -283,9 +265,10 @@ export default function VendorReviewsModal({
                     <p className="text-xs text-ink-light leading-relaxed">
                       "{rev.comment}"
                     </p>
-                  </div>
-                ))}
-              </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
           </div>

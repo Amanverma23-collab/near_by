@@ -60,11 +60,18 @@ export default function PlanDetailPage() {
         subscription_expires_at: expiresAt.toISOString(),
       };
 
+      const userPhone = user.phone || user.user_metadata?.phone_number;
+      const cleanPhone = userPhone ? userPhone.replace(/\D/g, '').slice(-10) : '';
+
       // Save to localStorage as guaranteed offline/immediate fallback
-      localStorage.setItem(`nearby_subscription_${user.id}`, JSON.stringify({
+      const subObj = JSON.stringify({
         status: 'trial',
         expiresAt: expiresAt.toISOString(),
-      }));
+      });
+      localStorage.setItem(`nearby_subscription_${user.id}`, subObj);
+      if (cleanPhone) {
+        localStorage.setItem(`nearby_subscription_${cleanPhone}`, subObj);
+      }
 
       // Update by auth_user_id
       const { error: err1 } = await supabase
@@ -77,13 +84,11 @@ export default function PlanDetailPage() {
       }
 
       // Fallback update by phone_number if available
-      const userPhone = user.phone || user.user_metadata?.phone_number;
-      if (userPhone) {
-        const cleanPhone = userPhone.replace(/\D/g, '').slice(-10);
+      if (cleanPhone) {
         await supabase
           .from('vendors')
           .update(subData)
-          .eq('phone_number', cleanPhone);
+          .or(`phone_number.eq.${cleanPhone},phone_number.eq.+91${cleanPhone}`);
       }
 
       navigate('/dashboard', { replace: true });
