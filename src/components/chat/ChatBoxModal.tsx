@@ -37,6 +37,7 @@ import {
   markConversationAsRead,
   toggleBlockConversation,
   reportConversation,
+  syncSupabaseChatMessages,
 } from '../../utils/chatStorage';
 import { getCurrentLocation } from '../../utils/nativeGeolocation';
 import { useBackButton } from '../../hooks/useBackButton';
@@ -157,10 +158,21 @@ export default function ChatBoxModal({
   // Reload messages when conversation changes or opens
   useEffect(() => {
     if (conversation && isOpen) {
-      const msgs = getConversationMessages(conversation.id);
-      setMessages(msgs);
-      markConversationAsRead(conversation.id, currentUserRole);
-      if (onConversationUpdated) onConversationUpdated();
+      const reload = () => {
+        const msgs = getConversationMessages(conversation.id);
+        setMessages(msgs);
+        markConversationAsRead(conversation.id, currentUserRole);
+        if (onConversationUpdated) onConversationUpdated();
+      };
+
+      reload();
+      syncSupabaseChatMessages(reload);
+
+      const timer = setInterval(() => {
+        syncSupabaseChatMessages(reload);
+      }, 3000);
+
+      return () => clearInterval(timer);
     }
   }, [conversation?.id, isOpen, currentUserRole]);
 

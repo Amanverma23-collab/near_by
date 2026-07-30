@@ -65,7 +65,36 @@ CREATE TABLE IF NOT EXISTS public.vendors (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Enable RLS
+-- In-App Customer <-> Vendor Chat Messages Table
+CREATE TABLE IF NOT EXISTS public.chat_messages (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    vendor_id TEXT NOT NULL,
+    customer_id TEXT NOT NULL,
+    sender_id TEXT NOT NULL,
+    sender_role TEXT NOT NULL,
+    text TEXT,
+    photo_url TEXT,
+    location JSONB,
+    audio_url TEXT,
+    audio_duration_sec INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    read BOOLEAN DEFAULT false,
+    vendor_name TEXT,
+    customer_name TEXT,
+    customer_phone TEXT,
+    vendor_sub_service TEXT,
+    vendor_shop_photo TEXT
+);
+
+ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public access to chat_messages"
+ON public.chat_messages FOR ALL
+USING (true)
+WITH CHECK (true);
+
+-- Enable RLS for vendors
 ALTER TABLE public.vendors ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for Vendors

@@ -1,3 +1,5 @@
+import { supabase } from '../lib/supabase';
+
 export interface ChatMessage {
   id: string;
   conversationId: string;
@@ -155,6 +157,98 @@ export function getConversationMessages(conversationId: string): ChatMessage[] {
   return map[conversationId] || [];
 }
 
+// Asynchronously sync chat messages with Supabase for real-time cross-device messaging
+export function syncSupabaseChatMessages(onUpdated?: () => void): void {
+  (async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error || !data || !Array.isArray(data) || data.length === 0) return;
+
+      const localConvs = getSavedConversations();
+      const localMap = getSavedMessagesMap();
+      let hasChanges = false;
+
+      // Group messages by conversation_id
+      const grouped: Record<string, any[]> = {};
+      data.forEach((row: any) => {
+        const convId = row.conversation_id || `conv-${row.vendor_id}`;
+        if (!grouped[convId]) grouped[convId] = [];
+        grouped[convId].push(row);
+      });
+
+      Object.entries(grouped).forEach(([convId, rows]) => {
+        const first = rows[0];
+        const last = rows[rows.length - 1];
+
+        // Ensure conversation exists locally
+        let conv = localConvs.find((c) => c.id === convId || c.vendorId === first.vendor_id);
+        if (!conv) {
+          conv = {
+            id: convId,
+            vendorId: first.vendor_id,
+            vendorName: first.vendor_name || 'Nearby Shop',
+            vendorShopPhoto: first.vendor_shop_photo,
+            vendorSubService: first.vendor_sub_service || 'General Services',
+            customerId: first.customer_id || 'cust-current',
+            customerName: first.customer_name || 'Customer',
+            customerPhone: first.customer_phone || '',
+            lastMessage: last.text || 'Message received',
+            lastMessageTime: last.created_at,
+            unreadCountCustomer: 0,
+            unreadCountVendor: rows.filter((r: any) => r.sender_role === 'customer' && !r.read).length,
+          };
+          localConvs.unshift(conv);
+          hasChanges = true;
+        } else {
+          let snippet = last.text || '';
+          if (last.photo_url) snippet = '📷 Photo attached';
+          else if (last.location) snippet = '📍 Shared location';
+          else if (last.audio_url) snippet = '🎙️ Voice note';
+
+          if (conv.lastMessageTime !== last.created_at) {
+            conv.lastMessage = snippet;
+            conv.lastMessageTime = last.created_at;
+            conv.unreadCountVendor = rows.filter((r: any) => r.sender_role === 'customer' && !r.read).length;
+            hasChanges = true;
+          }
+        }
+
+        // Map messages
+        const formattedMsgs: ChatMessage[] = rows.map((r: any) => ({
+          id: r.id,
+          conversationId: convId,
+          senderId: r.sender_id,
+          senderRole: r.sender_role,
+          text: r.text,
+          photoUrl: r.photo_url,
+          location: r.location,
+          audioUrl: r.audio_url,
+          audioDurationSec: r.audio_duration_sec,
+          created_at: r.created_at,
+          read: Boolean(r.read),
+        }));
+
+        if (JSON.stringify(localMap[convId]) !== JSON.stringify(formattedMsgs)) {
+          localMap[convId] = formattedMsgs;
+          hasChanges = true;
+        }
+      });
+
+      if (hasChanges) {
+        saveConversations(localConvs);
+        saveMessagesMap(localMap);
+        if (onUpdated) onUpdated();
+      }
+    } catch (e) {
+      console.warn('Chat sync notice:', e);
+    }
+  })();
+}
+
 // Send a message in a conversation
 export function sendMessageToConversation({
   conversationId,
@@ -226,6 +320,39 @@ export function sendMessageToConversation({
     }
 
     saveConversations(conversations);
+  }
+
+  // Async insert to Supabase DB for cross-device delivery
+  if (targetConv) {
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('chat_messages')
+          .insert({
+            id: newMsg.id,
+            conversation_id: conversationId,
+            vendor_id: targetConv.vendorId,
+            customer_id: targetConv.customerId,
+            sender_id: senderId,
+            sender_role: senderRole,
+            text: text || '',
+            photo_url: photoUrl || null,
+            location: location || null,
+            audio_url: audioUrl || null,
+            audio_duration_sec: audioDurationSec || null,
+            created_at: newMsg.created_at,
+            read: false,
+            vendor_name: targetConv.vendorName || null,
+            customer_name: targetConv.customerName || null,
+            customer_phone: targetConv.customerPhone || null,
+            vendor_sub_service: targetConv.vendorSubService || null,
+            vendor_shop_photo: targetConv.vendorShopPhoto || null,
+          });
+        if (error) console.warn('Supabase chat message insert notice:', error);
+      } catch (e) {
+        console.warn('Supabase chat message insert catch notice:', e);
+      }
+    })();
   }
 
   return newMsg;

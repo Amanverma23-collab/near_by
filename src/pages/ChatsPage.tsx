@@ -18,6 +18,7 @@ import type { ChatConversation } from '../utils/chatStorage';
 import {
   getSavedConversations,
   markConversationAsRead,
+  syncSupabaseChatMessages,
 } from '../utils/chatStorage';
 import ChatBoxModal from '../components/chat/ChatBoxModal';
 
@@ -38,6 +39,13 @@ export default function ChatsPage() {
 
   useEffect(() => {
     reloadConversations();
+    syncSupabaseChatMessages(reloadConversations);
+
+    const timer = setInterval(() => {
+      syncSupabaseChatMessages(reloadConversations);
+    }, 4000);
+
+    return () => clearInterval(timer);
   }, []);
 
   const handleOpenConversation = (conv: ChatConversation) => {

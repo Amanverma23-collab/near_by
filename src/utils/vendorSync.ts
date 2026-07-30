@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { dummyVendors, type Vendor } from '../data/dummyVendors';
+import { getEffectiveShopStatus } from './shopTiming';
 
 /**
  * Fetches all registered live vendors from Supabase / database and merges them
@@ -43,6 +44,9 @@ export async function fetchCombinedVendors(): Promise<Vendor[]> {
             ? v.opening_hours
             : `${v.opening_time || '08:00'} - ${v.closing_time || '21:00'}`;
 
+        // Compute real dynamic open/closed status based on opening hours & manual toggle
+        const timingStatus = getEffectiveShopStatus(v);
+
         return {
           id: v.id || `real-v-${idx}`,
           name: v.name || v.shop_name || 'Nearby Shop',
@@ -50,7 +54,7 @@ export async function fetchCombinedVendors(): Promise<Vendor[]> {
           subService: v.sub_service || 'General Services',
           distanceKm: v.distance_km || (0.4 + idx * 0.2),
           address: v.address || 'Local Market',
-          isOpenNow: v.is_open_now !== false,
+          isOpenNow: timingStatus.isOpen,
           openingHours: hoursText,
           phoneNumber: v.phone_number || v.whatsapp_number || '9876543210',
           whatsappNumber: v.whatsapp_number || v.phone_number || '9876543210',
