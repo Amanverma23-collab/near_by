@@ -184,6 +184,13 @@ export function syncSupabaseChatMessages(onUpdated?: () => void): void {
         const first = rows[0];
         const last = rows[rows.length - 1];
 
+        const unreadForVendor = rows.filter(
+          (r: any) => r.sender_role === 'customer' && !r.read_at && r.read !== true
+        ).length;
+        const unreadForCustomer = rows.filter(
+          (r: any) => r.sender_role === 'vendor' && !r.read_at && r.read !== true
+        ).length;
+
         // Ensure conversation exists locally
         let conv = localConvs.find((c) => c.id === convId || c.vendorId === first.vendor_id);
         if (!conv) {
@@ -191,6 +198,7 @@ export function syncSupabaseChatMessages(onUpdated?: () => void): void {
             id: convId,
             vendorId: first.vendor_id,
             vendorName: first.vendor_name || 'Nearby Shop',
+            vendorPhone: first.vendor_phone,
             vendorShopPhoto: first.vendor_shop_photo,
             vendorSubService: first.vendor_sub_service || 'General Services',
             customerId: first.customer_id || 'cust-current',
@@ -198,8 +206,8 @@ export function syncSupabaseChatMessages(onUpdated?: () => void): void {
             customerPhone: first.customer_phone || '',
             lastMessage: last.text || 'Message received',
             lastMessageTime: last.created_at,
-            unreadCountCustomer: 0,
-            unreadCountVendor: rows.filter((r: any) => r.sender_role === 'customer' && !r.read).length,
+            unreadCountCustomer: unreadForCustomer,
+            unreadCountVendor: unreadForVendor,
           };
           localConvs.unshift(conv);
           hasChanges = true;
@@ -209,12 +217,11 @@ export function syncSupabaseChatMessages(onUpdated?: () => void): void {
           else if (last.location) snippet = '📍 Shared location';
           else if (last.audio_url) snippet = '🎙️ Voice note';
 
-          if (conv.lastMessageTime !== last.created_at) {
-            conv.lastMessage = snippet;
-            conv.lastMessageTime = last.created_at;
-            conv.unreadCountVendor = rows.filter((r: any) => r.sender_role === 'customer' && !r.read).length;
-            hasChanges = true;
-          }
+          conv.lastMessage = snippet;
+          conv.lastMessageTime = last.created_at;
+          conv.unreadCountVendor = unreadForVendor;
+          conv.unreadCountCustomer = unreadForCustomer;
+          hasChanges = true;
         }
 
         // Map messages
@@ -326,6 +333,13 @@ export function sendMessageToConversation({
   if (targetConv) {
     (async () => {
       try {
+        const cleanVendorPhone = (
+          targetConv.vendorPhone ||
+          targetConv.vendorId ||
+          localStorage.getItem('nearby_vendor_phone') ||
+          ''
+        ).replace(/\D/g, '').slice(-10);
+
         const payload = {
           id: newMsg.id,
           conversation_id: conversationId,
@@ -342,6 +356,7 @@ export function sendMessageToConversation({
           read: false,
           read_at: null,
           vendor_name: targetConv.vendorName || null,
+          vendor_phone: cleanVendorPhone || null,
           customer_name: targetConv.customerName || null,
           customer_phone: targetConv.customerPhone || null,
           vendor_sub_service: targetConv.vendorSubService || null,
