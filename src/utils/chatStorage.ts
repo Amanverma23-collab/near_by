@@ -326,29 +326,37 @@ export function sendMessageToConversation({
   if (targetConv) {
     (async () => {
       try {
-        const { error } = await supabase
+        const payload = {
+          id: newMsg.id,
+          conversation_id: conversationId,
+          vendor_id: targetConv.vendorId,
+          customer_id: targetConv.customerId,
+          sender_id: senderId,
+          sender_role: senderRole,
+          text: text || '',
+          photo_url: photoUrl || null,
+          location: location || null,
+          audio_url: audioUrl || null,
+          audio_duration_sec: audioDurationSec || null,
+          created_at: newMsg.created_at,
+          read: false,
+          vendor_name: targetConv.vendorName || null,
+          customer_name: targetConv.customerName || null,
+          customer_phone: targetConv.customerPhone || null,
+          vendor_sub_service: targetConv.vendorSubService || null,
+          vendor_shop_photo: targetConv.vendorShopPhoto || null,
+        };
+
+        const { data, error } = await supabase
           .from('chat_messages')
-          .insert({
-            id: newMsg.id,
-            conversation_id: conversationId,
-            vendor_id: targetConv.vendorId,
-            customer_id: targetConv.customerId,
-            sender_id: senderId,
-            sender_role: senderRole,
-            text: text || '',
-            photo_url: photoUrl || null,
-            location: location || null,
-            audio_url: audioUrl || null,
-            audio_duration_sec: audioDurationSec || null,
-            created_at: newMsg.created_at,
-            read: false,
-            vendor_name: targetConv.vendorName || null,
-            customer_name: targetConv.customerName || null,
-            customer_phone: targetConv.customerPhone || null,
-            vendor_sub_service: targetConv.vendorSubService || null,
-            vendor_shop_photo: targetConv.vendorShopPhoto || null,
-          });
-        if (error) console.warn('Supabase chat message insert notice:', error);
+          .insert(payload)
+          .select();
+
+        console.log('SEND RESULT:', { data, error, payload });
+
+        if (error) {
+          console.warn('Supabase chat message insert error/notice:', error);
+        }
       } catch (e) {
         console.warn('Supabase chat message insert catch notice:', e);
       }
