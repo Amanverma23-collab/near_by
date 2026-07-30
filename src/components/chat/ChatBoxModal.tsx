@@ -40,6 +40,7 @@ import {
   syncSupabaseChatMessages,
 } from '../../utils/chatStorage';
 import { supabase } from '../../lib/supabase';
+import { useUnread } from '../../context/UnreadContext';
 import { getCurrentLocation } from '../../utils/nativeGeolocation';
 import { useBackButton } from '../../hooks/useBackButton';
 import { Keyboard } from '@capacitor/keyboard';
@@ -62,6 +63,7 @@ export default function ChatBoxModal({
   onConversationUpdated,
 }: ChatBoxModalProps) {
   const navigate = useNavigate();
+  const { markAsRead } = useUnread();
   useBackButton(onClose, isOpen);
 
   const handleOpenVendorProfile = () => {
@@ -163,6 +165,7 @@ export default function ChatBoxModal({
         const msgs = getConversationMessages(conversation.id);
         setMessages(msgs);
         markConversationAsRead(conversation.id, currentUserRole);
+        markAsRead(conversation.id);
         if (onConversationUpdated) onConversationUpdated();
       };
 

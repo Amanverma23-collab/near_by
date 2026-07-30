@@ -27,13 +27,13 @@ import {
   Camera,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useUnread } from '../../context/UnreadContext';
 import { supabase } from '../../lib/supabase';
 import AnimatedCountUp from '../ui/AnimatedCountUp';
 import ShopTimingModal from './ShopTimingModal';
 import VendorReviewsModal from './VendorReviewsModal';
 import ShopPhotosModal from './ShopPhotosModal';
 import { getEffectiveShopStatus } from '../../utils/shopTiming';
-import { getSavedReviews, getAllUserReviews } from '../../utils/reviewStorage';
 
 interface VendorShopDashboardProps {
   vendor: any;
@@ -43,6 +43,7 @@ interface VendorShopDashboardProps {
 export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorShopDashboardProps) {
   const navigate = useNavigate();
   const { signOut } = useAuth();
+  const { hasUnread } = useUnread();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -146,10 +147,19 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
             {/* Quick Chats Icon Button */}
             <button
               onClick={() => navigate('/chats')}
-              className="p-2 rounded-full border border-border-light bg-surface hover:bg-brand/10 hover:text-brand transition-colors cursor-pointer text-ink-muted"
+              className="relative p-2 rounded-full border border-border-light bg-surface hover:bg-brand/10 hover:text-brand transition-colors cursor-pointer text-ink-muted"
               title="Customer Chats"
             >
               <MessageCircle size={18} />
+              {hasUnread && (
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                  className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#EF4444] border-2 border-white shadow-xs z-30 pointer-events-none"
+                />
+              )}
             </button>
 
             {/* Profile Menu Dropdown Button */}
@@ -180,10 +190,19 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
                         setMenuOpen(false);
                         navigate('/chats');
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-display font-bold text-ink hover:bg-surface rounded-xl transition-colors cursor-pointer text-left"
+                      className="w-full flex items-center justify-between px-3 py-2 text-xs font-display font-bold text-ink hover:bg-surface rounded-xl transition-colors cursor-pointer text-left"
                     >
-                      <MessageCircle size={15} className="text-brand" />
-                      <span>Customer Chats</span>
+                      <div className="flex items-center gap-2.5">
+                        <MessageCircle size={15} className="text-brand" />
+                        <span>Customer Chats</span>
+                      </div>
+                      {hasUnread && (
+                        <motion.span
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          className="w-2 h-2 rounded-full bg-[#EF4444]"
+                        />
+                      )}
                     </button>
                     <button
                       onClick={() => {
@@ -414,8 +433,17 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
               className="p-4 sm:p-5 flex items-center justify-between cursor-pointer transition-colors bg-brand/5"
             >
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-brand/15 text-brand rounded-2xl border border-brand/20">
+                <div className="relative p-3 bg-brand/15 text-brand rounded-2xl border border-brand/20">
                   <MessageCircle size={20} />
+                  {hasUnread && (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      exit={{ scale: 0 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                      className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[#EF4444] border-2 border-white shadow-xs z-30 pointer-events-none"
+                    />
+                  )}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">

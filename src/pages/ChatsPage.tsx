@@ -14,6 +14,7 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useUnread } from '../context/UnreadContext';
 import type { ChatConversation } from '../utils/chatStorage';
 import {
   getSavedConversations,
@@ -41,6 +42,8 @@ export default function ChatsPage() {
   const [activeConversation, setActiveConversation] = useState<ChatConversation | null>(null);
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
 
+  const { markAsRead } = useUnread();
+
   const reloadConversations = () => {
     const list = getSavedConversations();
     setConversations(list);
@@ -49,6 +52,7 @@ export default function ChatsPage() {
   useEffect(() => {
     reloadConversations();
     syncSupabaseChatMessages(reloadConversations);
+    markAsRead();
 
     // Subscribe to live Supabase Realtime changes on chat_messages table
     const channel = supabase
@@ -74,11 +78,12 @@ export default function ChatsPage() {
       supabase.removeChannel(channel);
       clearInterval(timer);
     };
-  }, []);
+  }, [markAsRead]);
 
   const handleOpenConversation = (conv: ChatConversation) => {
     setActiveConversation(conv);
     markConversationAsRead(conv.id, userRole);
+    markAsRead(conv.id);
     setIsChatModalOpen(true);
     reloadConversations();
   };

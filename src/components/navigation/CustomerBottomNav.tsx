@@ -4,12 +4,14 @@ import { motion } from 'framer-motion';
 import { Home, Search, Heart, User, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useUnread } from '../../context/UnreadContext';
 
 export default function CustomerBottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const { role } = useAuth();
   const { t } = useLanguage();
+  const { hasUnread } = useUnread();
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   useEffect(() => {
@@ -111,9 +113,28 @@ export default function CustomerBottomNav() {
 
               {/* Icon for Inactive Tab */}
               {!isActive && (
-                <div className="text-gray-400 group-hover:text-ink transition-colors mb-1">
+                <div className="relative text-gray-400 group-hover:text-ink transition-colors mb-1">
                   <IconComponent size={20} />
+                  {tab.id === 'chats' && hasUnread && (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      exit={{ scale: 0 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                      className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#EF4444] border-2 border-white z-30 shadow-xs"
+                    />
+                  )}
                 </div>
+              )}
+
+              {isActive && tab.id === 'chats' && hasUnread && (
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                  className="absolute -top-4 right-1/2 translate-x-3.5 w-2.5 h-2.5 rounded-full bg-[#EF4444] border-2 border-white z-30 shadow-xs"
+                />
               )}
 
               {/* Text Label */}

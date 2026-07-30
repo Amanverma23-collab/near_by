@@ -340,6 +340,7 @@ export function sendMessageToConversation({
           audio_duration_sec: audioDurationSec || null,
           created_at: newMsg.created_at,
           read: false,
+          read_at: null,
           vendor_name: targetConv.vendorName || null,
           customer_name: targetConv.customerName || null,
           customer_phone: targetConv.customerPhone || null,
@@ -353,6 +354,7 @@ export function sendMessageToConversation({
           .select();
 
         console.log('SEND RESULT:', { data, error, payload });
+        window.dispatchEvent(new Event('nearby_unread_updated'));
 
         if (error) {
           console.warn('Supabase chat message insert error/notice:', error);

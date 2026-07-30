@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { AnimatePresence } from 'framer-motion';
 import { AuthProvider } from './context/AuthContext';
+import { UnreadProvider } from './context/UnreadContext';
 import { LocationProvider } from './context/LocationContext';
 import AuthPage from './pages/AuthPage';
 import LocationPage from './pages/LocationPage';
@@ -90,11 +91,13 @@ export default function App() {
     <BrowserRouter>
       <LanguageProvider>
         <AuthProvider>
-          <LocationProvider>
-            <HardwareBackButtonHandler />
-            <AppRoutes />
-            <CustomerBottomNav />
-          </LocationProvider>
+          <UnreadProvider>
+            <LocationProvider>
+              <HardwareBackButtonHandler />
+              <AppRoutes />
+              <CustomerBottomNav />
+            </LocationProvider>
+          </UnreadProvider>
         </AuthProvider>
       </LanguageProvider>
     </BrowserRouter>
