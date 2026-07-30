@@ -49,6 +49,7 @@ export default function AddReviewModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitted) return;
 
     if (rating === 0) {
       setErrorMsg('Please select a star rating (1 to 5 stars is required).');
@@ -265,10 +266,11 @@ export default function AddReviewModal({
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 bg-brand hover:bg-brand-dark text-white font-display font-extrabold text-xs rounded-xl shadow-brand cursor-pointer transition-all flex items-center justify-center gap-1.5"
+                  disabled={submitted}
+                  className="flex-1 py-3 bg-brand hover:bg-brand-dark text-white font-display font-extrabold text-xs rounded-xl shadow-brand cursor-pointer transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
                 >
                   <Sparkles size={14} />
-                  <span>Submit Review</span>
+                  <span>{submitted ? 'Publishing...' : 'Submit Review'}</span>
                 </button>
               </div>
             </form>

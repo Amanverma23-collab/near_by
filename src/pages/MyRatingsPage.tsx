@@ -63,15 +63,13 @@ export default function MyRatingsPage() {
     setReviews(getAllUserReviews());
   }, []);
 
-  const handleDelete = (review: SavedReview) => {
+  const handleDelete = async (review: SavedReview) => {
     setDeletingId(review.id);
-    setTimeout(() => {
-      deleteReview(review.vendorId, review.id);
-      setReviews((prev) => prev.filter((r) => r.id !== review.id));
-      setDeletingId(null);
-      setToast(t('rating_deleted'));
-      setTimeout(() => setToast(null), 3000);
-    }, 300);
+    await deleteReview(review.vendorId, review.id);
+    setReviews((prev) => prev.filter((r) => r.id !== review.id));
+    setDeletingId(null);
+    setToast(t('rating_deleted'));
+    setTimeout(() => setToast(null), 3000);
   };
 
   return (
