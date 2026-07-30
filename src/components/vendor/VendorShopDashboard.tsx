@@ -83,21 +83,12 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
     }
   }
 
-  // Real stats computation from vendor record or local tracking
+  // Real stats computation directly from vendor database record
   const localViews = Number(localStorage.getItem(`nearby_views_${vendor?.id}`) || 0);
   const localCalls = Number(localStorage.getItem(`nearby_calls_${vendor?.id}`) || 0);
   const localWa = Number(localStorage.getItem(`nearby_wa_${vendor?.id}`) || 0);
 
-  const cleanPhone = (vendor?.phone_number || '').replace(/\D/g, '').slice(-10);
-  const savedLocalReviews = getSavedReviews(vendor?.id || '')
-    .concat(cleanPhone ? getSavedReviews(cleanPhone) : [])
-    .concat(getAllUserReviews().filter(r => (vendor?.id && r.vendorId === vendor.id) || (vendor?.name && r.vendorName === vendor.name)));
-
-  const uniqueMap = new Map();
-  (vendor?.reviews || []).forEach((r: any) => uniqueMap.set(r.id || r.created_at || Math.random(), r));
-  savedLocalReviews.forEach((r: any) => uniqueMap.set(r.id || r.created_at || Math.random(), r));
-
-  const allVendorReviews = Array.from(uniqueMap.values());
+  const allVendorReviews: any[] = Array.isArray(vendor?.reviews) ? vendor.reviews : [];
   const realReviewCount = allVendorReviews.length;
 
   let realRating = 0.0;

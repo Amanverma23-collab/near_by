@@ -97,8 +97,9 @@ export default function VendorDetailPage() {
 
   useEffect(() => {
     if (vendorId) {
-      const saved = getSavedReviews(vendorId);
-      setCustomReviews(saved);
+      getSavedReviews(vendorId).then((saved) => {
+        setCustomReviews(saved);
+      });
 
       // Track real profile view
       const viewKey = `nearby_views_${vendorId}`;
@@ -586,8 +587,8 @@ export default function VendorDetailPage() {
                   vendorName={vendor.name}
                   isOpen={isAddReviewOpen}
                   onClose={() => setIsAddReviewOpen(false)}
-                  onSubmitReview={(newRev) => {
-                    const savedItem = saveNewReview(vendor.id || vendorId || 'v1', {
+                  onSubmitReview={async (newRev) => {
+                    const savedItem = await saveNewReview(vendor.id || vendorId || 'v1', {
                       reviewerName: newRev.reviewerName,
                       rating: newRev.rating,
                       comment: newRev.comment,

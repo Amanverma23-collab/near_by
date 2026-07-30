@@ -14,40 +14,83 @@ export interface SavedReview {
 }
 
 /**
- * Gets persistently saved customer reviews for a given vendor from localStorage/storage
+ * Clean up legacy localStorage review entries if any exist
  */
-export function getSavedReviews(vendorId: string): SavedReview[] {
-  if (!vendorId) return [];
+function purgeLegacyLocalStorageReviews(): void {
   try {
-    const raw = localStorage.getItem(`nearby_reviews_${vendorId}`);
-    if (raw) {
-      const parsed: SavedReview[] = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        // Deduplicate by review unique primary key 'id'
-        const map = new Map<string, SavedReview>();
-        parsed.forEach((r) => {
-          if (r && r.id) map.set(r.id, r);
-        });
-        return Array.from(map.values());
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('nearby_reviews_')) {
+        keysToRemove.push(key);
       }
     }
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
   } catch (err) {
-    console.error('Error reading saved reviews from localStorage:', err);
+    console.warn('Notice purging legacy localStorage reviews:', err);
+  }
+}
+
+/**
+ * Gets customer reviews for a given vendor directly from Supabase DB (0% localStorage)
+ */
+export async function getSavedReviews(vendorId: string): Promise<SavedReview[]> {
+  if (!vendorId) return [];
+  purgeLegacyLocalStorageReviews();
+
+  try {
+    const { data, error } = await supabase
+      .from('vendors')
+      .select('reviews')
+      .or(`id.eq.${vendorId},phone_number.eq.${vendorId}`)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('Supabase getSavedReviews error:', error);
+      return [];
+    }
+
+    if (data && Array.isArray(data.reviews)) {
+      const map = new Map<string, SavedReview>();
+      data.reviews.forEach((r: any) => {
+        if (r && (r.id || r.created_at)) {
+          const item: SavedReview = {
+            id: r.id || `rev-${r.created_at}`,
+            vendorId,
+            vendorName: r.vendorName,
+            reviewerName: r.reviewerName || r.reviewer_name || 'Customer',
+            reviewerPhone: r.reviewerPhone,
+            rating: Number(r.rating || 5),
+            comment: r.comment || '',
+            photoUrl: r.photoUrl,
+            daysAgo: r.daysAgo || 0,
+            created_at: r.created_at || new Date().toISOString(),
+          };
+          map.set(item.id, item);
+        }
+      });
+      return Array.from(map.values());
+    }
+  } catch (err) {
+    console.error('Error reading vendor reviews from Supabase DB:', err);
   }
   return [];
 }
 
 /**
- * Persists a new customer review into localStorage & Supabase so it remains and syncs to shop owner
+ * Persists a new customer review directly into Supabase DB (0% localStorage)
  */
-export function saveNewReview(
+export async function saveNewReview(
   vendorId: string,
   reviewData: { reviewerName: string; rating: number; comment?: string; photoUrl?: string; vendorName?: string }
-): SavedReview {
-  const existing = getSavedReviews(vendorId);
-  const currentPhone = localStorage.getItem('nearby_customer_phone') || undefined;
+): Promise<SavedReview> {
+  purgeLegacyLocalStorageReviews();
 
-  // Generate unique review primary ID with high entropy timestamp + random string
+  const currentPhone =
+    localStorage.getItem('nearby_customer_phone') ||
+    localStorage.getItem('nearby_vendor_phone') ||
+    undefined;
+
   const uniqueReviewId = `rev-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
   const newReviewItem: SavedReview = {
@@ -63,181 +106,128 @@ export function saveNewReview(
     created_at: new Date().toISOString(),
   };
 
-  // Deduplicate before saving
-  const filteredExisting = existing.filter((r) => r.id !== uniqueReviewId);
-  const updated = [newReviewItem, ...filteredExisting];
-
-  try {
-    // Only save to single canonical key by vendorId (avoiding duplicate vendorName key bloat)
-    localStorage.setItem(`nearby_reviews_${vendorId}`, JSON.stringify(updated));
-
-    // Also clean up any legacy vendorName keys if present to prevent ghost duplicates
-    if (reviewData.vendorName && reviewData.vendorName !== vendorId) {
-      localStorage.removeItem(`nearby_reviews_${reviewData.vendorName}`);
-    }
-  } catch (err) {
-    console.error('Error saving new review to localStorage:', err);
-  }
-
-  // Async update to Supabase vendors table
   if (vendorId) {
-    (async () => {
-      try {
-        // Fetch existing vendor row from Supabase to merge reviews cleanly without wiping other reviews
-        const { data: vendorRow } = await supabase
-          .from('vendors')
-          .select('id, reviews')
-          .or(`id.eq.${vendorId}${reviewData.vendorName ? `,name.eq.${reviewData.vendorName}` : ''}`)
-          .maybeSingle();
+    try {
+      const { data: vendorRow } = await supabase
+        .from('vendors')
+        .select('id, reviews')
+        .or(`id.eq.${vendorId}${reviewData.vendorName ? `,name.eq.${reviewData.vendorName}` : ''}`)
+        .maybeSingle();
 
-        let dbReviews: SavedReview[] = [];
-        if (vendorRow && Array.isArray(vendorRow.reviews)) {
-          dbReviews = vendorRow.reviews;
-        }
-
-        // Filter out any duplicate with same ID, then prepend new item
-        const mergedDbReviews = [newReviewItem, ...dbReviews.filter((r: any) => r.id !== newReviewItem.id)];
-        const avgRating =
-          mergedDbReviews.length > 0
-            ? Math.round((mergedDbReviews.reduce((acc, r) => acc + (r.rating || 5), 0) / mergedDbReviews.length) * 10) / 10
-            : 5.0;
-
-        await supabase
-          .from('vendors')
-          .update({
-            reviews: mergedDbReviews,
-            review_count: mergedDbReviews.length,
-            rating: avgRating,
-          })
-          .or(`id.eq.${vendorId}${reviewData.vendorName ? `,name.eq.${reviewData.vendorName}` : ''}`);
-      } catch (e) {
-        console.warn('Supabase review sync notice:', e);
+      let dbReviews: SavedReview[] = [];
+      if (vendorRow && Array.isArray(vendorRow.reviews)) {
+        dbReviews = vendorRow.reviews;
       }
-    })();
+
+      const mergedDbReviews = [newReviewItem, ...dbReviews.filter((r: any) => r.id !== newReviewItem.id)];
+      const avgRating =
+        mergedDbReviews.length > 0
+          ? Math.round((mergedDbReviews.reduce((acc, r) => acc + (r.rating || 5), 0) / mergedDbReviews.length) * 10) / 10
+          : 5.0;
+
+      await supabase
+        .from('vendors')
+        .update({
+          reviews: mergedDbReviews,
+          review_count: mergedDbReviews.length,
+          rating: avgRating,
+        })
+        .or(`id.eq.${vendorId}${reviewData.vendorName ? `,name.eq.${reviewData.vendorName}` : ''}`);
+    } catch (e) {
+      console.error('Error saving review to Supabase DB:', e);
+    }
   }
 
   return newReviewItem;
 }
 
 /**
- * Gets ALL reviews the current user has given across ALL vendors
- * Returns deduplicated reviews by review unique primary key 'id' and strictly filtered by current user's phone number
+ * Gets ALL reviews created by the currently logged-in user directly from Supabase DB (0% localStorage)
  */
-export function getAllUserReviews(): SavedReview[] {
+export async function getAllUserReviews(): Promise<SavedReview[]> {
+  purgeLegacyLocalStorageReviews();
+
   const currentPhone = (
     localStorage.getItem('nearby_customer_phone') ||
     localStorage.getItem('nearby_vendor_phone') ||
     ''
   ).replace(/\D/g, '').slice(-10);
 
-  const reviewsMap = new Map<string, SavedReview>();
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      // Scan canonical nearby_reviews_ keys
-      if (key && key.startsWith('nearby_reviews_')) {
-        const raw = localStorage.getItem(key);
-        if (raw) {
-          try {
-            const list: SavedReview[] = JSON.parse(raw);
-            if (Array.isArray(list)) {
-              list.forEach((r) => {
-                if (r && r.id) {
-                  // Filter strictly by current user's phone number if logged in
-                  if (currentPhone) {
-                    const rPhone = (r.reviewerPhone || '').replace(/\D/g, '').slice(-10);
-                    if (rPhone && rPhone !== currentPhone) {
-                      return; // Skip review from a different user's account
-                    }
-                  }
-                  reviewsMap.set(r.id, r);
-                }
-              });
-            }
-          } catch {}
-        }
-      }
-    }
-  } catch (err) {
-    console.error('Error reading all user reviews from localStorage:', err);
-  }
+  if (!currentPhone) return [];
 
-  const allReviews = Array.from(reviewsMap.values());
-  // Sort by created_at descending (newest first)
-  allReviews.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  return allReviews;
+  try {
+    const { data: vendors } = await supabase.from('vendors').select('id, name, reviews');
+    if (!vendors || !Array.isArray(vendors)) return [];
+
+    const reviewsMap = new Map<string, SavedReview>();
+
+    vendors.forEach((v: any) => {
+      if (Array.isArray(v.reviews)) {
+        v.reviews.forEach((r: any) => {
+          if (r) {
+            const rPhone = (r.reviewerPhone || '').replace(/\D/g, '').slice(-10);
+            if (rPhone && rPhone === currentPhone) {
+              const item: SavedReview = {
+                id: r.id || `rev-${r.created_at}`,
+                vendorId: v.id,
+                vendorName: v.name || r.vendorName,
+                reviewerName: r.reviewerName || 'Customer',
+                reviewerPhone: r.reviewerPhone,
+                rating: Number(r.rating || 5),
+                comment: r.comment || '',
+                photoUrl: r.photoUrl,
+                daysAgo: r.daysAgo || 0,
+                created_at: r.created_at || new Date().toISOString(),
+              };
+              reviewsMap.set(item.id, item);
+            }
+          }
+        });
+      }
+    });
+
+    const allReviews = Array.from(reviewsMap.values());
+    allReviews.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return allReviews;
+  } catch (err) {
+    console.error('Error reading user reviews from Supabase DB:', err);
+    return [];
+  }
 }
 
 /**
- * Deletes a SPECIFIC review by reviewId from BOTH local storage AND Supabase DB
- * Filters strictly by unique review primary key `r.id === reviewId` so OTHER reviews remain untouched!
+ * Deletes a SPECIFIC review by reviewId directly from Supabase DB (0% localStorage)
  */
 export async function deleteReview(vendorId: string, reviewId: string): Promise<boolean> {
   if (!reviewId) return false;
+  purgeLegacyLocalStorageReviews();
 
   try {
-    // 1. Delete from LocalStorage
-    const existing = getSavedReviews(vendorId);
-    const updated = existing.filter((r) => r.id !== reviewId);
-    if (updated.length === 0) {
-      localStorage.removeItem(`nearby_reviews_${vendorId}`);
-    } else {
-      localStorage.setItem(`nearby_reviews_${vendorId}`, JSON.stringify(updated));
+    const { data: vendorRow } = await supabase
+      .from('vendors')
+      .select('id, reviews')
+      .or(`id.eq.${vendorId},phone_number.eq.${vendorId}`)
+      .maybeSingle();
+
+    if (vendorRow && Array.isArray(vendorRow.reviews)) {
+      const dbUpdated = vendorRow.reviews.filter((r: any) => r.id !== reviewId);
+      const avgRating =
+        dbUpdated.length > 0
+          ? Math.round((dbUpdated.reduce((acc: number, r: any) => acc + (r.rating || 5), 0) / dbUpdated.length) * 10) / 10
+          : 5.0;
+
+      await supabase
+        .from('vendors')
+        .update({
+          reviews: dbUpdated,
+          review_count: dbUpdated.length,
+          rating: avgRating,
+        })
+        .eq('id', vendorRow.id);
     }
-
-    // Also clear any legacy keys if they exist in localStorage containing this reviewId
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('nearby_reviews_')) {
-        const raw = localStorage.getItem(key);
-        if (raw && raw.includes(reviewId)) {
-          try {
-            const parsed: SavedReview[] = JSON.parse(raw);
-            const filtered = parsed.filter((r) => r.id !== reviewId);
-            if (filtered.length === 0) {
-              localStorage.removeItem(key);
-            } else {
-              localStorage.setItem(key, JSON.stringify(filtered));
-            }
-          } catch {}
-        }
-      }
-    }
-
-    // 2. Persist deletion to Supabase Database by updating vendor reviews JSONB array
-    if (vendorId) {
-      try {
-        const { data: vendorRow } = await supabase
-          .from('vendors')
-          .select('id, reviews')
-          .or(`id.eq.${vendorId},phone_number.eq.${vendorId}`)
-          .maybeSingle();
-
-        if (vendorRow && Array.isArray(vendorRow.reviews)) {
-          // Strictly filter out ONLY the specific review targeted by unique primary key `id`
-          const dbUpdated = vendorRow.reviews.filter((r: any) => r.id !== reviewId);
-          const avgRating =
-            dbUpdated.length > 0
-              ? Math.round((dbUpdated.reduce((acc: number, r: any) => acc + (r.rating || 5), 0) / dbUpdated.length) * 10) / 10
-              : 5.0;
-
-          await supabase
-            .from('vendors')
-            .update({
-              reviews: dbUpdated,
-              review_count: dbUpdated.length,
-              rating: avgRating,
-            })
-            .eq('id', vendorRow.id);
-        }
-      } catch (e) {
-        console.warn('Supabase DB delete review notice:', e);
-      }
-    }
-
     return true;
   } catch (err) {
-    console.error('Error deleting review:', err);
+    console.error('Error deleting review from Supabase DB:', err);
     return false;
   }
 }

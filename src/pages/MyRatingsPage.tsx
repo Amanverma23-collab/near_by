@@ -60,7 +60,7 @@ export default function MyRatingsPage() {
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
-    setReviews(getAllUserReviews());
+    getAllUserReviews().then((data) => setReviews(data));
   }, []);
 
   const handleDelete = async (review: SavedReview) => {

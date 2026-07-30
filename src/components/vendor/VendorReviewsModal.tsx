@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Star, Flag, Check, AlertCircle, MessageSquare } from 'lucide-react';
 import { useBackButton } from '../../hooks/useBackButton';
@@ -28,9 +28,8 @@ export default function VendorReviewsModal({
   isOpen,
   onClose,
 }: VendorReviewsModalProps) {
-  // Read real customer reviews from props or localStorage
-  const savedReviews = vendorId ? getSavedReviews(vendorId) : [];
-  const initialReviews: ReviewItem[] = (vendorReviews.length > 0 ? vendorReviews : savedReviews).map((r: any, idx: number) => ({
+  // Read real customer reviews from props or Supabase DB
+  const initialReviews: ReviewItem[] = (Array.isArray(vendorReviews) ? vendorReviews : []).map((r: any, idx: number) => ({
     id: r.id || `rev-real-${idx}`,
     reviewerName: r.reviewerName || r.reviewer_name || 'Customer',
     rating: Number(r.rating || 5),
@@ -44,6 +43,22 @@ export default function VendorReviewsModal({
   const [reportSubmittedMsg, setReportSubmittedMsg] = useState<string | null>(null);
 
   useBackButton(onClose, isOpen);
+
+  useEffect(() => {
+    if (vendorId && isOpen) {
+      getSavedReviews(vendorId).then((saved) => {
+        const source = vendorReviews.length > 0 ? vendorReviews : saved;
+        const list: ReviewItem[] = source.map((r: any, idx: number) => ({
+          id: r.id || `rev-real-${idx}`,
+          reviewerName: r.reviewerName || r.reviewer_name || 'Customer',
+          rating: Number(r.rating || 5),
+          comment: r.comment || '',
+          created_at: r.created_at || new Date().toISOString(),
+        }));
+        setReviews(list);
+      });
+    }
+  }, [vendorId, isOpen, vendorReviews]);
 
   if (!isOpen) return null;
 

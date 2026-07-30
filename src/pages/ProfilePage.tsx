@@ -85,8 +85,9 @@ export default function ProfilePage() {
     }
 
     // Load rating count & saved shops count
-    const allReviews = getAllUserReviews();
-    setRatingCount(allReviews.length);
+    getAllUserReviews().then((allReviews) => {
+      setRatingCount(allReviews.length);
+    });
     setSavedShopsCount(getSavedVendorsCount());
 
     const handleFavChange = () => {
