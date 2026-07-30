@@ -82,21 +82,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Helper to process session
     const processSession = async (activeSession: Session | null) => {
-      let finalSession = activeSession;
-      if (!finalSession) {
-        const rawMock = localStorage.getItem('nearby_mock_session');
-        if (rawMock) {
-          try {
-            finalSession = JSON.parse(rawMock);
-          } catch {}
-        }
-      }
+      setSession(activeSession);
+      setUser(activeSession?.user ?? null);
 
-      setSession(finalSession);
-      setUser(finalSession?.user ?? null);
-
-      if (finalSession?.user) {
-        const userRole = await determineRole(finalSession.user);
+      if (activeSession?.user) {
+        const userRole = await determineRole(activeSession.user);
         setRole(userRole);
       } else {
         setRole(null);
@@ -131,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     localStorage.removeItem('nearby_mock_session');
     localStorage.removeItem('nearby_user_role');
+    localStorage.removeItem('nearby_vendor_name');
     try {
       await supabase.auth.signOut();
     } catch {}

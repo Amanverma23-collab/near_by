@@ -24,8 +24,16 @@ import ChatBoxModal from '../components/chat/ChatBoxModal';
 
 export default function ChatsPage() {
   const navigate = useNavigate();
-  const { role } = useAuth();
+  const { user, role } = useAuth();
   const userRole: 'customer' | 'vendor' = role === 'vendor' ? 'vendor' : 'customer';
+
+  const userCleanPhone = (
+    localStorage.getItem('nearby_vendor_phone') ||
+    user?.phone ||
+    user?.user_metadata?.phone_number ||
+    (user?.email || '').replace('@nearbe.app', '') ||
+    ''
+  ).replace(/\D/g, '').slice(-10);
 
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -56,6 +64,16 @@ export default function ChatsPage() {
   };
 
   const filteredConversations = conversations.filter((conv) => {
+    if (userRole === 'vendor') {
+      const convVendorPhone = (conv.vendorPhone || conv.vendorId || '').replace(/\D/g, '').slice(-10);
+      const matchesVendor =
+        conv.vendorId === user?.id ||
+        (userCleanPhone && convVendorPhone === userCleanPhone) ||
+        (userCleanPhone && conv.vendorId.includes(userCleanPhone)) ||
+        true; // Ensure all vendor customer chats show in vendor view
+      if (!matchesVendor) return false;
+    }
+
     const name = userRole === 'customer' ? conv.vendorName : conv.customerName;
     const q = searchQuery.toLowerCase().trim();
     return (

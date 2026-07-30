@@ -139,10 +139,16 @@ export default function VendorAuthForm() {
         });
       }
 
+      localStorage.removeItem('nearby_mock_session');
       localStorage.setItem('nearby_vendor_name', fullName.trim());
+      localStorage.setItem('nearby_vendor_phone', mobile);
       localStorage.setItem('nearby_user_role', 'vendor');
 
       // 4. Sign in to establish active session
+      try {
+        await supabase.auth.signOut();
+      } catch {}
+
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: pseudoEmail,
         password: password,
@@ -176,6 +182,13 @@ export default function VendorAuthForm() {
     setLoading(true);
 
     try {
+      localStorage.removeItem('nearby_mock_session');
+      localStorage.setItem('nearby_vendor_phone', mobile);
+
+      try {
+        await supabase.auth.signOut();
+      } catch {}
+
       const pseudoEmail = getPseudoEmail(mobile);
 
       // Check if this number is registered ONLY as a Customer
