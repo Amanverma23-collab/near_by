@@ -125,10 +125,16 @@ export default function CustomerAuthForm() {
         });
       }
 
+      localStorage.removeItem('nearby_mock_session');
       localStorage.setItem('nearby_customer_name', fullName.trim());
+      localStorage.setItem('nearby_customer_phone', mobile);
       localStorage.setItem('nearby_user_role', 'customer');
 
       // 4. Sign in to establish active session
+      try {
+        await supabase.auth.signOut();
+      } catch {}
+
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: pseudoEmail,
         password: password,
@@ -162,6 +168,13 @@ export default function CustomerAuthForm() {
     setLoading(true);
 
     try {
+      localStorage.removeItem('nearby_mock_session');
+      localStorage.setItem('nearby_customer_phone', mobile);
+
+      try {
+        await supabase.auth.signOut();
+      } catch {}
+
       const pseudoEmail = getPseudoEmail(mobile);
 
       // Check if this number is registered ONLY as a Vendor
@@ -199,6 +212,7 @@ export default function CustomerAuthForm() {
       // Preserve registered customer name
       const customerName = existingCust?.full_name || authData.user.user_metadata?.full_name || 'Customer';
       localStorage.setItem('nearby_customer_name', customerName);
+      localStorage.setItem('nearby_customer_phone', mobile);
       localStorage.setItem('nearby_user_role', 'customer');
 
       // Redirect upon successful customer authentication

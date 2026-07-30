@@ -288,7 +288,18 @@ export default function ProfilePage() {
             )}
             <div className="flex items-center justify-center gap-1.5 text-xs text-ink-muted">
               <Phone size={13} className="text-brand" />
-              <span>{user?.phone || '+91 98765 43210'}</span>
+              <span>
+                {(() => {
+                  const phoneNum =
+                    localStorage.getItem('nearby_customer_phone') ||
+                    user?.phone ||
+                    user?.user_metadata?.phone_number ||
+                    (user?.email && user.email.includes('@nearbe.app') ? user.email.split('@')[0] : null) ||
+                    '';
+                  const clean = phoneNum.replace(/\D/g, '').slice(-10);
+                  return clean ? `+91 ${clean}` : 'Verified Account';
+                })()}
+              </span>
             </div>
           </div>
 
