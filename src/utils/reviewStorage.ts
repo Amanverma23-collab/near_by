@@ -121,9 +121,15 @@ export function saveNewReview(
 
 /**
  * Gets ALL reviews the current user has given across ALL vendors
- * Returns deduplicated reviews by review unique primary key 'id'
+ * Returns deduplicated reviews by review unique primary key 'id' and strictly filtered by current user's phone number
  */
 export function getAllUserReviews(): SavedReview[] {
+  const currentPhone = (
+    localStorage.getItem('nearby_customer_phone') ||
+    localStorage.getItem('nearby_vendor_phone') ||
+    ''
+  ).replace(/\D/g, '').slice(-10);
+
   const reviewsMap = new Map<string, SavedReview>();
   try {
     for (let i = 0; i < localStorage.length; i++) {
@@ -137,7 +143,13 @@ export function getAllUserReviews(): SavedReview[] {
             if (Array.isArray(list)) {
               list.forEach((r) => {
                 if (r && r.id) {
-                  // Key by review primary ID to prevent double counting
+                  // Filter strictly by current user's phone number if logged in
+                  if (currentPhone) {
+                    const rPhone = (r.reviewerPhone || '').replace(/\D/g, '').slice(-10);
+                    if (rPhone && rPhone !== currentPhone) {
+                      return; // Skip review from a different user's account
+                    }
+                  }
                   reviewsMap.set(r.id, r);
                 }
               });

@@ -122,6 +122,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('nearby_mock_session');
     localStorage.removeItem('nearby_user_role');
     localStorage.removeItem('nearby_vendor_name');
+    localStorage.removeItem('nearby_vendor_phone');
+    localStorage.removeItem('nearby_customer_name');
+    localStorage.removeItem('nearby_customer_phone');
+    localStorage.removeItem('nearby_customer_email');
+    localStorage.removeItem('nearby_customer_address');
+    localStorage.removeItem('nearby_customer_avatar');
+    localStorage.removeItem('nearby_saved_vendor_ids');
     try {
       await supabase.auth.signOut();
     } catch {}
