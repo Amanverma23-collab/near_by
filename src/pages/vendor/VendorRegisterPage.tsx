@@ -1,17 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  Camera, 
-  Check, 
-  Lock, 
-  AlertCircle, 
-  X, 
-  Loader2, 
-  CheckCircle2, 
-  RefreshCw, 
-  MapPin, 
+import {
+  ArrowLeft,
+  Camera,
+  Check,
+  Lock,
+  AlertCircle,
+  X,
+  Loader2,
+  CheckCircle2,
+  RefreshCw,
+  MapPin,
   Navigation,
   Plus,
   Trash2
@@ -127,11 +127,11 @@ function MapRecenter({ lat, lng }: { lat: number; lng: number }) {
   useEffect(() => {
     map.invalidateSize();
     map.setView([lat, lng], map.getZoom());
-    
+
     const timer = setTimeout(() => {
       map.invalidateSize();
     }, 450);
-    
+
     return () => clearTimeout(timer);
   }, [lat, lng, map]);
   return null;
@@ -150,7 +150,7 @@ function DraggableMarker({
   icon: L.DivIcon;
 }) {
   const markerRef = useRef<L.Marker | null>(null);
-  
+
   const eventHandlers = useState(() => ({
     dragend() {
       const marker = markerRef.current;
@@ -307,11 +307,11 @@ export default function VendorRegisterPage() {
 
   const handleMarkerPositionChange = (lat: number, lon: number) => {
     setWizardData(prev => ({ ...prev, latitude: lat, longitude: lon }));
-    
+
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
-    
+
     debounceTimerRef.current = setTimeout(() => {
       reverseGeocode(lat, lon);
     }, 1000);
@@ -356,10 +356,10 @@ export default function VendorRegisterPage() {
     try {
       const facing = mode === 'owner' ? 'user' : 'environment';
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          facingMode: facing, 
-          width: { ideal: 640 }, 
-          height: { ideal: 480 } 
+        video: {
+          facingMode: facing,
+          width: { ideal: 640 },
+          height: { ideal: 480 }
         }
       });
       setCameraStream(stream);
@@ -395,7 +395,7 @@ export default function VendorRegisterPage() {
         }
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        
+
         if (cameraMode === 'owner') {
           setWizardData(prev => ({ ...prev, ownerPhoto: dataUrl }));
           triggerSuccessToast('Selfie captured successfully');
@@ -504,7 +504,7 @@ export default function VendorRegisterPage() {
   const handleSubServiceToggle = (subService: string) => {
     setWizardData(prev => {
       const exists = prev.subServices.includes(subService);
-      const updated = exists 
+      const updated = exists
         ? prev.subServices.filter(s => s !== subService)
         : [...prev.subServices, subService];
       return { ...prev, subServices: updated };
@@ -531,18 +531,18 @@ export default function VendorRegisterPage() {
   };
 
   // Step Validations
-  const isStep1Valid = 
-    wizardData.ownerPhoto !== null && 
-    wizardData.fullName.trim() !== '' && 
-    wizardData.mobileNumber.length === 10 && 
+  const isStep1Valid =
+    wizardData.ownerPhoto !== null &&
+    wizardData.fullName.trim() !== '' &&
+    wizardData.mobileNumber.length === 10 &&
     !isChangingMobile &&
     wizardData.homeAddress.trim().length >= 10;
 
-  const isStep2Valid = 
-    wizardData.shopName.trim() !== '' && 
-    wizardData.shopAddress.trim() !== '' && 
-    wizardData.shopPhoto !== null && 
-    wizardData.shopCategory !== '' && 
+  const isStep2Valid =
+    wizardData.shopName.trim() !== '' &&
+    wizardData.shopAddress.trim() !== '' &&
+    wizardData.shopPhoto !== null &&
+    wizardData.shopCategory !== '' &&
     wizardData.subServices.length >= 1;
 
   const handleNext = () => {
@@ -595,9 +595,9 @@ export default function VendorRegisterPage() {
 
       const { data: phoneVendors } = (!authVendors || authVendors.length === 0) && wizardData.mobileNumber
         ? await supabase
-            .from('vendors')
-            .select('id')
-            .eq('phone_number', wizardData.mobileNumber)
+          .from('vendors')
+          .select('id')
+          .eq('phone_number', wizardData.mobileNumber)
         : { data: null };
 
       const existingVendors = (authVendors && authVendors.length > 0) ? authVendors : (phoneVendors || []);
@@ -679,8 +679,8 @@ export default function VendorRegisterPage() {
 
   const itemVariants = {
     hidden: { opacity: 0, y: 15 },
-    visible: { 
-      opacity: 1, 
+    visible: {
+      opacity: 1,
       y: 0,
       transition: { type: 'spring' as const, stiffness: 200, damping: 18 }
     }
@@ -739,7 +739,7 @@ export default function VendorRegisterPage() {
 
       {/* Main Content */}
       <main className="flex-1 max-w-lg w-full mx-auto px-4 py-8 flex flex-col justify-center">
-        
+
         {loadingProfile ? (
           <div className="flex-1 flex flex-col items-center justify-center py-12">
             <Loader2 className="animate-spin text-brand" size={32} />
@@ -771,21 +771,20 @@ export default function VendorRegisterPage() {
                   <span className="text-xs font-display font-bold text-ink-light self-start">
                     Owner Photo (Selfie) <span className="text-brand">*</span>
                   </span>
-                  
+
                   <div className="relative group">
                     <button
                       onClick={() => openCamera('owner')}
-                      className={`w-36 h-36 rounded-full overflow-hidden border-2 flex flex-col items-center justify-center transition-all duration-300 relative cursor-pointer ${
-                        wizardData.ownerPhoto 
-                          ? 'border-brand' 
+                      className={`w-36 h-36 rounded-full overflow-hidden border-2 flex flex-col items-center justify-center transition-all duration-300 relative cursor-pointer ${wizardData.ownerPhoto
+                          ? 'border-brand'
                           : 'border-dashed border-border hover:border-brand bg-surface'
-                      }`}
+                        }`}
                     >
                       {wizardData.ownerPhoto ? (
                         <>
-                          <img 
-                            src={wizardData.ownerPhoto} 
-                            alt="Owner photo preview" 
+                          <img
+                            src={wizardData.ownerPhoto}
+                            alt="Owner photo preview"
                             className="w-full h-full object-cover"
                           />
                           {/* Success Badge */}
@@ -803,7 +802,7 @@ export default function VendorRegisterPage() {
                       )}
                     </button>
                   </div>
-                  
+
                   {wizardData.ownerPhoto && (
                     <button
                       onClick={() => openCamera('owner')}
@@ -949,7 +948,7 @@ export default function VendorRegisterPage() {
                                 {verifyingOtp && <Loader2 size={12} className="animate-spin" />}
                                 <span>Confirm Code</span>
                               </button>
-                              
+
                               <div className="flex items-center gap-3">
                                 <button
                                   onClick={handleSendOtp}
@@ -1042,7 +1041,7 @@ export default function VendorRegisterPage() {
                   <span className="text-[11px] text-ink-muted block mt-0.5">
                     Drag the pin to your exact shop location.
                   </span>
-                  
+
                   {/* Leaflet container */}
                   <div className="relative w-full rounded-[20px] overflow-hidden border border-border-light/80 bg-zinc-100 shadow-inner z-10" style={{ height: '280px' }}>
                     <MapContainer
@@ -1063,7 +1062,7 @@ export default function VendorRegisterPage() {
                       />
                       <MapRecenter lat={wizardData.latitude} lng={wizardData.longitude} />
                     </MapContainer>
-                    
+
                     {/* Floating GPS Button */}
                     <button
                       type="button"
@@ -1091,21 +1090,20 @@ export default function VendorRegisterPage() {
                   <span className="text-xs font-display font-bold text-ink-light block">
                     Shop Front Photo <span className="text-brand">*</span>
                   </span>
-                  
+
                   <div className="w-full relative group">
                     <button
                       onClick={() => openCamera('shop')}
-                      className={`w-full aspect-[4/3] rounded-2xl overflow-hidden border-2 flex flex-col items-center justify-center transition-all duration-300 relative cursor-pointer ${
-                        wizardData.shopPhoto 
-                          ? 'border-brand' 
+                      className={`w-full aspect-[4/3] rounded-2xl overflow-hidden border-2 flex flex-col items-center justify-center transition-all duration-300 relative cursor-pointer ${wizardData.shopPhoto
+                          ? 'border-brand'
                           : 'border-dashed border-border hover:border-brand bg-surface'
-                      }`}
+                        }`}
                     >
                       {wizardData.shopPhoto ? (
                         <>
-                          <img 
-                            src={wizardData.shopPhoto} 
-                            alt="Shop front preview" 
+                          <img
+                            src={wizardData.shopPhoto}
+                            alt="Shop front preview"
                             className="w-full h-full object-cover"
                           />
                           {/* Success Badge */}
@@ -1126,7 +1124,7 @@ export default function VendorRegisterPage() {
                       )}
                     </button>
                   </div>
-                  
+
                   {wizardData.shopPhoto && (
                     <button
                       onClick={() => openCamera('shop')}
@@ -1143,7 +1141,7 @@ export default function VendorRegisterPage() {
                   <label className="text-xs font-display font-bold text-ink-light block">
                     What type of service do you provide? <span className="text-brand">*</span>
                   </label>
-                  
+
                   {/* Parent Categories list */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     {CATEGORIES.map((cat) => {
@@ -1153,11 +1151,10 @@ export default function VendorRegisterPage() {
                           key={cat.id}
                           type="button"
                           onClick={() => handleCategorySelect(cat.id)}
-                          className={`p-4 rounded-2xl border text-left flex items-center justify-between cursor-pointer transition-all duration-300 relative ${
-                            isSelected 
-                              ? `${cat.selectedBorder} ${cat.selectedBg} ring-1 ring-offset-0 ring-${cat.color}-500 shadow-sm scale-[1.01]` 
+                          className={`p-4 rounded-2xl border text-left flex items-center justify-between cursor-pointer transition-all duration-300 relative ${isSelected
+                              ? `${cat.selectedBorder} ${cat.selectedBg} ring-1 ring-offset-0 ring-${cat.color}-500 shadow-sm scale-[1.01]`
                               : 'border-border-light hover:border-border bg-white hover:bg-surface/50'
-                          }`}
+                            }`}
                         >
                           <div className="flex items-center gap-3">
                             {/* Color Dot badge */}
@@ -1199,11 +1196,10 @@ export default function VendorRegisterPage() {
                                 key={sub}
                                 type="button"
                                 onClick={() => handleSubServiceToggle(sub)}
-                                className={`px-4 py-2 rounded-xl text-xs font-display font-bold cursor-pointer transition-all border flex items-center gap-1.5 ${
-                                  isSubSelected 
-                                    ? `bg-brand text-white border-transparent shadow-brand` 
+                                className={`px-4 py-2 rounded-xl text-xs font-display font-bold cursor-pointer transition-all border flex items-center gap-1.5 ${isSubSelected
+                                    ? `bg-brand text-white border-transparent shadow-brand`
                                     : 'bg-white text-ink border-border-light hover:bg-surface-card hover:border-border'
-                                }`}
+                                  }`}
                               >
                                 {isSubSelected && <Check size={12} strokeWidth={3} />}
                                 <span>{sub}</span>
@@ -1419,8 +1415,8 @@ export default function VendorRegisterPage() {
                 </button>
               )}
               <span className="text-[10px] text-zinc-500 font-body">
-                {cameraMode === 'owner' 
-                  ? 'Captured selfies are only used for owner verification.' 
+                {cameraMode === 'owner'
+                  ? 'Captured selfies are only used for owner verification.'
                   : 'Captured shop front photo will be shown on your profile.'}
               </span>
             </div>

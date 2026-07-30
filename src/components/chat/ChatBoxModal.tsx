@@ -107,42 +107,30 @@ export default function ChatBoxModal({
   // Location share loading state
   const [sharingLocation, setSharingLocation] = useState(false);
 
-  // Native Soft Keyboard Offset state
-  const [keyboardOffset, setKeyboardOffset] = useState(0);
-
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Track Native Keyboard & Visual Viewport resize
+  // Track Native Keyboard & Visual Viewport resize to keep messages scrolled to bottom naturally
   useEffect(() => {
     let showSub: any;
     let hideSub: any;
 
     try {
-      showSub = Keyboard.addListener('keyboardWillShow', (info) => {
-        setKeyboardOffset(info.keyboardHeight || 0);
+      showSub = Keyboard.addListener('keyboardWillShow', () => {
         setTimeout(() => {
           messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         }, 100);
       });
       hideSub = Keyboard.addListener('keyboardWillHide', () => {
-        setKeyboardOffset(0);
+        // smooth viewport restore
       });
     } catch (err) {
       console.warn('Keyboard listener error:', err);
     }
 
     const handleViewportResize = () => {
-      if (window.visualViewport) {
-        const diff = window.innerHeight - window.visualViewport.height;
-        if (diff > 120) {
-          setKeyboardOffset(diff);
-          setTimeout(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-          }, 100);
-        } else {
-          setKeyboardOffset(0);
-        }
-      }
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
     };
 
     if (window.visualViewport) {
@@ -163,7 +151,16 @@ export default function ChatBoxModal({
     if (conversation && isOpen) {
       const reload = () => {
         const msgs = getConversationMessages(conversation.id);
-        setMessages(msgs);
+        setMessages((prev) => {
+          const msgsIds = new Set(msgs.map((m) => m.id));
+          const unsyncedLocal = prev.filter(
+            (m) => !msgsIds.has(m.id) && Date.now() - new Date(m.created_at).getTime() < 30000
+          );
+          if (unsyncedLocal.length === 0) return msgs;
+          return [...msgs, ...unsyncedLocal].sort(
+            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+        });
         markConversationAsRead(conversation.id, currentUserRole);
         markAsRead(conversation.id);
         if (onConversationUpdated) onConversationUpdated();
@@ -201,7 +198,12 @@ export default function ChatBoxModal({
               };
 
               setMessages((prev) => {
-                if (prev.some((m) => m.id === newMsg.id)) return prev;
+                const existingIdx = prev.findIndex((m) => m.id === newMsg.id);
+                if (existingIdx !== -1) {
+                  const updated = [...prev];
+                  updated[existingIdx] = newMsg;
+                  return updated;
+                }
                 return [...prev, newMsg];
               });
 
@@ -556,7 +558,7 @@ export default function ChatBoxModal({
           initial={{ opacity: 0, scale: 0.97, y: 12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.97, y: 12 }}
-          className="bg-[#EFEAE2] w-full max-w-lg h-full sm:h-[90vh] sm:rounded-3xl border border-gray-300 shadow-2xl flex flex-col overflow-hidden relative"
+          className="bg-[#EFEAE2] w-full max-w-lg h-[100dvh] sm:h-[90vh] sm:rounded-3xl border border-gray-300 shadow-2xl flex flex-col overflow-hidden relative"
         >
           {/* Always-Mounted Hidden File Input for Camera/Gallery */}
           <input
@@ -974,10 +976,7 @@ export default function ChatBoxModal({
           </AnimatePresence>
 
           {/* ═══════════ AUTHENTIC WHATSAPP FLOATING INPUT TOOLBAR ═══════════ */}
-          <div
-            style={{ paddingBottom: keyboardOffset > 0 ? `${keyboardOffset}px` : undefined }}
-            className="p-2 px-2.5 bg-[#EFEAE2] shrink-0 transition-[padding] duration-150 z-30"
-          >
+          <div className="p-2 px-2.5 bg-[#EFEAE2] shrink-0 z-30">
             {isRecording ? (
               /* WhatsApp Voice Recording Bar */
               <div className="flex items-center justify-between gap-2 p-1.5 px-3 bg-white rounded-full shadow-lg border border-gray-200">

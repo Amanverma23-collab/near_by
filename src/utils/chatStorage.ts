@@ -224,20 +224,29 @@ export function syncSupabaseChatMessages(onUpdated?: () => void): void {
           hasChanges = true;
         }
 
-        // Map messages
-        const formattedMsgs: ChatMessage[] = rows.map((r: any) => ({
-          id: r.id,
-          conversationId: convId,
-          senderId: r.sender_id,
-          senderRole: r.sender_role,
-          text: r.text,
-          photoUrl: r.photo_url,
-          location: r.location,
-          audioUrl: r.audio_url,
-          audioDurationSec: r.audio_duration_sec,
-          created_at: r.created_at,
-          read: Boolean(r.read),
-        }));
+        // Map messages and merge with recent local optimistic messages so in-flight messages do not flicker
+        const existingLocal = localMap[convId] || [];
+        const dbIds = new Set(rows.map((r: any) => r.id));
+        const pendingOptimistic = existingLocal.filter(
+          (m) => !dbIds.has(m.id) && Date.now() - new Date(m.created_at).getTime() < 30000
+        );
+
+        const formattedMsgs: ChatMessage[] = [
+          ...rows.map((r: any) => ({
+            id: r.id,
+            conversationId: convId,
+            senderId: r.sender_id,
+            senderRole: r.sender_role,
+            text: r.text,
+            photoUrl: r.photo_url,
+            location: r.location,
+            audioUrl: r.audio_url,
+            audioDurationSec: r.audio_duration_sec,
+            created_at: r.created_at,
+            read: Boolean(r.read),
+          })),
+          ...pendingOptimistic,
+        ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
         if (JSON.stringify(localMap[convId]) !== JSON.stringify(formattedMsgs)) {
           localMap[convId] = formattedMsgs;
