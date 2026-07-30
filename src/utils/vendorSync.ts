@@ -16,8 +16,23 @@ export async function fetchCombinedVendors(): Promise<Vendor[]> {
       );
 
       const realVendors: Vendor[] = validRows.map((v: any, idx: number) => {
+        const cleanPhone = (v.phone_number || '').replace(/\D/g, '').slice(-10);
+        const localPhotosStr = v.id
+          ? localStorage.getItem(`nearby_photos_${v.id}`)
+          : cleanPhone
+          ? localStorage.getItem(`nearby_photos_${cleanPhone}`)
+          : null;
+        let parsedLocalPhotos: string[] | null = null;
+        if (localPhotosStr) {
+          try {
+            parsedLocalPhotos = JSON.parse(localPhotosStr);
+          } catch {}
+        }
+
         const images =
-          v.shop_images && Array.isArray(v.shop_images) && v.shop_images.length > 0
+          parsedLocalPhotos && parsedLocalPhotos.length > 0
+            ? parsedLocalPhotos
+            : v.shop_images && Array.isArray(v.shop_images) && v.shop_images.length > 0
             ? v.shop_images
             : ['https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&q=80&w=600'];
 

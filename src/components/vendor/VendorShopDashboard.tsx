@@ -24,12 +24,14 @@ import {
   Copy,
   Check,
   Clock,
+  Camera,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import AnimatedCountUp from '../ui/AnimatedCountUp';
 import ShopTimingModal from './ShopTimingModal';
 import VendorReviewsModal from './VendorReviewsModal';
+import ShopPhotosModal from './ShopPhotosModal';
 import { getEffectiveShopStatus } from '../../utils/shopTiming';
 import { getSavedReviews, getAllUserReviews } from '../../utils/reviewStorage';
 
@@ -47,6 +49,7 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
   const [showEditNotice, setShowEditNotice] = useState<string | null>(null);
   const [isTimingModalOpen, setIsTimingModalOpen] = useState(false);
   const [isReviewsModalOpen, setIsReviewsModalOpen] = useState(false);
+  const [isPhotosModalOpen, setIsPhotosModalOpen] = useState(false);
 
   // Compute live effective status
   const effectiveStatus = getEffectiveShopStatus(vendor);
@@ -436,6 +439,30 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
               <ChevronRight size={18} className="text-ink-muted shrink-0" />
             </motion.div>
 
+            {/* Shop Photos & Gallery */}
+            <motion.div
+              whileHover={{ backgroundColor: 'var(--color-surface)' }}
+              whileTap={{ scale: 0.995 }}
+              onClick={() => setIsPhotosModalOpen(true)}
+              className="p-4 sm:p-5 flex items-center justify-between cursor-pointer transition-colors"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-teal-50 text-teal-600 rounded-2xl border border-teal-100">
+                  <Camera size={20} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-display font-extrabold text-ink">Shop Photos & Gallery</h3>
+                    <span className="px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 font-display font-extrabold text-[10px]">
+                      {Array.isArray(vendor?.shop_images) && vendor.shop_images.length > 0 ? `${vendor.shop_images.length} Photos` : 'Multiple Photos'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-ink-muted mt-0.5">Upload & manage multiple photos shown to customers</p>
+                </div>
+              </div>
+              <ChevronRight size={18} className="text-ink-muted shrink-0" />
+            </motion.div>
+
             {/* Edit Shop Details */}
             <motion.div
               whileHover={{ backgroundColor: 'var(--color-surface)' }}
@@ -637,6 +664,16 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
         vendorReviews={allVendorReviews}
         isOpen={isReviewsModalOpen}
         onClose={() => setIsReviewsModalOpen(false)}
+      />
+
+      {/* Shop Photos & Gallery Modal */}
+      <ShopPhotosModal
+        vendor={vendor}
+        isOpen={isPhotosModalOpen}
+        onClose={() => setIsPhotosModalOpen(false)}
+        onPhotosUpdated={() => {
+          if (onRefreshVendor) onRefreshVendor();
+        }}
       />
     </div>
   );
