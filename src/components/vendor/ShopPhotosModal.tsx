@@ -11,6 +11,49 @@ interface ShopPhotosModalProps {
   onPhotosUpdated?: () => void;
 }
 
+/**
+ * Helper to compress base64 images via Canvas (Max 1000px width/height, 0.75 quality)
+ * Prevents localStorage QuotaExceededError and database payload bloat
+ */
+function compressImage(dataUrl: string, maxWidth = 1000, quality = 0.75): Promise<string> {
+  return new Promise((resolve) => {
+    if (!dataUrl || !dataUrl.startsWith('data:image')) {
+      resolve(dataUrl);
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth || height > maxWidth) {
+        if (width > height) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        } else {
+          width = Math.round((width * maxWidth) / height);
+          height = maxWidth;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressed = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressed);
+      } else {
+        resolve(dataUrl);
+      }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 export default function ShopPhotosModal({
   vendor,
   isOpen,
@@ -45,6 +88,7 @@ export default function ShopPhotosModal({
   const [urlInput, setUrlInput] = useState('');
   const [showUrlField, setShowUrlField] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [compressing, setCompressing] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -53,21 +97,30 @@ export default function ShopPhotosModal({
 
   if (!isOpen) return null;
 
-  // Handle uploading files (multiple photos at once)
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle uploading files with instant automatic canvas compression
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
-        if (result) {
-          setImages((prev) => [...prev, result]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    setCompressing(true);
+    const newPhotos: string[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const rawDataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (evt) => resolve((evt.target?.result as string) || '');
+        reader.readAsDataURL(file);
+      });
+
+      if (rawDataUrl) {
+        const compressed = await compressImage(rawDataUrl, 1000, 0.75);
+        newPhotos.push(compressed);
+      }
+    }
+
+    setImages((prev) => [...prev, ...newPhotos]);
+    setCompressing(false);
 
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -102,34 +155,46 @@ export default function ShopPhotosModal({
     });
   };
 
-  // Save changes to database and local storage
+  // Save changes to database and local storage safely
   const handleSave = async () => {
     setSaving(true);
     try {
+      // 1. Ensure all images are compressed
+      const compressedImages = await Promise.all(
+        images.map((img) => compressImage(img, 1000, 0.75))
+      );
+
       const vendorId = vendor?.id;
       const cleanPhone = (vendor?.phone_number || '').replace(/\D/g, '').slice(-10);
 
-      // Save in localStorage as guaranteed fallback
-      if (vendorId) {
-        localStorage.setItem(`nearby_photos_${vendorId}`, JSON.stringify(images));
-      }
-      if (cleanPhone) {
-        localStorage.setItem(`nearby_photos_${cleanPhone}`, JSON.stringify(images));
+      // 2. Save in localStorage safely without throwing QuotaExceededError
+      try {
+        if (vendorId) {
+          localStorage.setItem(`nearby_photos_${vendorId}`, JSON.stringify(compressedImages));
+        }
+        if (cleanPhone) {
+          localStorage.setItem(`nearby_photos_${cleanPhone}`, JSON.stringify(compressedImages));
+        }
+      } catch (storageErr) {
+        console.warn('LocalStorage quota warning (handled safely):', storageErr);
       }
 
-      // Update Supabase DB
+      // 3. Update Supabase DB
       if (vendorId) {
         await supabase
           .from('vendors')
-          .update({ shop_images: images })
+          .update({ shop_images: compressedImages })
           .eq('id', vendorId);
-      } else if (cleanPhone) {
+      }
+
+      if (cleanPhone) {
         await supabase
           .from('vendors')
-          .update({ shop_images: images })
+          .update({ shop_images: compressedImages })
           .or(`phone_number.eq.${cleanPhone},phone_number.eq.+91${cleanPhone}`);
       }
 
+      setImages(compressedImages);
       setSuccessMsg('Shop photos updated! Customers can now see all your new photos.');
       if (onPhotosUpdated) onPhotosUpdated();
       setTimeout(() => {
@@ -170,6 +235,7 @@ export default function ShopPhotosModal({
             </div>
 
             <button
+              type="button"
               onClick={onClose}
               className="p-2 text-ink-muted hover:text-ink hover:bg-surface rounded-full transition-colors cursor-pointer"
             >
@@ -212,11 +278,12 @@ export default function ShopPhotosModal({
               {/* File Upload Input Button */}
               <button
                 type="button"
+                disabled={compressing}
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center justify-center gap-2 p-3.5 bg-brand text-white rounded-2xl font-display font-bold text-xs hover:bg-brand-dark transition-colors cursor-pointer shadow-sm shadow-brand/20"
+                className="flex items-center justify-center gap-2 p-3.5 bg-brand text-white rounded-2xl font-display font-bold text-xs hover:bg-brand-dark transition-colors cursor-pointer shadow-sm shadow-brand/20 disabled:opacity-50"
               >
                 <Camera size={16} />
-                <span>Upload Photos</span>
+                <span>{compressing ? 'Optimizing...' : 'Upload Photos'}</span>
               </button>
               <input
                 ref={fileInputRef}
@@ -313,8 +380,8 @@ export default function ShopPhotosModal({
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving}
-              className="flex-1 py-3 bg-brand hover:bg-brand-dark text-white font-display font-extrabold text-xs rounded-2xl transition-colors cursor-pointer shadow-md shadow-brand/20 flex items-center justify-center gap-2"
+              disabled={saving || compressing}
+              className="flex-1 py-3 bg-brand hover:bg-brand-dark text-white font-display font-extrabold text-xs rounded-2xl transition-colors cursor-pointer shadow-md shadow-brand/20 flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {saving ? (
                 <span>Saving Photos...</span>
