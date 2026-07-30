@@ -39,6 +39,7 @@ import {
   reportConversation,
   syncSupabaseChatMessages,
 } from '../../utils/chatStorage';
+import { supabase } from '../../lib/supabase';
 import { getCurrentLocation } from '../../utils/nativeGeolocation';
 import { useBackButton } from '../../hooks/useBackButton';
 import { Keyboard } from '@capacitor/keyboard';
@@ -155,7 +156,7 @@ export default function ChatBoxModal({
     };
   }, []);
 
-  // Reload messages when conversation changes or opens
+  // Realtime subscription for instant (<100ms) message delivery
   useEffect(() => {
     if (conversation && isOpen) {
       const reload = () => {
@@ -168,11 +169,54 @@ export default function ChatBoxModal({
       reload();
       syncSupabaseChatMessages(reload);
 
+      // Subscribe to live Supabase Realtime postgres_changes
+      const channel = supabase
+        .channel(`chat_realtime_${conversation.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'chat_messages',
+            filter: `conversation_id=eq.${conversation.id}`,
+          },
+          (payload: any) => {
+            if (payload && payload.new) {
+              const r = payload.new;
+              const newMsg: ChatMessage = {
+                id: r.id,
+                conversationId: r.conversation_id,
+                senderId: r.sender_id,
+                senderRole: r.sender_role,
+                text: r.text || '',
+                photoUrl: r.photo_url || undefined,
+                location: r.location || undefined,
+                audioUrl: r.audio_url || undefined,
+                audioDurationSec: r.audio_duration_sec || undefined,
+                created_at: r.created_at,
+                read: Boolean(r.read),
+              };
+
+              setMessages((prev) => {
+                if (prev.some((m) => m.id === newMsg.id)) return prev;
+                return [...prev, newMsg];
+              });
+
+              markConversationAsRead(conversation.id, currentUserRole);
+              if (onConversationUpdated) onConversationUpdated();
+            }
+          }
+        )
+        .subscribe();
+
       const timer = setInterval(() => {
         syncSupabaseChatMessages(reload);
-      }, 3000);
+      }, 5000);
 
-      return () => clearInterval(timer);
+      return () => {
+        supabase.removeChannel(channel);
+        clearInterval(timer);
+      };
     }
   }, [conversation?.id, isOpen, currentUserRole]);
 

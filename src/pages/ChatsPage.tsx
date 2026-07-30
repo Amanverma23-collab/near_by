@@ -20,6 +20,7 @@ import {
   markConversationAsRead,
   syncSupabaseChatMessages,
 } from '../utils/chatStorage';
+import { supabase } from '../lib/supabase';
 import ChatBoxModal from '../components/chat/ChatBoxModal';
 
 export default function ChatsPage() {
@@ -49,11 +50,30 @@ export default function ChatsPage() {
     reloadConversations();
     syncSupabaseChatMessages(reloadConversations);
 
+    // Subscribe to live Supabase Realtime changes on chat_messages table
+    const channel = supabase
+      .channel('chats_page_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'chat_messages',
+        },
+        () => {
+          syncSupabaseChatMessages(reloadConversations);
+        }
+      )
+      .subscribe();
+
     const timer = setInterval(() => {
       syncSupabaseChatMessages(reloadConversations);
-    }, 4000);
+    }, 6000);
 
-    return () => clearInterval(timer);
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(timer);
+    };
   }, []);
 
   const handleOpenConversation = (conv: ChatConversation) => {

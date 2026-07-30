@@ -94,6 +94,9 @@ ON public.chat_messages FOR ALL
 USING (true)
 WITH CHECK (true);
 
+-- Enable Supabase Realtime for chat_messages
+ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_messages;
+
 -- Enable RLS for vendors
 ALTER TABLE public.vendors ENABLE ROW LEVEL SECURITY;
 
