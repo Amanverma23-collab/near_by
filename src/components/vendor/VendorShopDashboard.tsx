@@ -552,7 +552,7 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
                     </span>
                   </div>
                   <p className="text-xs text-ink-muted mt-0.5">
-                    {effectiveStatus.openingTimeFormatted} – {effectiveStatus.closingTimeFormatted} ({effectiveStatus.modeText})
+                    {effectiveStatus.displayText} ({effectiveStatus.modeText})
                   </p>
                 </div>
               </div>

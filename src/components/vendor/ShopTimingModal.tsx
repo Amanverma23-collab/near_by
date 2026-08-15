@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clock, Check, RefreshCw, Power, Sparkles, ShieldCheck } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { getEffectiveShopStatus, formatTime12H } from '../../utils/shopTiming';
+import { getEffectiveShopStatus, formatTime12H, parseOpeningHours } from '../../utils/shopTiming';
 import { useBackButton } from '../../hooks/useBackButton';
 
 interface ShopTimingModalProps {
@@ -28,8 +28,10 @@ export default function ShopTimingModal({
   onClose,
   onUpdated,
 }: ShopTimingModalProps) {
-  const [openingTime, setOpeningTime] = useState<string>(vendor?.opening_time || '08:00');
-  const [closingTime, setClosingTime] = useState<string>(vendor?.closing_time || '21:00');
+  const initialParsed = parseOpeningHours(vendor?.opening_hours);
+  const [openingTime, setOpeningTime] = useState<string>(vendor?.opening_time || initialParsed.openingTime24 || '09:00');
+  const [closingTime, setClosingTime] = useState<string>(vendor?.closing_time || initialParsed.closingTime24 || '21:00');
+  const [closedDays, setClosedDays] = useState<string[]>(initialParsed.closedDays);
   const [manualStatus, setManualStatus] = useState<'auto' | 'manual_open' | 'manual_closed'>(
     vendor?.manual_status || 'auto'
   );
@@ -60,12 +62,16 @@ export default function ShopTimingModal({
     setSavingHours(true);
     setSuccessMsg(null);
     try {
+      const closedDaysText =
+        closedDays.length === 0
+          ? 'Open all 7 days'
+          : `Closed on ${closedDays.join(', ')}`;
+      const openingHoursStr = `${formatTime12H(openingTime)} - ${formatTime12H(closingTime)} (${closedDaysText})`;
+
       await supabase
         .from('vendors')
         .update({
-          opening_time: openingTime,
-          closing_time: closingTime,
-          opening_hours: `${formatTime12H(openingTime)} - ${formatTime12H(closingTime)}`,
+          opening_hours: openingHoursStr,
         })
         .eq('id', vendor.id);
 
