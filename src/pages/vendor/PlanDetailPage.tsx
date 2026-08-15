@@ -70,15 +70,17 @@ export default function PlanDetailPage() {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 30);
 
-      const subData = {
-        auth_user_id: user.id,
-        subscription_status: 'trial',
-        has_used_trial: true,
-        subscription_expires_at: expiresAt.toISOString(),
-      };
-
       const userPhone = user.phone || user.user_metadata?.phone_number;
-      const cleanPhone = userPhone ? userPhone.replace(/\D/g, '').slice(-10) : '';
+      const cleanPhone =
+        userPhone ? userPhone.replace(/\D/g, '').slice(-10) :
+        (localStorage.getItem('nearby_customer_phone') || (user.email?.includes('@nearbe.app') ? user.email.split('@')[0] : ''));
+
+      const subData = {
+        subscription_status: 'trial',
+        subscription_expires_at: expiresAt.toISOString(),
+        is_verified: true,
+        verification_status: 'approved',
+      };
 
       // Save to localStorage as guaranteed offline/immediate fallback
       const subObj = JSON.stringify({
@@ -87,6 +89,7 @@ export default function PlanDetailPage() {
       });
       localStorage.setItem(`nearby_subscription_${user.id}`, subObj);
       localStorage.setItem(`nearby_trial_used_${user.id}`, 'true');
+      localStorage.setItem('nearby_has_used_trial', 'true');
       if (cleanPhone) {
         localStorage.setItem(`nearby_subscription_${cleanPhone}`, subObj);
         localStorage.setItem(`nearby_trial_used_${cleanPhone}`, 'true');
@@ -107,11 +110,13 @@ export default function PlanDetailPage() {
         await supabase
           .from('vendors')
           .update(subData)
-          .or(`phone_number.eq.${cleanPhone},phone_number.eq.+91${cleanPhone}`);
+          .or(`phone_number.eq.${cleanPhone},phone_number.eq.+91${cleanPhone},whatsapp_number.eq.${cleanPhone}`);
       }
 
       window.dispatchEvent(new Event('nearby_vendor_updated'));
-      navigate('/vendor/dashboard', { replace: true });
+      setTimeout(() => {
+        navigate('/vendor/dashboard', { replace: true });
+      }, 100);
     } catch (err) {
       console.error('Trial activation error:', err);
       window.dispatchEvent(new Event('nearby_vendor_updated'));
@@ -132,23 +137,28 @@ export default function PlanDetailPage() {
       expiresAt.setDate(expiresAt.getDate() + (plan.id === 'annual_pro' ? 365 : 30));
 
       const status = plan.id === 'annual_pro' ? 'pro' : 'active';
+      const userPhone = user.phone || user.user_metadata?.phone_number;
+      const cleanPhone =
+        userPhone ? userPhone.replace(/\D/g, '').slice(-10) :
+        (localStorage.getItem('nearby_customer_phone') || (user.email?.includes('@nearbe.app') ? user.email.split('@')[0] : ''));
+
       const subData = {
-        auth_user_id: user.id,
         subscription_status: status,
-        has_used_trial: true,
         subscription_expires_at: expiresAt.toISOString(),
+        is_verified: true,
+        verification_status: 'approved',
       };
 
       // Save to localStorage as guaranteed offline/immediate fallback
-      localStorage.setItem(`nearby_subscription_${user.id}`, JSON.stringify({
+      const subObj = JSON.stringify({
         status: status,
         expiresAt: expiresAt.toISOString(),
-      }));
+      });
+      localStorage.setItem(`nearby_subscription_${user.id}`, subObj);
       localStorage.setItem(`nearby_trial_used_${user.id}`, 'true');
-
-      const userPhone = user.phone || user.user_metadata?.phone_number;
-      const cleanPhone = userPhone ? userPhone.replace(/\D/g, '').slice(-10) : '';
+      localStorage.setItem('nearby_has_used_trial', 'true');
       if (cleanPhone) {
+        localStorage.setItem(`nearby_subscription_${cleanPhone}`, subObj);
         localStorage.setItem(`nearby_trial_used_${cleanPhone}`, 'true');
       }
 
@@ -167,13 +177,15 @@ export default function PlanDetailPage() {
         await supabase
           .from('vendors')
           .update(subData)
-          .eq('phone_number', cleanPhone);
+          .or(`phone_number.eq.${cleanPhone},phone_number.eq.+91${cleanPhone},whatsapp_number.eq.${cleanPhone}`);
       }
 
       window.dispatchEvent(new Event('nearby_vendor_updated'));
-      navigate('/vendor/dashboard', { replace: true });
+      setTimeout(() => {
+        navigate('/vendor/dashboard', { replace: true });
+      }, 100);
     } catch (err) {
-      console.error('Payment activation error:', err);
+      console.error('Payment processing error:', err);
       window.dispatchEvent(new Event('nearby_vendor_updated'));
       navigate('/vendor/dashboard', { replace: true });
     } finally {

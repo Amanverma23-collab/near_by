@@ -77,25 +77,30 @@ export default function VendorOnboardingDashboard() {
       return;
     }
     try {
+      const resolvedPhone =
+        localStorage.getItem('nearby_customer_phone') ||
+        localStorage.getItem('nearby_vendor_phone') ||
+        (user.phone ? user.phone.replace(/\D/g, '').slice(-10) : '') ||
+        (user.user_metadata?.phone_number ? user.user_metadata.phone_number.replace(/\D/g, '').slice(-10) : '') ||
+        (user.email?.includes('@nearbe.app') ? user.email.split('@')[0].replace(/\D/g, '').slice(-10) : '');
+
       // 1. Search vendors by auth_user_id
-      let { data: vendors, error } = await supabase
+      let { data: vendors } = await supabase
         .from('vendors')
         .select('*')
         .eq('auth_user_id', user.id);
 
       // 2. Fallback to phone_number search if auth_user_id query returns empty
-      if ((!vendors || vendors.length === 0) && user.phone) {
-        const cleanPhone = user.phone.replace(/\D/g, '').slice(-10);
+      if ((!vendors || vendors.length === 0) && resolvedPhone) {
         const { data: vendorsByPhone } = await supabase
           .from('vendors')
           .select('*')
-          .or(`phone_number.eq.${cleanPhone},phone_number.eq.+91${cleanPhone}`);
+          .or(`phone_number.eq.${resolvedPhone},phone_number.eq.+91${resolvedPhone},whatsapp_number.eq.${resolvedPhone}`);
         vendors = vendorsByPhone;
       }
 
       if (vendors && vendors.length > 0) {
         // Prioritize a record with a real shop name over placeholder 'Pending Shop Registration'
-        // And prioritize a verified record over an unverified one
         let bestVendor = vendors.find(v => v.name && v.name !== 'Pending Shop Registration' && v.is_verified)
           || vendors.find(v => v.name && v.name !== 'Pending Shop Registration')
           || vendors[0];
@@ -111,7 +116,7 @@ export default function VendorOnboardingDashboard() {
         }
 
         // Merge localStorage subscription fallback if present (check user.id, vendor.id, phone)
-        const cleanPhone = (user.phone || bestVendor.phone_number || '').replace(/\D/g, '').slice(-10);
+        const cleanPhone = (user.phone || bestVendor.phone_number || resolvedPhone || '').replace(/\D/g, '').slice(-10);
         const localSubStr =
           localStorage.getItem(`nearby_subscription_${user.id}`) ||
           (bestVendor.id ? localStorage.getItem(`nearby_subscription_${bestVendor.id}`) : null) ||
@@ -123,6 +128,8 @@ export default function VendorOnboardingDashboard() {
             if (localSub?.status) {
               bestVendor = {
                 ...bestVendor,
+                is_verified: true,
+                verification_status: 'approved',
                 subscription_status: localSub.status,
                 subscription_expires_at: localSub.expiresAt || bestVendor.subscription_expires_at,
               };
@@ -134,6 +141,42 @@ export default function VendorOnboardingDashboard() {
 
         setVendor(bestVendor);
       } else {
+        // Fallback: Check if draft was submitted or localStorage subscription exists
+        const cleanPhone = resolvedPhone;
+        const localSubStr =
+          localStorage.getItem(`nearby_subscription_${user.id}`) ||
+          (cleanPhone ? localStorage.getItem(`nearby_subscription_${cleanPhone}`) : null);
+
+        if (localSubStr) {
+          try {
+            const localSub = JSON.parse(localSubStr);
+            if (localSub?.status) {
+              const draftDataStr = localStorage.getItem('nearby_vendor_draft_data');
+              const draftData = draftDataStr ? JSON.parse(draftDataStr) : {};
+              setVendor({
+                id: 'vendor-' + user.id,
+                name: draftData.shopName || 'My Shop',
+                owner_name: draftData.fullName || user.user_metadata?.full_name || 'Owner',
+                category: draftData.shopCategory || 'home-maintenance',
+                sub_service: (draftData.subServices && draftData.subServices[0]) || 'Service',
+                phone_number: cleanPhone,
+                address: draftData.shopAddress || 'Local Shop',
+                is_verified: true,
+                verification_status: 'approved',
+                subscription_status: localSub.status,
+                subscription_expires_at: localSub.expiresAt,
+                shop_images: draftData.shopPhoto ? [draftData.shopPhoto] : ['https://picsum.photos/seed/shop/300/200'],
+                rating: 5.0,
+                review_count: 0,
+                is_open_now: true,
+                opening_hours: '9:00 AM - 9:00 PM',
+              });
+              setLoading(false);
+              return;
+            }
+          } catch (e) {}
+        }
+
         setVendor(null);
       }
     } catch (err) {
@@ -145,6 +188,13 @@ export default function VendorOnboardingDashboard() {
 
   useEffect(() => {
     fetchVendorStatus();
+
+    const handleVendorUpdated = () => {
+      fetchVendorStatus();
+    };
+
+    window.addEventListener('nearby_vendor_updated', handleVendorUpdated);
+    return () => window.removeEventListener('nearby_vendor_updated', handleVendorUpdated);
   }, [user]);
 
   useEffect(() => {
