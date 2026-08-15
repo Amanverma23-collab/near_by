@@ -14,7 +14,8 @@ import {
   MapPin,
   Navigation,
   Plus,
-  Trash2
+  Trash2,
+  Clock
 } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -45,6 +46,10 @@ interface WizardData {
   shopCategory: string;
   subServices: string[];
   servicesList: ServiceItem[];
+  openingTime: string;
+  closingTime: string;
+  closedDays: string[];
+  isOpen24Hours: boolean;
 }
 
 // Category Configuration with Customer-side colors
@@ -198,6 +203,10 @@ export default function VendorRegisterPage() {
     shopCategory: '',
     subServices: [],
     servicesList: [{ name: '', price: '' }],
+    openingTime: '09:00',
+    closingTime: '21:00',
+    closedDays: ['Sunday'],
+    isOpen24Hours: false,
   });
 
   // Mobile change states
@@ -314,6 +323,10 @@ export default function VendorRegisterPage() {
         servicesList: savedDraft?.servicesList && savedDraft.servicesList.length > 0
           ? savedDraft.servicesList
           : [{ name: '', price: '' }],
+        openingTime: savedDraft?.openingTime || '09:00',
+        closingTime: savedDraft?.closingTime || '21:00',
+        closedDays: savedDraft?.closedDays !== undefined ? savedDraft.closedDays : ['Sunday'],
+        isOpen24Hours: savedDraft?.isOpen24Hours || false,
       };
 
       setWizardData(mergedData);
@@ -722,6 +735,20 @@ export default function VendorRegisterPage() {
     setActiveStep(1);
   };
 
+  // Helper function to format 24h time to 12h AM/PM
+  const formatTime12H = (time24?: string): string => {
+    if (!time24) return 'N/A';
+    const parts = time24.split(':');
+    if (parts.length < 2) return time24;
+    let hours = parseInt(parts[0], 10);
+    const minutes = parts[1];
+    if (isNaN(hours)) return time24;
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    return `${hours}:${minutes} ${ampm}`;
+  };
+
   // Final Registration Submit Flow
   const handleSubmit = async () => {
     if (!isStep1Valid || !isStep2Valid || !user) return;
@@ -737,7 +764,18 @@ export default function VendorRegisterPage() {
         .filter(s => s.name.trim() !== '')
         .map(s => ({ name: s.name.trim(), price: s.price.trim() }));
 
-      // 3. Update database row
+      // Compute formatted opening hours string
+      const formattedOpen = formatTime12H(wizardData.openingTime || '09:00');
+      const formattedClose = formatTime12H(wizardData.closingTime || '21:00');
+      const closedDaysText =
+        wizardData.closedDays.length === 0
+          ? 'Open all 7 days'
+          : `Closed on ${wizardData.closedDays.join(', ')}`;
+      const computedOpeningHours = wizardData.isOpen24Hours
+        ? `Open 24 Hours (${closedDaysText})`
+        : `${formattedOpen} - ${formattedClose} (${closedDaysText})`;
+
+      // 3. Update database row with all required columns
       const updatePayload: any = {
         name: wizardData.shopName.trim(),
         owner_name: wizardData.fullName.trim(),
@@ -751,6 +789,10 @@ export default function VendorRegisterPage() {
         services_offered: cleanServices,
         is_verified: false,
         whatsapp_number: wizardData.whatsappNumber || wizardData.mobileNumber,
+        opening_hours: computedOpeningHours,
+        opening_time: wizardData.openingTime || '09:00',
+        closing_time: wizardData.closingTime || '21:00',
+        city: 'Bangalore',
       };
 
       // Check if vendor row already exists by auth_user_id or phone_number (safely without maybeSingle)
@@ -1543,7 +1585,145 @@ export default function VendorRegisterPage() {
                   </AnimatePresence>
                 </motion.div>
 
-                {/* Field 5: Services list (Optional Section) */}
+                {/* Field 5: Shop Timing & Working Days */}
+                <motion.div variants={itemVariants} className="space-y-3 bg-surface/70 p-4 rounded-2xl border border-border-light">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-xl bg-brand/10 text-brand flex items-center justify-center">
+                        <Clock size={16} />
+                      </div>
+                      <div>
+                        <label className="text-xs font-display font-bold text-ink block">
+                          Shop Timing & Working Days <span className="text-brand">*</span>
+                        </label>
+                        <span className="text-[10px] text-ink-muted block">
+                          Dukan khulne aur band hone ka samay
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 24 Hours Open Toggle */}
+                    <button
+                      type="button"
+                      onClick={() => setWizardData(prev => ({ ...prev, isOpen24Hours: !prev.isOpen24Hours }))}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-display font-bold border transition-colors cursor-pointer ${
+                        wizardData.isOpen24Hours
+                          ? 'bg-brand text-white border-brand shadow-xs'
+                          : 'bg-white text-ink-muted border-border-light hover:border-brand/40'
+                      }`}
+                    >
+                      {wizardData.isOpen24Hours ? '✓ 24 Hours Open' : '24 Hours Open?'}
+                    </button>
+                  </div>
+
+                  {!wizardData.isOpen24Hours && (
+                    <div className="grid grid-cols-2 gap-3 pt-1">
+                      <div>
+                        <span className="text-[11px] font-display font-bold text-ink-light block mb-1">
+                          Opening Time (Khulne ka Samay)
+                        </span>
+                        <input
+                          type="time"
+                          value={wizardData.openingTime}
+                          onChange={(e) => setWizardData(prev => ({ ...prev, openingTime: e.target.value }))}
+                          className="w-full py-2.5 px-3 text-xs text-ink font-mono font-medium border border-border-light rounded-xl focus:border-brand focus:ring-1 focus:ring-brand-glow focus:outline-none bg-white shadow-xs"
+                        />
+                        <span className="text-[10px] text-brand font-semibold block mt-1">
+                          Opens at {formatTime12H(wizardData.openingTime)}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-[11px] font-display font-bold text-ink-light block mb-1">
+                          Closing Time (Band hone ka Samay)
+                        </span>
+                        <input
+                          type="time"
+                          value={wizardData.closingTime}
+                          onChange={(e) => setWizardData(prev => ({ ...prev, closingTime: e.target.value }))}
+                          className="w-full py-2.5 px-3 text-xs text-ink font-mono font-medium border border-border-light rounded-xl focus:border-brand focus:ring-1 focus:ring-brand-glow focus:outline-none bg-white shadow-xs"
+                        />
+                        <span className="text-[10px] text-brand font-semibold block mt-1">
+                          Closes at {formatTime12H(wizardData.closingTime)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Weekly Off Days Selection */}
+                  <div className="pt-2 border-t border-border-light/60 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-display font-bold text-ink-light block">
+                        Weekly Off / Closed Day (Chhutti ka din):
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setWizardData(prev => ({ ...prev, closedDays: [] }))}
+                        className={`text-[10px] font-display font-bold px-2 py-0.5 rounded-md cursor-pointer transition-colors ${
+                          wizardData.closedDays.length === 0
+                            ? 'bg-emerald-500 text-white'
+                            : 'bg-white text-ink-muted border border-border-light hover:text-ink'
+                        }`}
+                      >
+                        {wizardData.closedDays.length === 0 ? '✓ Open All 7 Days' : 'Set Open All 7 Days'}
+                      </button>
+                    </div>
+
+                    {/* Day chips */}
+                    <div className="grid grid-cols-7 gap-1.5">
+                      {[
+                        { short: 'Sun', full: 'Sunday' },
+                        { short: 'Mon', full: 'Monday' },
+                        { short: 'Tue', full: 'Tuesday' },
+                        { short: 'Wed', full: 'Wednesday' },
+                        { short: 'Thu', full: 'Thursday' },
+                        { short: 'Fri', full: 'Friday' },
+                        { short: 'Sat', full: 'Saturday' },
+                      ].map((day) => {
+                        const isClosed = wizardData.closedDays.includes(day.full);
+                        return (
+                          <button
+                            key={day.full}
+                            type="button"
+                            onClick={() => {
+                              setWizardData(prev => {
+                                const exists = prev.closedDays.includes(day.full);
+                                return {
+                                  ...prev,
+                                  closedDays: exists
+                                    ? prev.closedDays.filter(d => d !== day.full)
+                                    : [...prev.closedDays, day.full]
+                                };
+                              });
+                            }}
+                            className={`py-2 rounded-xl text-xs font-display font-bold cursor-pointer transition-all border text-center flex flex-col items-center justify-center ${
+                              isClosed
+                                ? 'bg-rose-50 border-rose-400 text-rose-600 shadow-xs ring-1 ring-rose-300'
+                                : 'bg-white border-border-light text-ink hover:border-brand/40'
+                            }`}
+                          >
+                            <span>{day.short}</span>
+                            <span className={`text-[9px] ${isClosed ? 'text-rose-500 font-extrabold' : 'text-ink-muted'}`}>
+                              {isClosed ? 'Off' : 'Open'}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Timing Preview */}
+                    <div className="mt-2 py-2 px-3 bg-white rounded-xl border border-border-light flex items-center justify-between text-xs">
+                      <span className="text-ink-muted text-[11px]">Display on Profile:</span>
+                      <span className="font-display font-bold text-ink">
+                        {wizardData.isOpen24Hours
+                          ? `Open 24 Hours (${wizardData.closedDays.length > 0 ? `Closed: ${wizardData.closedDays.join(', ')}` : 'Open 7 days'})`
+                          : `${formatTime12H(wizardData.openingTime)} – ${formatTime12H(wizardData.closingTime)} (${wizardData.closedDays.length > 0 ? `Closed: ${wizardData.closedDays.join(', ')}` : 'Open 7 days'})`}
+                      </span>
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Field 6: Services list (Optional Section) */}
                 <motion.div variants={itemVariants} className="space-y-3">
                   <div className="flex items-center gap-1.5">
                     <label className="text-xs font-display font-bold text-ink-light">
