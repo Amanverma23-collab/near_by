@@ -109,15 +109,25 @@ export default function UnifiedAuthForm() {
         throw signUpError;
       }
 
-      const user = signUpData?.user;
+      // Sign in immediately to establish authenticated JWT for RLS policies
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: pseudoEmail,
+        password: password,
+      });
 
-      // Insert customer record
-      if (user) {
-        await supabase.from('customers').upsert({
-          auth_user_id: user.id,
+      const activeUser = signInData?.user || signUpData?.user;
+
+      // Insert customer profile record with authenticated session
+      if (activeUser) {
+        const { error: custErr } = await supabase.from('customers').upsert({
+          auth_user_id: activeUser.id,
           full_name: fullName.trim(),
           mobile_number: mobile,
         });
+
+        if (custErr) {
+          console.warn('Customer profile upsert warning:', custErr);
+        }
       }
 
       localStorage.removeItem('nearby_mock_session');
@@ -125,52 +135,11 @@ export default function UnifiedAuthForm() {
       localStorage.setItem('nearby_customer_phone', mobile);
       localStorage.setItem('nearby_user_role', 'customer');
 
-      // Sign in to guarantee an active auth session
-      try {
-        await supabase.auth.signOut();
-      } catch {}
-
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: pseudoEmail,
-        password: password,
-      });
-
-      if (signInError) {
-        // Fallback for auto-signin
-        console.warn('Auto sign-in warning:', signInError);
-      }
-
       setTimeout(() => {
         navigate('/location', { replace: true });
       }, 300);
     } catch (err: any) {
       console.error('Registration error:', err);
-      // If network fails, provide friendly mock offline account
-      if (err.message?.includes('fetch') || err.message?.includes('network')) {
-        const userId = 'mock-user-' + mobile;
-        const mockUser = {
-          id: userId,
-          email: getPseudoEmail(mobile),
-          phone: mobile,
-          role: 'authenticated',
-          user_metadata: { full_name: fullName.trim() },
-          created_at: new Date().toISOString(),
-        };
-        const mockSession = {
-          access_token: 'mock-token-' + userId,
-          token_type: 'bearer',
-          expires_in: 3600,
-          user: mockUser,
-        };
-        localStorage.setItem('nearby_mock_session', JSON.stringify(mockSession));
-        localStorage.setItem('nearby_customer_name', fullName.trim());
-        localStorage.setItem('nearby_customer_phone', mobile);
-        localStorage.setItem('nearby_user_role', 'customer');
-        setTimeout(() => {
-          navigate('/location', { replace: true });
-        }, 400);
-        return;
-      }
       setError(err.message || 'Failed to create account. Please try again.');
     } finally {
       setLoading(false);
