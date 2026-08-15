@@ -775,7 +775,7 @@ export default function VendorRegisterPage() {
         ? `Open 24 Hours (${closedDaysText})`
         : `${formattedOpen} - ${formattedClose} (${closedDaysText})`;
 
-      // 3. Update database row with all required columns
+      // 3. Update database row with all required columns matching Supabase schema
       const updatePayload: any = {
         name: wizardData.shopName.trim(),
         owner_name: wizardData.fullName.trim(),
@@ -790,8 +790,6 @@ export default function VendorRegisterPage() {
         is_verified: false,
         whatsapp_number: wizardData.whatsappNumber || wizardData.mobileNumber,
         opening_hours: computedOpeningHours,
-        opening_time: wizardData.openingTime || '09:00',
-        closing_time: wizardData.closingTime || '21:00',
         city: 'Bangalore',
       };
 
