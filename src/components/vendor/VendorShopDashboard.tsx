@@ -25,6 +25,8 @@ import {
   Check,
   Clock,
   Camera,
+  ArrowLeft,
+  Home,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useUnread } from '../../context/UnreadContext';
@@ -144,6 +146,18 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
 
           {/* Top Header Actions */}
           <div className="flex items-center gap-2">
+            {/* Switch to Customer App Pill Button */}
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => navigate('/dashboard')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-teal-200 bg-teal-50 text-teal-800 hover:bg-teal-100 transition-colors cursor-pointer text-xs font-display font-extrabold"
+              title="Return to Customer App"
+            >
+              <Home size={14} className="text-teal-700" />
+              <span className="hidden sm:inline">Customer App</span>
+              <span className="sm:hidden">App</span>
+            </motion.button>
+
             {/* Quick Chats Icon Button */}
             <button
               onClick={() => navigate('/chats')}
@@ -185,6 +199,16 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
                     transition={{ duration: 0.15 }}
                     className="absolute right-0 mt-2 w-52 bg-white rounded-2xl border border-border-light shadow-card p-2 z-50 space-y-1"
                   >
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false);
+                        navigate('/dashboard');
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-display font-bold text-teal-800 bg-teal-50 hover:bg-teal-100 rounded-xl transition-colors cursor-pointer text-left"
+                    >
+                      <Home size={15} className="text-teal-700" />
+                      <span>Customer App</span>
+                    </button>
                     <button
                       onClick={() => {
                         setMenuOpen(false);
@@ -274,7 +298,7 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
                   <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-teal-400" />
                 </span>
                 <span className="text-[10px] sm:text-[11px] font-display font-extrabold text-teal-200 uppercase tracking-wider">
-                  LIVE ON NEARBE
+                  LIVE ON NEARBY
                 </span>
               </div>
 

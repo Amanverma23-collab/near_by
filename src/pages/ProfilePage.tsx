@@ -32,7 +32,7 @@ import { getSavedVendorsCount } from '../utils/favoritesStorage';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user, signOut, hasShop, vendorStatus, vendorRecord } = useAuth();
   const { location: userLocation } = useLocation();
   const { language, toggleLanguage, t } = useLanguage();
   const currentAddress = userLocation?.city;
@@ -508,7 +508,7 @@ export default function ProfilePage() {
           </div>
         </motion.div>
 
-        {/* ────────────────── SECTION 4: VENDOR PROMO BANNER ────────────────── */}
+        {/* ────────────────── SECTION 4: VENDOR PROMO / SHOP MANAGEMENT BANNER ────────────────── */}
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
@@ -518,20 +518,50 @@ export default function ProfilePage() {
           <div className="flex items-center gap-2">
             <Sparkles size={16} className="text-amber-300" />
             <span className="text-[10px] font-display font-extrabold uppercase tracking-wider text-teal-200">
-              {t('own_a_shop')}
+              {vendorStatus === 'approved'
+                ? 'Vendor Partner'
+                : vendorStatus === 'pending'
+                ? 'Shop Registration Status'
+                : t('own_a_shop')}
             </span>
           </div>
 
           <h3 className="text-base font-display font-extrabold text-white leading-tight">
-            {t('register_shop_promo')}
+            {vendorStatus === 'approved'
+              ? `Manage ${vendorRecord?.name || 'Your Shop'} Dashboard`
+              : vendorStatus === 'pending'
+              ? 'Your shop registration is under review'
+              : t('register_shop_promo')}
           </h3>
 
+          <p className="text-xs text-teal-100/80 font-body">
+            {vendorStatus === 'approved'
+              ? 'View live customer views, update services, and manage your shop profile.'
+              : vendorStatus === 'pending'
+              ? 'Verification is in progress. You can check the approval status anytime.'
+              : 'List your shop with 0% commission and receive direct WhatsApp & call inquiries.'}
+          </p>
+
           <button
-            onClick={() => navigate('/vendor/register')}
+            onClick={() => {
+              if (vendorStatus === 'approved') {
+                navigate('/vendor/dashboard');
+              } else if (vendorStatus === 'pending') {
+                navigate('/vendor/pending');
+              } else {
+                navigate('/vendor/register');
+              }
+            }}
             className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-teal-950 font-display font-extrabold text-xs rounded-xl shadow-md cursor-pointer transition-all flex items-center gap-1.5"
           >
             <Store size={15} />
-            <span>{t('register_shop_btn')}</span>
+            <span>
+              {vendorStatus === 'approved'
+                ? 'Go to Vendor Dashboard'
+                : vendorStatus === 'pending'
+                ? 'Check Verification Status'
+                : t('register_shop_btn')}
+            </span>
           </button>
         </motion.div>
 
@@ -565,7 +595,7 @@ export default function ProfilePage() {
               <div className="space-y-1">
                 <h3 className="text-base font-display font-extrabold text-ink">{t('confirm_logout')}</h3>
                 <p className="text-xs text-ink-muted">
-                  Are you sure you want to log out of your NearBe account?
+                  Are you sure you want to log out of your NearBy account?
                 </p>
               </div>
 

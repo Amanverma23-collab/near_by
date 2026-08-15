@@ -6,19 +6,13 @@ import CategoryGrid from '../components/dashboard/CategoryGrid';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from '../context/LocationContext';
 import BrandLoader from '../components/ui/BrandLoader';
-import VendorOnboardingDashboard from '../components/vendor/VendorOnboardingDashboard';
 
 export default function DashboardPage() {
-  const { session, role, loading: authLoading } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const { locationSet, loading: locLoading } = useLocation();
 
   if (authLoading || locLoading) return <BrandLoader />;
-  if (!session || !role) return <Navigate to="/" replace />;
-
-  if (role === 'vendor') {
-    return <VendorOnboardingDashboard />;
-  }
-
+  if (!session) return <Navigate to="/" replace />;
   if (!locationSet) return <Navigate to="/location" replace />;
 
   return (
@@ -35,3 +29,4 @@ export default function DashboardPage() {
     </motion.div>
   );
 }
+

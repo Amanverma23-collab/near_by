@@ -84,7 +84,10 @@ export default function VendorServicesPage() {
 
   // Fetch vendor services from Supabase or default
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     const fetchServices = async () => {
       try {
         const { data } = await supabase

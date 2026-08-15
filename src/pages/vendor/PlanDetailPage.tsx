@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Check, Sparkles, Tag, X, ShieldCheck, ArrowRight } from 'lucide-react';
@@ -9,9 +9,25 @@ import { supabase } from '../../lib/supabase';
 export default function PlanDetailPage() {
   const { planId } = useParams<{ planId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, vendorRecord } = useAuth();
 
   const plan = PLANS.find((p) => p.id === planId) || PLANS[1]; // fallback to monthly pro
+
+  // If user already used free trial and attempts to view trial plan, redirect to subscriptions
+  useEffect(() => {
+    if (plan.isFree && user) {
+      const cleanPhone = (user.phone || '').replace(/\D/g, '').slice(-10);
+      const isTrialUsed =
+        Boolean(vendorRecord?.has_used_trial) ||
+        Boolean(vendorRecord?.subscription_status) ||
+        localStorage.getItem(`nearby_trial_used_${user.id}`) === 'true' ||
+        (cleanPhone ? localStorage.getItem(`nearby_trial_used_${cleanPhone}`) === 'true' : false);
+
+      if (isTrialUsed) {
+        navigate('/vendor/subscriptions', { replace: true });
+      }
+    }
+  }, [plan, user, vendorRecord, navigate]);
 
   const [promoInput, setPromoInput] = useState('');
   const [appliedPromo, setAppliedPromo] = useState<PromoResult | null>(null);
@@ -57,6 +73,7 @@ export default function PlanDetailPage() {
       const subData = {
         auth_user_id: user.id,
         subscription_status: 'trial',
+        has_used_trial: true,
         subscription_expires_at: expiresAt.toISOString(),
       };
 
@@ -69,8 +86,10 @@ export default function PlanDetailPage() {
         expiresAt: expiresAt.toISOString(),
       });
       localStorage.setItem(`nearby_subscription_${user.id}`, subObj);
+      localStorage.setItem(`nearby_trial_used_${user.id}`, 'true');
       if (cleanPhone) {
         localStorage.setItem(`nearby_subscription_${cleanPhone}`, subObj);
+        localStorage.setItem(`nearby_trial_used_${cleanPhone}`, 'true');
       }
 
       // Update by auth_user_id
@@ -91,10 +110,12 @@ export default function PlanDetailPage() {
           .or(`phone_number.eq.${cleanPhone},phone_number.eq.+91${cleanPhone}`);
       }
 
-      navigate('/dashboard', { replace: true });
+      window.dispatchEvent(new Event('nearby_vendor_updated'));
+      navigate('/vendor/dashboard', { replace: true });
     } catch (err) {
       console.error('Trial activation error:', err);
-      navigate('/dashboard', { replace: true });
+      window.dispatchEvent(new Event('nearby_vendor_updated'));
+      navigate('/vendor/dashboard', { replace: true });
     } finally {
       setLoading(false);
     }
@@ -114,6 +135,7 @@ export default function PlanDetailPage() {
       const subData = {
         auth_user_id: user.id,
         subscription_status: status,
+        has_used_trial: true,
         subscription_expires_at: expiresAt.toISOString(),
       };
 
@@ -122,6 +144,13 @@ export default function PlanDetailPage() {
         status: status,
         expiresAt: expiresAt.toISOString(),
       }));
+      localStorage.setItem(`nearby_trial_used_${user.id}`, 'true');
+
+      const userPhone = user.phone || user.user_metadata?.phone_number;
+      const cleanPhone = userPhone ? userPhone.replace(/\D/g, '').slice(-10) : '';
+      if (cleanPhone) {
+        localStorage.setItem(`nearby_trial_used_${cleanPhone}`, 'true');
+      }
 
       // Update by auth_user_id
       const { error: err1 } = await supabase
@@ -134,19 +163,19 @@ export default function PlanDetailPage() {
       }
 
       // Fallback update by phone_number if available
-      const userPhone = user.phone || user.user_metadata?.phone_number;
-      if (userPhone) {
-        const cleanPhone = userPhone.replace(/\D/g, '').slice(-10);
+      if (cleanPhone) {
         await supabase
           .from('vendors')
           .update(subData)
           .eq('phone_number', cleanPhone);
       }
 
-      navigate('/dashboard', { replace: true });
+      window.dispatchEvent(new Event('nearby_vendor_updated'));
+      navigate('/vendor/dashboard', { replace: true });
     } catch (err) {
       console.error('Payment activation error:', err);
-      navigate('/dashboard', { replace: true });
+      window.dispatchEvent(new Event('nearby_vendor_updated'));
+      navigate('/vendor/dashboard', { replace: true });
     } finally {
       setLoading(false);
     }

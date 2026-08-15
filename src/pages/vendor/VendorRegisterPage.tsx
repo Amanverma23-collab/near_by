@@ -34,6 +34,7 @@ interface WizardData {
   ownerPhoto: string | null;
   fullName: string;
   mobileNumber: string;
+  whatsappNumber: string;
   homeAddress: string;
   // Step 2
   shopName: string;
@@ -100,25 +101,25 @@ const CATEGORIES = [
   }
 ];
 
-// Helper to create a custom brand-matching teal pin marker
+// Helper to create Google Maps style red pin marker
 const customPinIcon = L.divIcon({
   html: `
     <div class="relative flex items-center justify-center">
-      <div class="absolute -top-[38px] flex flex-col items-center">
+      <div class="absolute -top-[36px] flex flex-col items-center">
         <!-- Pin Body -->
-        <div class="w-9 h-9 rounded-full flex items-center justify-center text-white border-2 border-white shadow-lg" style="background-color: #0D9488;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white border-2 border-white shadow-lg" style="background-color: #EA4335;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
         </div>
         <!-- Pin Tip -->
-        <div class="w-3 h-3 rotate-45 -mt-[7px] border-r border-b border-white shadow-[1px_1px_1px_rgba(0,0,0,0.15)]" style="background-color: #0D9488;"></div>
+        <div class="w-2.5 h-2.5 rotate-45 -mt-[6px] border-r border-b border-white shadow-[1px_1px_1px_rgba(0,0,0,0.15)]" style="background-color: #EA4335;"></div>
         <!-- Ground Glow Pulse Shadow -->
-        <div class="w-5 h-2.5 bg-black/20 rounded-full blur-[1.5px] mt-[3px]"></div>
+        <div class="w-4 h-2 bg-black/25 rounded-full blur-[1px] mt-[2px]"></div>
       </div>
     </div>
   `,
   className: 'custom-map-pin',
-  iconSize: [36, 36],
-  iconAnchor: [18, 36],
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
 });
 
 // React Leaflet Re-centering helper
@@ -187,6 +188,7 @@ export default function VendorRegisterPage() {
     ownerPhoto: null,
     fullName: '',
     mobileNumber: '',
+    whatsappNumber: '',
     homeAddress: '',
     shopName: '',
     latitude: 27.6094,
@@ -208,6 +210,16 @@ export default function VendorRegisterPage() {
   const [otpError, setOtpError] = useState('');
   const [successToast, setSuccessToast] = useState('');
 
+  // WhatsApp change states
+  const [isChangingWhatsapp, setIsChangingWhatsapp] = useState(false);
+  const [newWhatsappNumber, setNewWhatsappNumber] = useState('');
+  const [whatsappOtpSent, setWhatsappOtpSent] = useState(false);
+  const [whatsappOtpCode, setWhatsappOtpCode] = useState<string[]>(Array(6).fill(''));
+  const [whatsappOtpTimer, setWhatsappOtpTimer] = useState(0);
+  const [verifyingWhatsappOtp, setVerifyingWhatsappOtp] = useState(false);
+  const [whatsappOtpError, setWhatsappOtpError] = useState('');
+  const whatsappOtpRefs = useRef<(HTMLInputElement | null)[]>([]);
+
   // Camera states
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [cameraMode, setCameraMode] = useState<'owner' | 'shop'>('owner');
@@ -227,6 +239,8 @@ export default function VendorRegisterPage() {
       closeCamera();
     } else if (isChangingMobile) {
       handleCancelMobileChange();
+    } else if (isChangingWhatsapp) {
+      handleCancelWhatsappChange();
     } else if (activeStep === 2) {
       handleBack();
     } else {
@@ -234,34 +248,103 @@ export default function VendorRegisterPage() {
     }
   }, true);
 
-  // Fetch prefilled data from vendors table
+  // Fetch prefilled data from vendors table or customer session & restore saved draft
   useEffect(() => {
     async function fetchVendorData() {
-      if (!user) return;
+      // 1. Check if there is a saved draft in localStorage
+      let savedDraft: Partial<WizardData> | null = null;
+      let savedStep = 1;
       try {
-        const { data, error } = await supabase
-          .from('vendors')
-          .select('owner_name, phone_number')
-          .eq('auth_user_id', user.id)
-          .maybeSingle();
-
-        if (error) throw error;
-
-        if (data) {
-          setWizardData(prev => ({
-            ...prev,
-            fullName: data.owner_name || '',
-            mobileNumber: data.phone_number || '',
-          }));
+        const draftStr = localStorage.getItem('nearby_vendor_draft_data');
+        if (draftStr) {
+          savedDraft = JSON.parse(draftStr);
         }
-      } catch (err) {
-        console.error('Error fetching initial profile:', err);
-      } finally {
-        setLoadingProfile(false);
+        const stepStr = localStorage.getItem('nearby_vendor_draft_step');
+        if (stepStr === '2') {
+          savedStep = 2;
+        }
+      } catch (e) {
+        console.warn('Error reading saved draft:', e);
+      }
+
+      const customerName =
+        localStorage.getItem('nearby_customer_name') ||
+        user?.user_metadata?.full_name ||
+        '';
+      const customerPhone =
+        localStorage.getItem('nearby_customer_phone') ||
+        (user?.phone ? user.phone.replace(/\D/g, '').slice(-10) : '') ||
+        (user?.email?.includes('@nearbe.app') ? user.email.split('@')[0] : '') ||
+        '';
+
+      let dbData: any = null;
+      if (user) {
+        try {
+          const { data, error } = await supabase
+            .from('vendors')
+            .select('owner_name, phone_number, whatsapp_number')
+            .eq('auth_user_id', user.id)
+            .maybeSingle();
+
+          if (!error && data) {
+            dbData = data;
+          }
+        } catch (err) {
+          console.error('Error fetching initial profile from db:', err);
+        }
+      }
+
+      const resolvedFullName = savedDraft?.fullName || dbData?.owner_name || customerName || '';
+      const resolvedPhone = savedDraft?.mobileNumber || dbData?.phone_number || customerPhone || '';
+      const resolvedWhatsapp = savedDraft?.whatsappNumber || dbData?.whatsapp_number || resolvedPhone || customerPhone || '';
+
+      const mergedData: WizardData = {
+        ownerPhoto: savedDraft?.ownerPhoto || null,
+        fullName: resolvedFullName,
+        mobileNumber: resolvedPhone,
+        whatsappNumber: resolvedWhatsapp,
+        homeAddress: savedDraft?.homeAddress || '',
+        shopName: savedDraft?.shopName || '',
+        latitude: savedDraft?.latitude || 27.6094,
+        longitude: savedDraft?.longitude || 75.1398,
+        shopAddress: savedDraft?.shopAddress || '',
+        shopPhoto: savedDraft?.shopPhoto || null,
+        shopCategory: savedDraft?.shopCategory || '',
+        subServices: savedDraft?.subServices || [],
+        servicesList: savedDraft?.servicesList && savedDraft.servicesList.length > 0
+          ? savedDraft.servicesList
+          : [{ name: '', price: '' }],
+      };
+
+      setWizardData(mergedData);
+      setLoadingProfile(false);
+
+      // If Step 1 was completed and saved at Step 2, jump straight to Step 2!
+      const isStep1Done =
+        Boolean(mergedData.ownerPhoto) &&
+        Boolean(mergedData.fullName.trim()) &&
+        mergedData.mobileNumber.length === 10 &&
+        mergedData.whatsappNumber.length === 10 &&
+        mergedData.homeAddress.trim().length >= 10;
+
+      if (savedStep === 2 && isStep1Done) {
+        setActiveStep(2);
       }
     }
     fetchVendorData();
   }, [user]);
+
+  // Auto-save form progress to localStorage
+  useEffect(() => {
+    if (!loadingProfile) {
+      try {
+        localStorage.setItem('nearby_vendor_draft_data', JSON.stringify(wizardData));
+        localStorage.setItem('nearby_vendor_draft_step', String(activeStep));
+      } catch (e) {
+        console.warn('Draft auto-save error:', e);
+      }
+    }
+  }, [wizardData, activeStep, loadingProfile]);
 
   // Request GPS permission and center location
   useEffect(() => {
@@ -289,6 +372,13 @@ export default function VendorRegisterPage() {
       return () => clearTimeout(timer);
     }
   }, [otpTimer]);
+
+  useEffect(() => {
+    if (whatsappOtpTimer > 0) {
+      const timer = setTimeout(() => setWhatsappOtpTimer(prev => prev - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [whatsappOtpTimer]);
 
   // Reverse geocoding (OpenStreetMap Nominatim)
   const reverseGeocode = async (lat: number, lon: number) => {
@@ -331,19 +421,21 @@ export default function VendorRegisterPage() {
     }
   };
 
-  // Camera handling (Capacitor Native Camera with WebRTC fallback)
+  // Camera handling (Capacitor Native Camera on mobile, direct WebRTC on web/desktop)
   const openCamera = async (mode: 'owner' | 'shop') => {
     setCameraMode(mode);
     setCameraError('');
 
-    // Attempt Capacitor Native Camera
+    // Attempt Capacitor Native Camera ONLY if on native device (Android/iOS)
     try {
       const nativePhoto = await captureNativePhoto();
       if (nativePhoto) {
         if (mode === 'owner') {
-          setWizardData((prev) => ({ ...prev, ownerPhotoUrl: nativePhoto }));
+          setWizardData((prev) => ({ ...prev, ownerPhoto: nativePhoto }));
+          triggerSuccessToast('Selfie captured successfully');
         } else {
-          setWizardData((prev) => ({ ...prev, shopPhotoUrl: nativePhoto }));
+          setWizardData((prev) => ({ ...prev, shopPhoto: nativePhoto }));
+          triggerSuccessToast('Shop front photo captured successfully');
         }
         return;
       }
@@ -351,7 +443,7 @@ export default function VendorRegisterPage() {
       console.warn('Native camera capture fallback to web camera:', err);
     }
 
-    // WebRTC Fallback
+    // Direct WebRTC Live Camera (on desktop/web browsers)
     setIsCameraOpen(true);
     try {
       const facing = mode === 'owner' ? 'user' : 'environment';
@@ -492,6 +584,68 @@ export default function VendorRegisterPage() {
     }, 1000);
   };
 
+  // WhatsApp change handlers
+  const handleStartWhatsappChange = () => {
+    setIsChangingWhatsapp(true);
+    setNewWhatsappNumber('');
+    setWhatsappOtpSent(false);
+    setWhatsappOtpError('');
+  };
+
+  const handleCancelWhatsappChange = () => {
+    setIsChangingWhatsapp(false);
+    setWhatsappOtpSent(false);
+    setWhatsappOtpError('');
+    setNewWhatsappNumber('');
+  };
+
+  const handleSendWhatsappOtp = () => {
+    if (newWhatsappNumber.length !== 10) return;
+    setWhatsappOtpSent(true);
+    setWhatsappOtpTimer(30);
+    setWhatsappOtpCode(Array(6).fill(''));
+    setWhatsappOtpError('');
+    triggerSuccessToast(`OTP sent to WhatsApp +91 ${newWhatsappNumber}`);
+  };
+
+  const handleWhatsappOtpChange = (val: string, index: number) => {
+    if (isNaN(Number(val))) return;
+    const newCode = [...whatsappOtpCode];
+    newCode[index] = val.slice(-1);
+    setWhatsappOtpCode(newCode);
+
+    if (val && index < 5) {
+      whatsappOtpRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleWhatsappOtpKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+    if (e.key === 'Backspace' && !whatsappOtpCode[index] && index > 0) {
+      whatsappOtpRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleVerifyWhatsappOtp = async () => {
+    const fullOtp = whatsappOtpCode.join('');
+    if (fullOtp.length !== 6) return;
+
+    setVerifyingWhatsappOtp(true);
+    setWhatsappOtpError('');
+
+    setTimeout(() => {
+      if (fullOtp === '123456') {
+        setWizardData(prev => ({ ...prev, whatsappNumber: newWhatsappNumber }));
+        setIsChangingWhatsapp(false);
+        setWhatsappOtpSent(false);
+        setVerifyingWhatsappOtp(false);
+        triggerSuccessToast('WhatsApp number updated');
+      } else {
+        setWhatsappOtpError('Invalid verification code. Use 123456 for testing.');
+        setVerifyingWhatsappOtp(false);
+      }
+    }, 1000);
+  };
+
   // Category and sub-services selects
   const handleCategorySelect = (categoryId: string) => {
     setWizardData(prev => ({
@@ -536,22 +690,34 @@ export default function VendorRegisterPage() {
     wizardData.fullName.trim() !== '' &&
     wizardData.mobileNumber.length === 10 &&
     !isChangingMobile &&
+    wizardData.whatsappNumber.length === 10 &&
+    !isChangingWhatsapp &&
     wizardData.homeAddress.trim().length >= 10;
 
   const isStep2Valid =
     wizardData.shopName.trim() !== '' &&
-    wizardData.shopAddress.trim() !== '' &&
     wizardData.shopPhoto !== null &&
     wizardData.shopCategory !== '' &&
     wizardData.subServices.length >= 1;
 
   const handleNext = () => {
     if (!isStep1Valid) return;
+    try {
+      localStorage.setItem('nearby_vendor_draft_data', JSON.stringify(wizardData));
+      localStorage.setItem('nearby_vendor_draft_step', '2');
+    } catch (e) {
+      console.warn('Draft save error:', e);
+    }
     setDirection(1);
     setActiveStep(2);
   };
 
   const handleBack = () => {
+    try {
+      localStorage.setItem('nearby_vendor_draft_step', '1');
+    } catch (e) {
+      console.warn('Draft save error:', e);
+    }
     setDirection(-1);
     setActiveStep(1);
   };
@@ -584,7 +750,7 @@ export default function VendorRegisterPage() {
         shop_images: [shopUrl, selfieUrl],
         services_offered: cleanServices,
         is_verified: false,
-        whatsapp_number: wizardData.mobileNumber, // sync WhatsApp
+        whatsapp_number: wizardData.whatsappNumber || wizardData.mobileNumber,
       };
 
       // Check if vendor row already exists by auth_user_id or phone_number (safely without maybeSingle)
@@ -642,6 +808,12 @@ export default function VendorRegisterPage() {
           if (basicErr) throw basicErr;
         }
       }
+
+      window.dispatchEvent(new Event('nearby_vendor_updated'));
+
+      // Clear draft on successful submission
+      localStorage.removeItem('nearby_vendor_draft_data');
+      localStorage.removeItem('nearby_vendor_draft_step');
 
       // Redirect to Pending Verification screen
       navigate('/vendor/pending');
@@ -972,6 +1144,152 @@ export default function VendorRegisterPage() {
                   </AnimatePresence>
                 </motion.div>
 
+                {/* Field: WhatsApp Number (Read-Only / Edit inline with OTP) */}
+                <motion.div variants={itemVariants} className="space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-xs font-display font-bold text-ink-light">
+                        WhatsApp Number
+                      </label>
+                      <span className="text-[10px] font-display font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                        WhatsApp
+                      </span>
+                    </div>
+                    {!isChangingWhatsapp && (
+                      <button
+                        onClick={handleStartWhatsappChange}
+                        className="text-xs font-display font-bold text-brand hover:text-brand-dark flex items-center gap-1 cursor-pointer"
+                      >
+                        Change
+                      </button>
+                    )}
+                  </div>
+
+                  <AnimatePresence mode="wait">
+                    {!isChangingWhatsapp ? (
+                      <motion.div
+                        key="view-whatsapp"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="relative rounded-[var(--radius-md)] overflow-hidden bg-surface border border-border-light flex items-center pr-3.5"
+                      >
+                        <span className="pl-4 text-sm text-ink-muted">+91</span>
+                        <input
+                          type="text"
+                          value={wizardData.whatsappNumber}
+                          disabled
+                          readOnly
+                          className="w-full py-3 px-2 text-sm text-ink-muted cursor-not-allowed bg-transparent focus:outline-none"
+                        />
+                        <Lock size={15} className="text-ink-muted" />
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="edit-whatsapp"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="space-y-3 overflow-hidden"
+                      >
+                        <div className="relative rounded-[var(--radius-md)] border border-emerald-500/50 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 flex items-center pr-2 bg-white transition-all">
+                          <span className="pl-4 text-sm text-ink-light">+91</span>
+                          <input
+                            type="text"
+                            maxLength={10}
+                            value={newWhatsappNumber}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '');
+                              if (val.length <= 10) setNewWhatsappNumber(val);
+                            }}
+                            placeholder="Enter 10-digit WhatsApp number"
+                            disabled={whatsappOtpSent}
+                            className="w-full py-3 px-2 text-sm text-ink focus:outline-none"
+                          />
+                        </div>
+
+                        {newWhatsappNumber.length === 10 && !whatsappOtpSent && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={handleSendWhatsappOtp}
+                              className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-display font-bold text-xs rounded-xl shadow-xs cursor-pointer transition-colors"
+                            >
+                              Verify via OTP
+                            </button>
+                            <button
+                              onClick={handleCancelWhatsappChange}
+                              className="py-2.5 px-4 border border-border text-ink-muted hover:text-ink font-display font-bold text-xs rounded-xl hover:bg-surface cursor-pointer transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+
+                        {whatsappOtpSent && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="space-y-3 p-4 bg-surface rounded-2xl border border-border-light"
+                          >
+                            <span className="text-[11px] font-display font-bold text-ink-light block">
+                              Enter 6-digit WhatsApp Verification Code:
+                            </span>
+
+                            <div className="flex justify-between gap-1.5 max-w-xs mx-auto">
+                              {whatsappOtpCode.map((digit, i) => (
+                                <input
+                                  key={i}
+                                  ref={el => { whatsappOtpRefs.current[i] = el; }}
+                                  type="text"
+                                  maxLength={1}
+                                  value={digit}
+                                  onChange={(e) => handleWhatsappOtpChange(e.target.value, i)}
+                                  onKeyDown={(e) => handleWhatsappOtpKeyDown(e, i)}
+                                  className="w-10 h-12 text-center text-lg font-display font-bold border border-border focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 rounded-xl bg-white focus:outline-none"
+                                />
+                              ))}
+                            </div>
+
+                            {whatsappOtpError && (
+                              <p className="text-[11px] text-red-500 font-body flex items-center gap-1">
+                                <AlertCircle size={12} />
+                                <span>{whatsappOtpError}</span>
+                              </p>
+                            )}
+
+                            <div className="flex items-center justify-between pt-1">
+                              <button
+                                onClick={handleVerifyWhatsappOtp}
+                                disabled={whatsappOtpCode.join('').length !== 6 || verifyingWhatsappOtp}
+                                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-display font-bold text-xs rounded-lg shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                              >
+                                {verifyingWhatsappOtp && <Loader2 size={12} className="animate-spin" />}
+                                <span>Confirm Code</span>
+                              </button>
+
+                              <div className="flex items-center gap-3">
+                                <button
+                                  onClick={handleSendWhatsappOtp}
+                                  disabled={whatsappOtpTimer > 0}
+                                  className="text-xs font-display font-bold text-emerald-700 disabled:text-ink-muted cursor-pointer"
+                                >
+                                  {whatsappOtpTimer > 0 ? `Resend (${whatsappOtpTimer}s)` : 'Resend'}
+                                </button>
+                                <button
+                                  onClick={handleCancelWhatsappChange}
+                                  className="text-xs font-display font-bold text-ink-muted hover:text-ink cursor-pointer"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+
                 {/* Field 4: Home Address */}
                 <motion.div variants={itemVariants} className="space-y-1.5">
                   <label className="text-xs font-display font-bold text-ink-light block">
@@ -1042,17 +1360,19 @@ export default function VendorRegisterPage() {
                     Drag the pin to your exact shop location.
                   </span>
 
-                  {/* Leaflet container */}
-                  <div className="relative w-full rounded-[20px] overflow-hidden border border-border-light/80 bg-zinc-100 shadow-inner z-10" style={{ height: '280px' }}>
+                  {/* Compact Google Maps container */}
+                  <div className="relative w-full rounded-2xl overflow-hidden border border-border-light bg-zinc-100 shadow-sm z-10" style={{ height: '190px' }}>
                     <MapContainer
                       center={[wizardData.latitude, wizardData.longitude]}
-                      zoom={15}
+                      zoom={16}
                       zoomControl={false}
-                      style={{ height: '280px', width: '100%' }}
+                      style={{ height: '190px', width: '100%' }}
                     >
                       <TileLayer
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        url="https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+                        subdomains={['mt0', 'mt1', 'mt2', 'mt3']}
+                        maxZoom={20}
+                        attribution='&copy; Google Maps'
                       />
                       <DraggableMarker
                         lat={wizardData.latitude}
@@ -1067,22 +1387,33 @@ export default function VendorRegisterPage() {
                     <button
                       type="button"
                       onClick={useCurrentLocation}
-                      className="absolute top-3 right-3 z-[400] p-2 bg-white hover:bg-surface rounded-xl border border-border shadow-md cursor-pointer text-brand hover:text-brand-dark transition-colors flex items-center justify-center"
+                      className="absolute top-2.5 right-2.5 z-[400] p-2 bg-white hover:bg-surface rounded-xl border border-border shadow-md cursor-pointer text-brand hover:text-brand-dark transition-colors flex items-center justify-center"
                       title="Use My Current Location"
                     >
-                      <Navigation size={14} fill="currentColor" />
+                      <Navigation size={13} fill="currentColor" />
                     </button>
                   </div>
 
-                  {/* Geocoded Address Confirmation */}
-                  {wizardData.shopAddress && (
-                    <div className="p-3 bg-surface border border-border-light/60 rounded-xl flex gap-2 items-start mt-2">
-                      <MapPin className="text-brand shrink-0 mt-0.5" size={14} />
-                      <span className="text-xs text-ink leading-relaxed">
-                        {wizardData.shopAddress}
-                      </span>
+                  {/* Manual Shop Address & Landmark (Optional) */}
+                  <div className="space-y-1.5 pt-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-display font-bold text-ink-light block">
+                        Shop Address / Landmark <span className="text-ink-muted text-[10px] font-normal">(Optional)</span>
+                      </label>
                     </div>
-                  )}
+                    <div className="relative rounded-[var(--radius-md)] border border-border-light focus-within:border-brand focus-within:ring-2 focus-within:ring-brand-glow bg-white transition-all">
+                      <textarea
+                        rows={2}
+                        value={wizardData.shopAddress}
+                        onChange={(e) => setWizardData(prev => ({ ...prev, shopAddress: e.target.value }))}
+                        placeholder="e.g. Shop No. 12, Ground Floor, Near Main Chowk, City Mall Road"
+                        className="w-full py-2.5 px-3.5 text-xs sm:text-sm text-ink placeholder:text-ink-muted/50 bg-transparent focus:outline-none resize-none"
+                      />
+                    </div>
+                    <span className="text-[10px] text-ink-muted block">
+                      Shop no., floor ya koi landmark add karein taaki customers asani se pahuche.
+                    </span>
+                  </div>
                 </motion.div>
 
                 {/* Field 3: Live Shop Front Photo */}

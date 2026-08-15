@@ -13,7 +13,7 @@ export default function BrandLoader() {
           Near
         </span>
         <span className="text-3xl font-extrabold font-display text-brand">
-          Be
+          By
         </span>
       </motion.div>
       <div className="flex gap-2">

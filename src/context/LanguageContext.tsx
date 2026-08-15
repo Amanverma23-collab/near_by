@@ -96,7 +96,7 @@ const TRANSLATIONS: Record<Language, Record<string, string>> = {
     nearby_alerts: 'Nearby Offer Updates',
     app_language: 'App Language',
     own_a_shop: 'Own a Local Shop?',
-    register_shop_promo: 'Register your shop on NearBe & get local customer calls!',
+    register_shop_promo: 'Register your shop on NearBy & get local customer calls!',
     register_shop_btn: 'Register Your Shop →',
     confirm_logout: 'Confirm Logout',
     my_ratings: 'My Ratings',

@@ -3,13 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, MapPin, Star, BadgeCheck, Phone, Clock,
-  ChevronLeft, ChevronRight, Navigation, ExternalLink, MessageSquare, Plus, Check,
+  ChevronLeft, ChevronRight, Navigation, ExternalLink, MessageSquare, Plus, Check, Trash2,
 } from 'lucide-react';
 import { dummyVendors, type Vendor } from '../data/dummyVendors';
 import { getEffectiveShopStatus } from '../utils/shopTiming';
 import { fetchCombinedVendors } from '../utils/vendorSync';
 import AddReviewModal from '../components/customer/AddReviewModal';
-import { getSavedReviews, saveNewReview } from '../utils/reviewStorage';
+import { getSavedReviews, saveNewReview, deleteReview } from '../utils/reviewStorage';
+import { useAuth } from '../context/AuthContext';
 import SaveHeartButton from '../components/ui/SaveHeartButton';
 import ChatBoxModal from '../components/chat/ChatBoxModal';
 import { getOrCreateConversation } from '../utils/chatStorage';
@@ -76,12 +77,34 @@ export default function VendorDetailPage() {
   const vendor = allVendors.find((v) => v.id === vendorId) || dummyVendors.find((v) => v.id === vendorId);
   const effectiveStatus = getEffectiveShopStatus(vendor || {});
 
+  const { user } = useAuth();
+  const currentPhone = (
+    localStorage.getItem('nearby_customer_phone') ||
+    user?.phone ||
+    user?.user_metadata?.phone_number ||
+    ''
+  ).replace(/\D/g, '').slice(-10);
+  const currentName = (
+    localStorage.getItem('nearby_customer_name') ||
+    user?.user_metadata?.full_name ||
+    ''
+  ).trim().toLowerCase();
+
   const [isAddReviewOpen, setIsAddReviewOpen] = useState(false);
   const [customReviews, setCustomReviews] = useState<any[]>([]);
   const [reviewToast, setReviewToast] = useState<string | null>(null);
 
   const [activeChatConv, setActiveChatConv] = useState<ChatConversation | null>(null);
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+
+  const handleDeleteUserReview = async (reviewId: string) => {
+    if (!vendor) return;
+    const targetVendorId = vendor.id || vendorId || 'v1';
+    await deleteReview(targetVendorId, reviewId);
+    setCustomReviews((prev) => prev.filter((r) => r.id !== reviewId));
+    setReviewToast('Your previous rating has been deleted. You can now submit a new rating.');
+    setTimeout(() => setReviewToast(null), 4000);
+  };
 
   const handleStartChat = () => {
     if (!vendor) return;
@@ -430,6 +453,15 @@ export default function VendorDetailPage() {
             allReviewsList.reduce((acc, r) => acc + r.rating, 0) / (allReviewsList.length || 1)
           ).toFixed(1);
 
+          // Find if the logged in customer has already submitted a review
+          const existingUserReview = allReviewsList.find((r) => {
+            if (!r) return false;
+            const rPhone = (r.reviewerPhone || '').replace(/\D/g, '').slice(-10);
+            if (currentPhone && rPhone && currentPhone === rPhone) return true;
+            if (currentName && r.reviewerName && currentName === r.reviewerName.trim().toLowerCase()) return true;
+            return false;
+          });
+
           // 5-Star distribution calculations
           const distribution = [5, 4, 3, 2, 1].map((star) => {
             const count = allReviewsList.filter((r) => Math.floor(r.rating) === star).length;
@@ -455,10 +487,23 @@ export default function VendorDetailPage() {
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
                     onClick={() => setIsAddReviewOpen(true)}
-                    className="flex items-center gap-1.5 px-3.5 py-2 bg-brand text-white font-display font-extrabold text-xs rounded-xl shadow-brand cursor-pointer hover:bg-brand-dark transition-all"
+                    className={`flex items-center gap-1.5 px-3.5 py-2 font-display font-extrabold text-xs rounded-xl shadow-sm cursor-pointer transition-all ${
+                      existingUserReview
+                        ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20'
+                        : 'bg-brand hover:bg-brand-dark text-white shadow-brand'
+                    }`}
                   >
-                    <Plus size={14} />
-                    <span>Rate & Review</span>
+                    {existingUserReview ? (
+                      <>
+                        <Star size={14} className="fill-white" />
+                        <span>Your Rating ({existingUserReview.rating}★)</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus size={14} />
+                        <span>Rate & Review</span>
+                      </>
+                    )}
                   </motion.button>
                 </div>
 
@@ -519,6 +564,7 @@ export default function VendorDetailPage() {
                 {/* ── INDIVIDUAL REVIEW CARDS ── */}
                 <div className="space-y-3 pt-1">
                   {allReviewsList.map((review, idx) => {
+                    const isMyReview = existingUserReview && review.id === existingUserReview.id;
                     const avatarColor = [
                       'bg-teal-500 text-white',
                       'bg-amber-500 text-white',
@@ -533,7 +579,9 @@ export default function VendorDetailPage() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: idx * 0.05 }}
-                        className="bg-white rounded-2xl p-4 sm:p-5 border border-border-light shadow-xs space-y-3 relative"
+                        className={`bg-white rounded-2xl p-4 sm:p-5 border shadow-xs space-y-3 relative ${
+                          isMyReview ? 'border-amber-300 ring-2 ring-amber-100' : 'border-border-light'
+                        }`}
                       >
                         {/* Header: User Avatar & Name */}
                         <div className="flex items-center justify-between">
@@ -542,19 +590,38 @@ export default function VendorDetailPage() {
                               {(review.reviewerName || 'C')[0]}
                             </div>
                             <div>
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 <h4 className="text-sm font-display font-extrabold text-ink leading-tight">
                                   {review.reviewerName}
                                 </h4>
-                                <span className="px-2 py-0.2 bg-teal-50 text-teal-700 text-[9px] font-display font-extrabold rounded-full border border-teal-100 uppercase tracking-wider">
-                                  Verified Customer
-                                </span>
+                                {isMyReview ? (
+                                  <span className="px-2 py-0.2 bg-amber-50 text-amber-800 text-[9px] font-display font-extrabold rounded-full border border-amber-200 uppercase tracking-wider">
+                                    Your Rating
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.2 bg-teal-50 text-teal-700 text-[9px] font-display font-extrabold rounded-full border border-teal-100 uppercase tracking-wider">
+                                    Verified Customer
+                                  </span>
+                                )}
                               </div>
                               <span className="text-[10px] text-ink-muted font-body">
                                 📅 {review.daysAgo === 0 ? 'Today' : review.daysAgo === 1 ? 'Yesterday' : `${review.daysAgo || 1} days ago`}
                               </span>
                             </div>
                           </div>
+
+                          {/* Delete Rating Button if it's the current user's review */}
+                          {isMyReview && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteUserReview(review.id)}
+                              className="px-2.5 py-1 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-display font-bold cursor-pointer"
+                              title="Delete rating to submit a new one"
+                            >
+                              <Trash2 size={12} />
+                              <span>Delete</span>
+                            </button>
+                          )}
                         </div>
 
                         {/* Rating Stars */}
@@ -586,6 +653,12 @@ export default function VendorDetailPage() {
                 <AddReviewModal
                   vendorName={vendor.name}
                   isOpen={isAddReviewOpen}
+                  existingReview={existingUserReview}
+                  onDeleteExistingReview={async () => {
+                    if (existingUserReview) {
+                      await handleDeleteUserReview(existingUserReview.id);
+                    }
+                  }}
                   onClose={() => setIsAddReviewOpen(false)}
                   onSubmitReview={async (newRev) => {
                     const savedItem = await saveNewReview(vendor.id || vendorId || 'v1', {
@@ -597,7 +670,7 @@ export default function VendorDetailPage() {
                     });
 
                     setCustomReviews((prev) => [savedItem, ...prev]);
-                    setReviewToast('Thank you! Your rating & review has been published.');
+                    setReviewToast('Thank you! Your rating and review has been published.');
                     setTimeout(() => setReviewToast(null), 4000);
                   }}
                 />

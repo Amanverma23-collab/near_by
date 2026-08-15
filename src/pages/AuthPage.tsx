@@ -1,21 +1,14 @@
-import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Navigate } from 'react-router-dom';
-import AuthTabs from '../components/auth/AuthTabs';
-import CustomerAuthForm from '../components/auth/CustomerAuthForm';
-import VendorAuthForm from '../components/auth/VendorAuthForm';
+import UnifiedAuthForm from '../components/auth/UnifiedAuthForm';
 import { useAuth } from '../context/AuthContext';
 import BrandLoader from '../components/ui/BrandLoader';
 
 export default function AuthPage() {
-  const { session, role, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'customer' | 'vendor'>('customer');
+  const { session, loading } = useAuth();
 
   if (loading) return <BrandLoader />;
-  if (session && role) {
-    if (role === 'vendor') {
-      return <Navigate to="/dashboard" replace />;
-    }
+  if (session) {
     return <Navigate to="/location" replace />;
   }
 
@@ -61,20 +54,14 @@ export default function AuthPage() {
           Your neighbourhood local services, at your fingertips
         </motion.p>
 
-        {/* Professional Auth Card */}
+        {/* Professional Unified Auth Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, type: 'spring', stiffness: 200, damping: 20 }}
           className="w-full max-w-md bg-white/95 backdrop-blur-md rounded-3xl shadow-card p-6 sm:p-8 border border-border-light relative"
         >
-          <AuthTabs activeTab={activeTab} onTabChange={setActiveTab}>
-            {activeTab === 'customer' ? (
-              <CustomerAuthForm />
-            ) : (
-              <VendorAuthForm />
-            )}
-          </AuthTabs>
+          <UnifiedAuthForm />
         </motion.div>
 
         {/* Footer & Security Trust Badge */}

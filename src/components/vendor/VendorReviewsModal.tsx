@@ -83,7 +83,7 @@ export default function VendorReviewsModal({
       prev.map((r) => (r.id === reportingReview.id ? { ...r, isReported: true } : r))
     );
 
-    setReportSubmittedMsg(`Review by "${reportingReview.reviewerName}" has been reported to NearBe Moderation Team.`);
+    setReportSubmittedMsg(`Review by "${reportingReview.reviewerName}" has been reported to NearBy Moderation Team.`);
     setReportingReview(null);
     setTimeout(() => setReportSubmittedMsg(null), 4000);
   };

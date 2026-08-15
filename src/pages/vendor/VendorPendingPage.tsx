@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, ArrowRight } from 'lucide-react';
+import { ShieldCheck, ArrowRight, Home, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useBackButton } from '../../hooks/useBackButton';
 import { supabase } from '../../lib/supabase';
 import VerificationTimer from '../../components/vendor/VerificationTimer';
 import DevApproveButton from '../../components/vendor/DevApproveButton';
@@ -12,6 +13,11 @@ export default function VendorPendingPage() {
   const { user } = useAuth();
   const [requestedAt, setRequestedAt] = useState<string | null>(null);
   const [isApproved, setIsApproved] = useState<boolean>(false);
+
+  // Hardware Back button returns directly to Customer Dashboard instead of Step 2
+  useBackButton(() => {
+    navigate('/dashboard', { replace: true });
+  }, true);
 
   useEffect(() => {
     if (!user) return;
@@ -71,15 +77,10 @@ export default function VendorPendingPage() {
 
   const ringVariants = {
     animate: {
-      scale: [1, 1.05, 1],
-      opacity: [0.8, 1, 0.8],
-      boxShadow: [
-        "0 0 0 0px rgba(13, 148, 136, 0.15)",
-        "0 0 0 12px rgba(13, 148, 136, 0.3)",
-        "0 0 0 0px rgba(13, 148, 136, 0.15)"
-      ],
+      scale: [1, 1.08, 1],
+      opacity: [0.7, 1, 0.7],
       transition: {
-        duration: 2.5,
+        duration: 3,
         repeat: Infinity,
         ease: "easeInOut" as const
       }
@@ -103,15 +104,33 @@ export default function VendorPendingPage() {
       {/* Header */}
       <header className="sticky top-0 z-40 w-full bg-white/80 backdrop-blur-md border-b border-border-light">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl font-extrabold font-display">
-              <span className="text-ink">Near</span>
-              <span className="text-brand">By</span>
-            </span>
-            <span className="text-[10px] font-display font-extrabold px-2 py-0.5 rounded-full bg-brand/10 text-brand uppercase tracking-wider">
-              Partner
-            </span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/dashboard', { replace: true })}
+              className="p-2 -ml-2 rounded-xl text-ink-muted hover:text-ink hover:bg-surface transition-colors cursor-pointer flex items-center justify-center"
+              title="Back to Customer App"
+              aria-label="Back to Customer App"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-extrabold font-display">
+                <span className="text-ink">Near</span>
+                <span className="text-brand">By</span>
+              </span>
+              <span className="text-[10px] font-display font-extrabold px-2 py-0.5 rounded-full bg-brand/10 text-brand uppercase tracking-wider">
+                Partner
+              </span>
+            </div>
           </div>
+
+          <button
+            onClick={() => navigate('/dashboard', { replace: true })}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-teal-200 bg-teal-50 text-teal-800 hover:bg-teal-100 transition-colors cursor-pointer text-xs font-display font-extrabold"
+          >
+            <Home size={14} className="text-teal-700" />
+            <span>Customer App</span>
+          </button>
         </div>
       </header>
 

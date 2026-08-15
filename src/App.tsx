@@ -17,6 +17,7 @@ import VendorPendingPage from './pages/vendor/VendorPendingPage';
 import SubscriptionPlaceholder from './pages/vendor/SubscriptionPlaceholder';
 import PlanDetailPage from './pages/vendor/PlanDetailPage';
 import VendorServicesPage from './pages/vendor/VendorServicesPage';
+import VendorOnboardingDashboard from './components/vendor/VendorOnboardingDashboard';
 import SearchPage from './pages/SearchPage';
 import FavoritesPage from './pages/FavoritesPage';
 import MyRatingsPage from './pages/MyRatingsPage';
@@ -72,6 +73,7 @@ function AppRoutes() {
         <Route path="/favorites" element={<FavoritesPage />} />
         <Route path="/category/:slug" element={<CategoryPage />} />
         <Route path="/vendor/:vendorId" element={<VendorDetailPage />} />
+        <Route path="/vendor/dashboard" element={<VendorOnboardingDashboard />} />
         <Route path="/vendor/register" element={<VendorRegisterPage />} />
         <Route path="/vendor/pending" element={<VendorPendingPage />} />
         <Route path="/vendor/subscriptions" element={<SubscriptionPlaceholder />} />

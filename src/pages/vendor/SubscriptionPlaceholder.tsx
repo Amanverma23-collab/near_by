@@ -1,10 +1,60 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Sparkles, Check, Crown } from 'lucide-react';
 import { PLANS } from '../../data/plans';
+import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabase';
 
 export default function SubscriptionPlaceholder() {
   const navigate = useNavigate();
+  const { user, vendorRecord } = useAuth();
+
+  const [hasUsedTrial, setHasUsedTrial] = useState<boolean>(() => {
+    if (!user) return false;
+    const cleanPhone = (user.phone || '').replace(/\D/g, '').slice(-10);
+    return (
+      Boolean(vendorRecord?.has_used_trial) ||
+      Boolean(vendorRecord?.subscription_status) ||
+      localStorage.getItem(`nearby_trial_used_${user.id}`) === 'true' ||
+      (cleanPhone ? localStorage.getItem(`nearby_trial_used_${cleanPhone}`) === 'true' : false)
+    );
+  });
+
+  useEffect(() => {
+    if (!user) return;
+    const checkTrialUsage = async () => {
+      const cleanPhone = (user.phone || '').replace(/\D/g, '').slice(-10);
+      const localUsed =
+        localStorage.getItem(`nearby_trial_used_${user.id}`) === 'true' ||
+        (cleanPhone ? localStorage.getItem(`nearby_trial_used_${cleanPhone}`) === 'true' : false);
+
+      if (localUsed || vendorRecord?.has_used_trial || vendorRecord?.subscription_status) {
+        setHasUsedTrial(true);
+        return;
+      }
+
+      try {
+        const { data: vendors } = await supabase
+          .from('vendors')
+          .select('has_used_trial, subscription_status')
+          .eq('auth_user_id', user.id);
+
+        if (vendors && vendors.some(v => v.has_used_trial || v.subscription_status)) {
+          setHasUsedTrial(true);
+          localStorage.setItem(`nearby_trial_used_${user.id}`, 'true');
+        }
+      } catch (e) {
+        console.warn('Error checking trial status:', e);
+      }
+    };
+    checkTrialUsage();
+  }, [user, vendorRecord]);
+
+  // If the user already used their free trial, hide the trial plan
+  const visiblePlans = hasUsedTrial
+    ? PLANS.filter(p => !p.isFree)
+    : PLANS;
 
   return (
     <div className="vendor-mode min-h-screen bg-surface flex flex-col font-body pb-12">
@@ -40,19 +90,21 @@ export default function SubscriptionPlaceholder() {
         >
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-100 text-amber-800 font-display font-extrabold text-xs tracking-wider uppercase mb-2">
             <Sparkles size={14} className="animate-pulse text-amber-600" />
-            Choose a Subscription Plan
+            {hasUsedTrial ? 'Renew or Upgrade Plan' : 'Choose a Subscription Plan'}
           </div>
           <h2 className="text-3xl sm:text-4xl font-display font-extrabold text-ink tracking-tight">
-            Go Live & Reach Local Customers
+            {hasUsedTrial ? 'Select Your NearBy Partner Plan' : 'Go Live & Reach Local Customers'}
           </h2>
           <p className="text-sm sm:text-base text-ink-muted max-w-xl mx-auto leading-relaxed">
-            Select a plan to activate your verified storefront and start receiving direct customer leads with zero commission.
+            {hasUsedTrial
+              ? 'Choose a plan to keep your verified shop live, receive direct customer calls, and boost local leads.'
+              : 'Select a plan to activate your verified storefront and start receiving direct customer leads with zero commission.'}
           </p>
         </motion.div>
 
         {/* Plans Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
-          {PLANS.map((plan, idx) => (
+        <div className={`grid grid-cols-1 sm:grid-cols-2 ${hasUsedTrial ? 'lg:grid-cols-3 max-w-4xl' : 'lg:grid-cols-4'} gap-6 w-full`}>
+          {visiblePlans.map((plan, idx) => (
             <motion.div
               key={plan.id}
               initial={{ opacity: 0, y: 20 }}

@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Star, Camera, Check, AlertCircle, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { X, Star, Camera, Check, AlertCircle, Sparkles, Trash2, Info } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useBackButton } from '../../hooks/useBackButton';
+import type { SavedReview } from '../../utils/reviewStorage';
 
 interface AddReviewModalProps {
   vendorName: string;
   isOpen: boolean;
   onClose: () => void;
   onSubmitReview: (review: { reviewerName: string; rating: number; comment?: string; photoUrl?: string }) => void;
+  existingReview?: SavedReview | null;
+  onDeleteExistingReview?: () => Promise<void>;
 }
 
 const RATING_SENTIMENTS: Record<number, { label: string; emoji: string; color: string }> = {
@@ -24,15 +27,18 @@ export default function AddReviewModal({
   isOpen,
   onClose,
   onSubmitReview,
+  existingReview,
+  onDeleteExistingReview,
 }: AddReviewModalProps) {
   const { user } = useAuth();
   const [rating, setRating] = useState<number>(0);
   const [hoverRating, setHoverRating] = useState<number>(0);
-  const [reviewerName, setReviewerName] = useState(user?.user_metadata?.full_name || 'Rahul M.');
+  const [reviewerName, setReviewerName] = useState(user?.user_metadata?.full_name || 'Customer');
   const [comment, setComment] = useState('');
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useBackButton(onClose, isOpen);
 
@@ -110,8 +116,67 @@ export default function AddReviewModal({
             </button>
           </div>
 
-          {/* Success Checkmark overlay when submitted */}
-          {submitted ? (
+          {/* If user already reviewed, show requirement to delete previous rating first */}
+          {existingReview ? (
+            <div className="space-y-4 py-2">
+              <div className="p-4 bg-amber-50/90 border border-amber-200 rounded-2xl space-y-2">
+                <div className="flex items-center gap-2 text-amber-900 font-display font-extrabold text-xs">
+                  <Info size={16} className="text-amber-700 shrink-0" />
+                  <span>You have already rated this shop</span>
+                </div>
+                <p className="text-xs text-ink-light leading-relaxed">
+                  A user can only submit 1 rating per shop. To change your rating or submit a new review, please delete your previous rating first.
+                </p>
+              </div>
+
+              {/* Previous Review Summary */}
+              <div className="p-4 bg-surface border border-border-light rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-display font-bold text-ink-muted uppercase">Your Current Rating</span>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Star
+                        key={s}
+                        size={14}
+                        className={s <= existingReview.rating ? 'text-amber-500 fill-amber-500' : 'text-gray-300'}
+                      />
+                    ))}
+                    <span className="text-xs font-bold text-ink ml-1">{existingReview.rating}★</span>
+                  </div>
+                </div>
+                {existingReview.comment && (
+                  <p className="text-xs text-ink-light italic">"{existingReview.comment}"</p>
+                )}
+              </div>
+
+              {/* Action: Delete Previous Rating & Re-rate */}
+              <div className="space-y-2 pt-2">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={async () => {
+                    setIsDeleting(true);
+                    if (onDeleteExistingReview) {
+                      await onDeleteExistingReview();
+                    }
+                    setIsDeleting(false);
+                  }}
+                  className="w-full py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-display font-extrabold text-xs rounded-xl shadow-xs cursor-pointer transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Trash2 size={15} />
+                  <span>{isDeleting ? 'Deleting Rating...' : 'Delete Previous Rating & Rate Again'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-full py-2 text-ink-muted hover:text-ink font-display font-bold text-xs cursor-pointer text-center"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : submitted ? (
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}

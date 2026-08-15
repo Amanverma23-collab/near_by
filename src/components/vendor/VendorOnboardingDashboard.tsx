@@ -7,7 +7,8 @@ import {
   ArrowRight,
   Clock,
   ShieldCheck,
-  Info
+  Info,
+  Home,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -71,7 +72,10 @@ export default function VendorOnboardingDashboard() {
   const [loading, setLoading] = useState(true);
 
   const fetchVendorStatus = async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     try {
       // 1. Search vendors by auth_user_id
       let { data: vendors, error } = await supabase
@@ -231,14 +235,16 @@ export default function VendorOnboardingDashboard() {
   const isShopRegistered = Boolean(vendor && vendor.name && vendor.name !== 'Pending Shop Registration');
   const isVerified = Boolean(vendor && (vendor.is_verified || vendor.verification_status === 'approved'));
 
-  // Effective subscription status (verified shops auto-default to trial if missing)
-  const effectiveSubStatus = vendor?.subscription_status || (isVerified ? 'trial' : null);
+  // Effective subscription status (strictly check if user explicitly activated a plan or trial)
+  const hasActiveSubscription = Boolean(
+    vendor?.subscription_status && ['trial', 'active', 'pro'].includes(vendor.subscription_status)
+  );
 
-  // STATE D: Subscribed / Active Live Dashboard (Or Verified Trial)
-  if (vendor && isShopRegistered && (effectiveSubStatus === 'trial' || effectiveSubStatus === 'active' || effectiveSubStatus === 'pro')) {
+  // STATE D: Subscribed / Active Live Dashboard (Only when plan or trial was selected)
+  if (vendor && isShopRegistered && isVerified && hasActiveSubscription) {
     const vendorWithSub = {
       ...vendor,
-      subscription_status: effectiveSubStatus,
+      subscription_status: vendor.subscription_status,
       subscription_expires_at: vendor.subscription_expires_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     };
     return <VendorShopDashboard vendor={vendorWithSub} onRefreshVendor={fetchVendorStatus} />;
@@ -266,12 +272,21 @@ export default function VendorOnboardingDashboard() {
                 Business
               </span>
             </div>
-            <button
-              onClick={signOut}
-              className="text-xs font-display font-bold text-ink-muted hover:text-ink cursor-pointer border border-border px-3.5 py-1.5 rounded-full hover:bg-surface transition-colors"
-            >
-              Logout
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-teal-200 bg-teal-50 text-teal-800 hover:bg-teal-100 transition-colors cursor-pointer text-xs font-display font-extrabold"
+              >
+                <Home size={14} className="text-teal-700" />
+                <span>Customer App</span>
+              </button>
+              <button
+                onClick={signOut}
+                className="text-xs font-display font-bold text-ink-muted hover:text-ink cursor-pointer border border-border px-3.5 py-1.5 rounded-full hover:bg-surface transition-colors"
+              >
+                Logout
+              </button>
+            </div>
           </div>
         </header>
 
@@ -508,12 +523,21 @@ export default function VendorOnboardingDashboard() {
               Business
             </span>
           </div>
-          <button
-            onClick={signOut}
-            className="text-xs font-display font-bold text-ink-muted hover:text-ink cursor-pointer border border-border px-3.5 py-1.5 rounded-full hover:bg-surface transition-colors"
-          >
-            Logout
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-teal-200 bg-teal-50 text-teal-800 hover:bg-teal-100 transition-colors cursor-pointer text-xs font-display font-extrabold"
+            >
+              <Home size={14} className="text-teal-700" />
+              <span>Customer App</span>
+            </button>
+            <button
+              onClick={signOut}
+              className="text-xs font-display font-bold text-ink-muted hover:text-ink cursor-pointer border border-border px-3.5 py-1.5 rounded-full hover:bg-surface transition-colors"
+            >
+              Logout
+            </button>
+          </div>
         </div>
       </header>
 

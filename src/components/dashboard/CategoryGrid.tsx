@@ -32,6 +32,7 @@ import {
 import { useLocation } from '../../context/LocationContext';
 import { useLanguage } from '../../context/LanguageContext';
 import CitySelector from '../location/CitySelector';
+import RegisterShopBanner from './RegisterShopBanner';
 
 interface ServiceInfo {
   label: string;
@@ -294,6 +295,9 @@ export default function CategoryGrid() {
           ))}
         </div>
       </section>
+
+      {/* Register Your Shop CTA Banner */}
+      <RegisterShopBanner />
 
       {/* City Change Modal */}
       <AnimatePresence>

@@ -9,7 +9,7 @@ import { useUnread } from '../../context/UnreadContext';
 export default function CustomerBottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { role } = useAuth();
+  const { session } = useAuth();
   const { t } = useLanguage();
   const { hasUnread } = useUnread();
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -24,15 +24,25 @@ export default function CustomerBottomNav() {
     };
   }, []);
 
-  // Only display for customer users
-  if (role !== 'customer') return null;
+  // Only display for logged-in sessions
+  if (!session) return null;
 
   // Hide when chat box is open
   if (isChatOpen) return null;
 
-  // Paths where bottom nav should be hidden
-  const hiddenPaths = ['/', '/location', '/vendor/register', '/vendor/pending', '/vendor/subscriptions'];
-  if (hiddenPaths.includes(location.pathname)) return null;
+  // Paths where customer bottom nav should be hidden
+  if (
+    location.pathname === '/' ||
+    location.pathname === '/location' ||
+    location.pathname.startsWith('/vendor/register') ||
+    location.pathname.startsWith('/vendor/pending') ||
+    location.pathname.startsWith('/vendor/dashboard') ||
+    location.pathname.startsWith('/vendor/subscriptions') ||
+    location.pathname.startsWith('/vendor/plan') ||
+    location.pathname.startsWith('/vendor/services')
+  ) {
+    return null;
+  }
 
   const tabs = [
     {

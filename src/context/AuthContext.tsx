@@ -3,17 +3,25 @@ import {
   useContext,
   useEffect,
   useState,
+  useCallback,
+  useRef,
   type ReactNode,
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import type { UserRole } from '../types';
 
+export type VendorStatus = 'unregistered' | 'pending' | 'approved' | 'rejected';
+
 interface AuthContextType {
   session: Session | null;
   user: User | null;
   role: UserRole;
   loading: boolean;
+  hasShop: boolean;
+  vendorStatus: VendorStatus;
+  vendorRecord: any | null;
+  refreshVendorStatus: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -22,6 +30,10 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   role: null,
   loading: true,
+  hasShop: false,
+  vendorStatus: 'unregistered',
+  vendorRecord: null,
+  refreshVendorStatus: async () => {},
   signOut: async () => {},
 });
 
@@ -30,93 +42,193 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<UserRole>(null);
   const [loading, setLoading] = useState(true);
+  const [hasShop, setHasShop] = useState(false);
+  const [vendorStatus, setVendorStatus] = useState<VendorStatus>('unregistered');
+  const [vendorRecord, setVendorRecord] = useState<any | null>(null);
 
-  const determineRole = async (u: User): Promise<UserRole> => {
-    const roleHint =
-      (localStorage.getItem('nearby_user_role') as UserRole) ||
-      (u.user_metadata?.role as UserRole);
+  const userRef = useRef<User | null>(null);
+  userRef.current = user;
 
-    try {
-      if (roleHint === 'customer') {
-        const { data: customer } = await supabase
-          .from('customers')
-          .select('id')
-          .eq('auth_user_id', u.id)
-          .maybeSingle();
-        if (customer) return 'customer';
-      }
-
-      if (roleHint === 'vendor') {
-        const { data: vendorRows } = await supabase
-          .from('vendors')
-          .select('id')
-          .eq('auth_user_id', u.id)
-          .limit(1);
-        if (vendorRows && vendorRows.length > 0) return 'vendor';
-      }
-
-      // Default order check: customers first, then vendors
-      const { data: customer } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('auth_user_id', u.id)
-        .maybeSingle();
-
-      if (customer) return 'customer';
-
-      const { data: vendorRows } = await supabase
-        .from('vendors')
-        .select('id')
-        .eq('auth_user_id', u.id)
-        .limit(1);
-
-      if (vendorRows && vendorRows.length > 0) return 'vendor';
-    } catch (err) {
-      console.warn('Error determining user role from database:', err);
+  const fetchVendorInfo = useCallback(async (u: User | null) => {
+    if (!u) {
+      setHasShop(false);
+      setVendorStatus('unregistered');
+      setVendorRecord(null);
+      return;
     }
 
-    // Fallback: If user is logged in, return roleHint or default to 'customer'
-    return roleHint || 'customer';
-  };
+    try {
+      const cleanPhone =
+        localStorage.getItem('nearby_customer_phone') ||
+        localStorage.getItem('nearby_vendor_phone') ||
+        (u.phone ? u.phone.replace(/\D/g, '').slice(-10) : '') ||
+        (u.email?.includes('@nearbe.app') ? u.email.split('@')[0] : '');
+
+      const vendorQueryPromise = (async () => {
+        let { data: vendors } = await supabase
+          .from('vendors')
+          .select('*')
+          .eq('auth_user_id', u.id);
+
+        if ((!vendors || vendors.length === 0) && cleanPhone) {
+          const { data: phoneVendors } = await supabase
+            .from('vendors')
+            .select('*')
+            .or(`phone_number.eq.${cleanPhone},phone_number.eq.+91${cleanPhone}`);
+          vendors = phoneVendors;
+        }
+        return vendors;
+      })();
+
+      // Timeout query after 1.5s to prevent hanging
+      const vendors = await Promise.race([
+        vendorQueryPromise,
+        new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 1500)),
+      ]);
+
+      if (vendors && vendors.length > 0) {
+        const realVendor =
+          vendors.find((v) => v.name && v.name !== 'Pending Shop Registration' && v.is_verified) ||
+          vendors.find((v) => v.name && v.name !== 'Pending Shop Registration') ||
+          vendors[0];
+
+        setVendorRecord(realVendor);
+
+        if (realVendor.is_verified || realVendor.verification_status === 'approved') {
+          setHasShop(true);
+          setVendorStatus('approved');
+        } else if (
+          realVendor.verification_status === 'pending' ||
+          realVendor.verification_requested_at ||
+          (realVendor.name && realVendor.name !== 'Pending Shop Registration')
+        ) {
+          setHasShop(true);
+          setVendorStatus('pending');
+        } else if (realVendor.verification_status === 'rejected') {
+          setHasShop(true);
+          setVendorStatus('rejected');
+        } else {
+          setHasShop(false);
+          setVendorStatus('unregistered');
+        }
+      } else {
+        setHasShop(false);
+        setVendorStatus('unregistered');
+        setVendorRecord(null);
+      }
+    } catch (err) {
+      console.warn('Error fetching vendor status:', err);
+      setHasShop(false);
+      setVendorStatus('unregistered');
+      setVendorRecord(null);
+    }
+  }, []);
+
+  const refreshVendorStatus = useCallback(async () => {
+    if (userRef.current) {
+      await fetchVendorInfo(userRef.current);
+    }
+  }, [fetchVendorInfo]);
 
   useEffect(() => {
+    let isMounted = true;
+
     // Helper to process session
     const processSession = async (activeSession: Session | null) => {
+      if (!isMounted) return;
       setSession(activeSession);
-      setUser(activeSession?.user ?? null);
+      const currentUser = activeSession?.user ?? null;
+      setUser(currentUser);
 
-      if (activeSession?.user) {
-        const userRole = await determineRole(activeSession.user);
-        setRole(userRole);
+      if (currentUser) {
+        setRole('customer');
+        try {
+          await fetchVendorInfo(currentUser);
+        } catch (e) {
+          console.warn('Error in fetchVendorInfo during auth init:', e);
+        }
       } else {
         setRole(null);
+        setHasShop(false);
+        setVendorStatus('unregistered');
+        setVendorRecord(null);
       }
 
-      setLoading(false);
+      if (isMounted) {
+        setLoading(false);
+      }
     };
 
-    // Get initial session
-    supabase.auth
-      .getSession()
-      .then(async ({ data: { session } }) => {
-        await processSession(session);
-      })
-      .catch(async (err) => {
+    // Check mock session in localStorage if Supabase has none
+    const getLocalSession = () => {
+      try {
+        const raw = localStorage.getItem('nearby_mock_session');
+        if (raw) return JSON.parse(raw);
+      } catch {}
+      return null;
+    };
+
+    // Hard safety timeout: Ensure loading is set to false within max 1200ms
+    const safetyTimer = setTimeout(() => {
+      if (isMounted) {
+        setLoading(false);
+      }
+    }, 1200);
+
+    // Initial session check
+    const initAuth = async () => {
+      try {
+        const sessionPromise = supabase.auth.getSession();
+        const res: any = await Promise.race([
+          sessionPromise,
+          new Promise((resolve) => setTimeout(() => resolve({ data: { session: null } }), 1000)),
+        ]);
+
+        if (res?.data?.session) {
+          await processSession(res.data.session);
+        } else {
+          const mockSess = getLocalSession();
+          await processSession(mockSess);
+        }
+      } catch (err) {
         console.error('Error fetching initial auth session:', err);
-        await processSession(null);
-      });
+        const mockSess = getLocalSession();
+        await processSession(mockSess);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+          clearTimeout(safetyTimer);
+        }
+      }
+    };
+
+    initAuth();
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      await processSession(session);
+      if (!isMounted) return;
+      if (session) {
+        await processSession(session);
+      } else {
+        const mockSess = getLocalSession();
+        await processSession(mockSess);
+      }
     });
 
-    return () => {
-      subscription.unsubscribe();
+    const handleVendorUpdate = () => {
+      if (userRef.current) fetchVendorInfo(userRef.current);
     };
-  }, []);
+    window.addEventListener('nearby_vendor_updated', handleVendorUpdate);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(safetyTimer);
+      subscription.unsubscribe();
+      window.removeEventListener('nearby_vendor_updated', handleVendorUpdate);
+    };
+  }, [fetchVendorInfo]);
 
   const signOut = async () => {
     localStorage.removeItem('nearby_mock_session');
@@ -135,10 +247,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setUser(null);
     setRole(null);
+    setHasShop(false);
+    setVendorStatus('unregistered');
+    setVendorRecord(null);
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, role, loading, signOut }}>
+    <AuthContext.Provider
+      value={{
+        session,
+        user,
+        role,
+        loading,
+        hasShop,
+        vendorStatus,
+        vendorRecord,
+        refreshVendorStatus,
+        signOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -151,3 +278,5 @@ export function useAuth() {
   }
   return context;
 }
+
+

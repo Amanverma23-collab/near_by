@@ -1,7 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || 'https://rvgimglpwcbyuzmttfln.supabase.co';
-const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2Z2ltZ2xwd2NieXV6bXR0ZmxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NzQwMzcsImV4cCI6MjA5OTM1MDAzN30.jeb1tSBS9RxEuJW5OXKd81yl8sGwu_ENsA79kyDbou8';
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || '';
+const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || '';
 
 export const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
@@ -10,28 +10,37 @@ const isValidUrl = (url: string): boolean => {
   if (!url) return false;
   try {
     const parsed = new URL(url);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !url.includes('rvgimglpwcbyuzmttfln');
   } catch {
     return false;
   }
 };
 
 const hasValidCreds =
-  SUPABASE_URL &&
+  !DEV_MODE &&
+  Boolean(SUPABASE_URL) &&
   isValidUrl(SUPABASE_URL) &&
   !SUPABASE_URL.includes('your-supabase-url-here') &&
-  SUPABASE_ANON_KEY &&
+  Boolean(SUPABASE_ANON_KEY) &&
   !SUPABASE_ANON_KEY.includes('your-supabase-anon-key-here');
 
 let supabaseClient: any;
 
 if (hasValidCreds) {
-  supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-} else {
-  console.warn(
-    '⚠️ NearBy: Dev Mode or missing Supabase backend. Initializing Local Mock Client.'
-  );
+  try {
+    supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    });
+  } catch (e) {
+    console.warn('Failed to initialize Supabase client, falling back to mock:', e);
+  }
+}
 
+if (!supabaseClient) {
   // Mock Auth Callback Listeners
   const authListeners = new Set<(event: string, session: any) => void>();
 
@@ -52,7 +61,7 @@ if (hasValidCreds) {
     }
   };
 
-  const getMockDb = (table: string) => {
+  const getMockDb = (table: string): any[] => {
     try {
       return JSON.parse(localStorage.getItem(`nearby_mock_db_${table}`) || '[]');
     } catch {
@@ -66,6 +75,61 @@ if (hasValidCreds) {
     } catch (e) {
       console.error(`Failed to update mock db for ${table}`, e);
     }
+  };
+
+  const createQueryChain = (table: string, filters: ((item: any) => boolean)[] = []) => {
+    const applyFilters = () => {
+      let items = getMockDb(table);
+      for (const filter of filters) {
+        items = items.filter(filter);
+      }
+      return items;
+    };
+
+    const chain: any = {
+      eq: (col: string, val: any) => {
+        return createQueryChain(table, [...filters, (item: any) => item[col] === val]);
+      },
+      neq: (col: string, val: any) => {
+        return createQueryChain(table, [...filters, (item: any) => item[col] !== val]);
+      },
+      is: (col: string, val: any) => {
+        return createQueryChain(table, [...filters, (item: any) => val === null ? (item[col] === null || item[col] === undefined) : item[col] === val]);
+      },
+      in: (col: string, vals: any[]) => {
+        return createQueryChain(table, [...filters, (item: any) => Array.isArray(vals) && vals.includes(item[col])]);
+      },
+      or: (orString: string) => {
+        return createQueryChain(table, [
+          ...filters,
+          (item: any) => {
+            // e.g. "phone_number.eq.123,phone_number.eq.+91123"
+            const parts = orString.split(',');
+            return parts.some((p) => {
+              const [c, op, v] = p.split('.');
+              if (op === 'eq') return item[c] === v;
+              return false;
+            });
+          },
+        ]);
+      },
+      order: () => chain,
+      limit: () => chain,
+      maybeSingle: async () => {
+        const items = applyFilters();
+        return { data: items[0] || null, error: null };
+      },
+      single: async () => {
+        const items = applyFilters();
+        return { data: items[0] || null, error: items[0] ? null : new Error('Not found') };
+      },
+      then: (resolve: any) => {
+        const items = applyFilters();
+        return Promise.resolve({ data: items, count: items.length, error: null }).then(resolve);
+      },
+    };
+
+    return chain;
   };
 
   supabaseClient = {
@@ -128,7 +192,6 @@ if (hasValidCreds) {
         const users = getMockUsers();
         let match = users[identifier] || (email ? users[email] : null) || (phone ? users[phone] : null);
 
-        // Strict Check 1: User Must Be Registered
         if (!match) {
           return {
             data: { user: null, session: null },
@@ -136,7 +199,6 @@ if (hasValidCreds) {
           };
         }
 
-        // Strict Check 2: Password Match
         if (match.password !== password) {
           return {
             data: { user: null, session: null },
@@ -167,7 +229,7 @@ if (hasValidCreds) {
       signInWithOtp: async ({ phone }: any) => {
         return { data: { user: null, session: null }, error: null };
       },
-      verifyOtp: async ({ phone, token }: any) => {
+      verifyOtp: async ({ phone }: any) => {
         const userId = 'mock-user-' + Math.random().toString(36).substring(2, 11);
         const mockUser = {
           id: userId,
@@ -190,11 +252,13 @@ if (hasValidCreds) {
 
         return { data: { user: mockUser, session: mockSession }, error: null };
       },
-      updateUser: async ({ password }: any) => {
+      updateUser: async ({ data }: any) => {
         const session = getSessionFromStorage();
         if (!session?.user) {
           return { data: { user: null }, error: new Error('Mock Auth: No active session found.') };
         }
+        session.user.user_metadata = { ...(session.user.user_metadata || {}), ...data };
+        localStorage.setItem('nearby_mock_session', JSON.stringify(session));
         return { data: { user: session.user }, error: null };
       },
       signOut: async () => {
@@ -221,45 +285,24 @@ if (hasValidCreds) {
     },
     from: (table: string) => {
       return {
-        select: (columns: string = '*') => {
-          const createQuery = (col?: string, val?: any) => {
-            const getFiltered = () => {
-              const items = getMockDb(table);
-              if (!col) return items;
-              return items.filter((i: any) => i[col] === val);
-            };
+        select: (_columns: string = '*', options?: any) => {
+          const query = createQueryChain(table);
+          if (options?.head || options?.count) {
             return {
-              maybeSingle: async () => {
-                const items = getFiltered();
-                return { data: items[0] || null, error: null };
+              ...query,
+              then: (resolve: any) => {
+                const items = getMockDb(table);
+                return Promise.resolve({ data: null, count: items.length, error: null }).then(resolve);
               },
-              single: async () => {
-                const items = getFiltered();
-                return { data: items[0] || null, error: items[0] ? null : new Error('Not found') };
-              },
-              order: () => createQuery(col, val),
-              limit: () => createQuery(col, val),
-              then: (resolve: any) => resolve({ data: getFiltered(), error: null }),
             };
-          };
-
-          return {
-            eq: (col: string, val: any) => createQuery(col, val),
-            maybeSingle: async () => {
-              const items = getMockDb(table);
-              return { data: items[0] || null, error: null };
-            },
-            single: async () => {
-              const items = getMockDb(table);
-              return { data: items[0] || null, error: items[0] ? null : new Error('Not found') };
-            },
-          };
+          }
+          return query;
         },
         insert: async (data: any) => {
           const items = getMockDb(table);
           const records = Array.isArray(data) ? data : [data];
           const newRecords = records.map((r) => ({
-            id: 'mock-id-' + Math.random().toString(36).substring(2, 11),
+            id: r.id || 'mock-id-' + Math.random().toString(36).substring(2, 11),
             created_at: new Date().toISOString(),
             ...r,
           }));
@@ -268,27 +311,78 @@ if (hasValidCreds) {
           return { data: Array.isArray(data) ? newRecords : newRecords[0], error: null };
         },
         update: (updateData: any) => {
-          return {
-            eq: async (col: string, val: any) => {
-              const items = getMockDb(table);
-              const updated = items.map((item: any) => {
-                if (item[col] === val) {
+          const makeUpdateChain = (filters: ((item: any) => boolean)[] = []) => {
+            const executeUpdate = () => {
+              let items = getMockDb(table);
+              let updated = items.map((item: any) => {
+                const matches = filters.every((fn) => fn(item));
+                if (matches) {
                   return { ...item, ...updateData };
                 }
                 return item;
               });
               setMockDb(table, updated);
               return { data: updateData, error: null };
+            };
+
+            const chain: any = {
+              eq: (col: string, val: any) => {
+                const nextFilters = [...filters, (item: any) => item[col] === val];
+                return makeUpdateChain(nextFilters);
+              },
+              is: (col: string, val: any) => {
+                const nextFilters = [
+                  ...filters,
+                  (item: any) => val === null ? (item[col] === null || item[col] === undefined) : item[col] === val,
+                ];
+                return makeUpdateChain(nextFilters);
+              },
+              or: (orString: string) => {
+                const parts = orString.split(',');
+                const nextFilters = [
+                  ...filters,
+                  (item: any) =>
+                    parts.some((p) => {
+                      const [c, op, v] = p.split('.');
+                      if (op === 'eq') return item[c] === v;
+                      return false;
+                    }),
+                ];
+                return makeUpdateChain(nextFilters);
+              },
+              then: (resolve: any) => {
+                return Promise.resolve(executeUpdate()).then(resolve);
+              },
+            };
+            return chain;
+          };
+
+          return makeUpdateChain();
+        },
+        delete: () => {
+          return {
+            eq: async (col: string, val: any) => {
+              const items = getMockDb(table);
+              const filtered = items.filter((i: any) => i[col] !== val);
+              setMockDb(table, filtered);
+              return { data: null, error: null };
             },
           };
         },
       };
     },
+    channel: (_channelName: string) => ({
+      on: () => ({
+        subscribe: () => ({ unsubscribe: () => {} }),
+      }),
+      subscribe: () => ({ unsubscribe: () => {} }),
+    }),
+    removeChannel: (_channel: any) => {},
     storage: {
       createBucket: async () => ({ data: null, error: null }),
-      from: (bucket: string) => ({
-        upload: async (path: string, file: any) => ({ data: { path }, error: null }),
-        getPublicUrl: (path: string) => ({
+      from: (_bucket: string) => ({
+        upload: async (path: string, _file: any) => ({ data: { path }, error: null }),
+        getPublicUrl: (_path: string) => ({
           data: { publicUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&q=80&w=600' },
         }),
       }),

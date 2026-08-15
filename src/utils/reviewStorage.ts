@@ -119,7 +119,24 @@ export async function saveNewReview(
         dbReviews = vendorRow.reviews;
       }
 
-      const mergedDbReviews = [newReviewItem, ...dbReviews.filter((r: any) => r.id !== newReviewItem.id)];
+      const cleanPhone = (currentPhone || '').replace(/\D/g, '').slice(-10);
+      const cleanName = (reviewData.reviewerName || '').trim().toLowerCase();
+
+      // Filter out any existing review by this user (by phone or name or review ID)
+      const filteredDbReviews = dbReviews.filter((r: any) => {
+        if (!r) return false;
+        if (r.id === newReviewItem.id) return false;
+        if (cleanPhone) {
+          const rPhone = (r.reviewerPhone || '').replace(/\D/g, '').slice(-10);
+          if (rPhone && rPhone === cleanPhone) return false;
+        }
+        if (cleanName && r.reviewerName && r.reviewerName.trim().toLowerCase() === cleanName) {
+          return false;
+        }
+        return true;
+      });
+
+      const mergedDbReviews = [newReviewItem, ...filteredDbReviews];
       const avgRating =
         mergedDbReviews.length > 0
           ? Math.round((mergedDbReviews.reduce((acc, r) => acc + (r.rating || 5), 0) / mergedDbReviews.length) * 10) / 10
