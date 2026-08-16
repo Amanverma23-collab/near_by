@@ -29,6 +29,7 @@ const LocationContext = createContext<LocationContextType>({
 });
 
 import { getCurrentLocation, startWatchingLocation } from '../utils/nativeGeolocation';
+import { INDIAN_CITY_COORDINATES } from '../components/location/CitySelector';
 
 export function LocationProvider({ children }: { children: ReactNode }) {
   const [location, setLocationState] = useState<LocationData | null>(null);
@@ -47,33 +48,43 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     }
     setLoading(false);
 
-    // 2. Silently acquire fresh live device GPS coordinates
-    getCurrentLocation()
-      .then((coords) => {
-        setLocationState((prev) => {
-          const updated: LocationData = {
-            city: prev?.city || DEFAULT_CITY,
-            latitude: coords.latitude,
-            longitude: coords.longitude,
-          };
-          try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-            localStorage.setItem('nearby_current_gps', JSON.stringify(coords));
-          } catch {}
-          return updated;
-        });
-      })
-      .catch((e) => {
-        console.warn('Silent live GPS acquisition notice:', e);
-      });
+    const isManualSelected = localStorage.getItem('nearby_manual_location_selected') === 'true';
 
-    // 3. Watch for live device movement continuously
+    // 2. Silently acquire fresh live device GPS coordinates ONLY if user hasn't explicitly chosen a manual location
+    if (!isManualSelected) {
+      getCurrentLocation()
+        .then((coords) => {
+          if (localStorage.getItem('nearby_manual_location_selected') === 'true') return;
+          setLocationState((prev) => {
+            const updated: LocationData = {
+              city: prev?.city || DEFAULT_CITY,
+              latitude: coords.latitude,
+              longitude: coords.longitude,
+              isManual: false,
+            };
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+              localStorage.setItem('nearby_current_gps', JSON.stringify(coords));
+            } catch {}
+            return updated;
+          });
+        })
+        .catch((e) => {
+          console.warn('Silent live GPS acquisition notice:', e);
+        });
+    }
+
+    // 3. Watch for live device movement continuously (ignored if manual location is active)
     const cleanupWatcher = startWatchingLocation((coords) => {
+      const isManual = localStorage.getItem('nearby_manual_location_selected') === 'true';
+      if (isManual) return; // Preserve user's manually chosen location
+
       setLocationState((prev) => {
         const updated: LocationData = {
           city: prev?.city || DEFAULT_CITY,
           latitude: coords.latitude,
           longitude: coords.longitude,
+          isManual: false,
         };
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
@@ -113,11 +124,21 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   };
 
   const setCityManually = (city: string, coords?: { latitude: number; longitude: number }) => {
+    const resolvedCoords =
+      coords && typeof coords.latitude === 'number' && typeof coords.longitude === 'number'
+        ? coords
+        : (city && INDIAN_CITY_COORDINATES[city]) || { latitude: 27.6094, longitude: 75.1398 };
+
     const data: LocationData = {
       city: city || DEFAULT_CITY,
-      latitude: coords?.latitude ?? null,
-      longitude: coords?.longitude ?? null,
+      latitude: resolvedCoords.latitude,
+      longitude: resolvedCoords.longitude,
+      isManual: true,
     };
+
+    localStorage.setItem('nearby_manual_location_selected', 'true');
+    localStorage.setItem('nearby_current_gps', JSON.stringify(resolvedCoords));
+    window.dispatchEvent(new CustomEvent('nearby_gps_updated', { detail: resolvedCoords }));
     setLocation(data);
   };
 

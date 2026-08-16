@@ -50,18 +50,7 @@ export function calculateHaversineDistanceKm(
  * Resolves current customer GPS or city coordinates from localStorage
  */
 export function getUserCurrentCoordinates(): { latitude: number; longitude: number } {
-  // 1. Try active live GPS coordinates cached in localStorage
-  try {
-    const rawGps = localStorage.getItem('nearby_current_gps');
-    if (rawGps) {
-      const parsed = JSON.parse(rawGps);
-      if (parsed && typeof parsed.latitude === 'number' && typeof parsed.longitude === 'number') {
-        return { latitude: Number(parsed.latitude), longitude: Number(parsed.longitude) };
-      }
-    }
-  } catch {}
-
-  // 2. Try nearby_location from LocationContext
+  // 1. Try nearby_location from LocationContext (active selected location or live GPS)
   try {
     const rawLoc = localStorage.getItem('nearby_location');
     if (rawLoc) {
@@ -73,6 +62,17 @@ export function getUserCurrentCoordinates(): { latitude: number; longitude: numb
         if (parsed.city && INDIAN_CITY_COORDINATES[parsed.city]) {
           return INDIAN_CITY_COORDINATES[parsed.city];
         }
+      }
+    }
+  } catch {}
+
+  // 2. Try nearby_current_gps cached coordinates
+  try {
+    const rawGps = localStorage.getItem('nearby_current_gps');
+    if (rawGps) {
+      const parsed = JSON.parse(rawGps);
+      if (parsed && typeof parsed.latitude === 'number' && typeof parsed.longitude === 'number') {
+        return { latitude: Number(parsed.latitude), longitude: Number(parsed.longitude) };
       }
     }
   } catch {}

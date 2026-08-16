@@ -190,12 +190,13 @@ export default function CategoryGrid() {
   const { t } = useLanguage();
   const [cityModalOpen, setCityModalOpen] = useState(false);
 
-  const handleCitySelect = (city: string) => {
-    setCityManually(city);
+  const handleCitySelect = (city: string, coords?: { latitude: number; longitude: number }) => {
+    setCityManually(city, coords);
     setCityModalOpen(false);
   };
 
   const handleRedetect = () => {
+    localStorage.removeItem('nearby_manual_location_selected');
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
@@ -211,9 +212,9 @@ export default function CategoryGrid() {
               data.address?.village ||
               data.address?.state_district ||
               'Unknown';
-            setCityManually(city);
+            setCityManually(city, { latitude, longitude });
           } catch {
-            setCityManually('Unknown');
+            setCityManually('Unknown', { latitude, longitude });
           }
           setCityModalOpen(false);
         },

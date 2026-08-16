@@ -27,6 +27,7 @@ export interface LocationData {
   city: string;
   latitude: number | null;
   longitude: number | null;
+  isManual?: boolean;
 }
 
 export interface ServiceCategory {
