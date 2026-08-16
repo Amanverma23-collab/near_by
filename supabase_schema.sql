@@ -58,6 +58,9 @@ CREATE TABLE IF NOT EXISTS public.vendors (
     services_offered JSONB DEFAULT '[]', -- JSON array of {name, price}
     reviews JSONB DEFAULT '[]',          -- JSON array of {id, reviewerName, rating, comment, daysAgo}
     review_count INTEGER DEFAULT 0,
+    profile_views INTEGER DEFAULT 0,
+    call_clicks INTEGER DEFAULT 0,
+    whatsapp_clicks INTEGER DEFAULT 0,
     verification_requested_at TIMESTAMP WITH TIME ZONE,
     verification_status TEXT DEFAULT NULL CHECK (verification_status IN ('pending', 'approved', 'rejected')),
     subscription_status TEXT DEFAULT NULL,

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { dummyVendors, type Vendor } from '../data/dummyVendors';
 import { getEffectiveShopStatus } from '../utils/shopTiming';
-import { fetchCombinedVendors, trackVendorCall, trackVendorWhatsApp } from '../utils/vendorSync';
+import { fetchCombinedVendors, trackVendorCall, trackVendorWhatsApp, trackVendorView } from '../utils/vendorSync';
 import AddReviewModal from '../components/customer/AddReviewModal';
 import { getSavedReviews, saveNewReview, deleteReview } from '../utils/reviewStorage';
 import { useAuth } from '../context/AuthContext';
@@ -140,12 +140,10 @@ export default function VendorDetailPage() {
         setCustomReviews(saved);
       });
 
-      // Track real profile view exactly 1 time per page visit
+      // Track real profile view exactly 1 time per page visit (in DB & localStorage)
       if (viewTrackedRef.current !== vendorId) {
         viewTrackedRef.current = vendorId;
-        const viewKey = `nearby_views_${vendorId}`;
-        const currentViews = Number(localStorage.getItem(viewKey) || 0);
-        localStorage.setItem(viewKey, String(currentViews + 1));
+        trackVendorView(vendor?.id || vendorId, vendor?.phoneNumber);
       }
     }
   }, [vendorId]);

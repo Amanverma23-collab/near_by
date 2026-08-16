@@ -90,7 +90,7 @@ export async function fetchCombinedVendors(): Promise<Vendor[]> {
   return dummyVendors;
 }
 
-export function trackVendorCall(vendorId?: string, phoneNumber?: string) {
+export async function trackVendorCall(vendorId?: string, phoneNumber?: string) {
   const cleanPhone = (phoneNumber || '').replace(/\D/g, '').slice(-10);
   if (vendorId) {
     const key = `nearby_calls_${vendorId}`;
@@ -102,9 +102,26 @@ export function trackVendorCall(vendorId?: string, phoneNumber?: string) {
     const curr = Number(localStorage.getItem(key) || 0);
     localStorage.setItem(key, String(curr + 1));
   }
+
+  // Update in central Supabase database
+  try {
+    if (vendorId) {
+      const { data: v } = await supabase.from('vendors').select('call_clicks').eq('id', vendorId).maybeSingle();
+      const newCount = (Number(v?.call_clicks) || 0) + 1;
+      await supabase.from('vendors').update({ call_clicks: newCount }).eq('id', vendorId);
+    } else if (cleanPhone) {
+      const { data: v } = await supabase.from('vendors').select('id, call_clicks').eq('phone_number', cleanPhone).maybeSingle();
+      if (v) {
+        const newCount = (Number(v.call_clicks) || 0) + 1;
+        await supabase.from('vendors').update({ call_clicks: newCount }).eq('id', v.id);
+      }
+    }
+  } catch (e) {
+    // Non-blocking background analytics
+  }
 }
 
-export function trackVendorWhatsApp(vendorId?: string, phoneNumber?: string) {
+export async function trackVendorWhatsApp(vendorId?: string, phoneNumber?: string) {
   const cleanPhone = (phoneNumber || '').replace(/\D/g, '').slice(-10);
   if (vendorId) {
     const key = `nearby_wa_${vendorId}`;
@@ -115,5 +132,53 @@ export function trackVendorWhatsApp(vendorId?: string, phoneNumber?: string) {
     const key = `nearby_wa_${cleanPhone}`;
     const curr = Number(localStorage.getItem(key) || 0);
     localStorage.setItem(key, String(curr + 1));
+  }
+
+  // Update in central Supabase database
+  try {
+    if (vendorId) {
+      const { data: v } = await supabase.from('vendors').select('whatsapp_clicks').eq('id', vendorId).maybeSingle();
+      const newCount = (Number(v?.whatsapp_clicks) || 0) + 1;
+      await supabase.from('vendors').update({ whatsapp_clicks: newCount }).eq('id', vendorId);
+    } else if (cleanPhone) {
+      const { data: v } = await supabase.from('vendors').select('id, whatsapp_clicks').eq('phone_number', cleanPhone).maybeSingle();
+      if (v) {
+        const newCount = (Number(v.whatsapp_clicks) || 0) + 1;
+        await supabase.from('vendors').update({ whatsapp_clicks: newCount }).eq('id', v.id);
+      }
+    }
+  } catch (e) {
+    // Non-blocking background analytics
+  }
+}
+
+export async function trackVendorView(vendorId?: string, phoneNumber?: string) {
+  const cleanPhone = (phoneNumber || '').replace(/\D/g, '').slice(-10);
+  if (vendorId) {
+    const key = `nearby_views_${vendorId}`;
+    const curr = Number(localStorage.getItem(key) || 0);
+    localStorage.setItem(key, String(curr + 1));
+  }
+  if (cleanPhone && cleanPhone !== vendorId) {
+    const key = `nearby_views_${cleanPhone}`;
+    const curr = Number(localStorage.getItem(key) || 0);
+    localStorage.setItem(key, String(curr + 1));
+  }
+
+  // Update in central Supabase database
+  try {
+    if (vendorId) {
+      const { data: v } = await supabase.from('vendors').select('profile_views').eq('id', vendorId).maybeSingle();
+      const newCount = (Number(v?.profile_views) || 0) + 1;
+      await supabase.from('vendors').update({ profile_views: newCount }).eq('id', vendorId);
+    } else if (cleanPhone) {
+      const { data: v } = await supabase.from('vendors').select('id, profile_views').eq('phone_number', cleanPhone).maybeSingle();
+      if (v) {
+        const newCount = (Number(v.profile_views) || 0) + 1;
+        await supabase.from('vendors').update({ profile_views: newCount }).eq('id', v.id);
+      }
+    }
+  } catch (e) {
+    // Non-blocking background analytics
   }
 }
