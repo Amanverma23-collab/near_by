@@ -38,21 +38,51 @@ export interface ChatConversation {
   reportReason?: string;
 }
 
-const STORAGE_CONVERSATIONS_KEY = 'nearby_chat_conversations_v1';
-const STORAGE_MESSAGES_KEY = 'nearby_chat_messages_v1';
+// Helper to retrieve active chat context for current user
+export function getActiveChatContext(): {
+  cleanPhone: string;
+  customerId: string;
+  customerName: string;
+  vendorId?: string;
+} {
+  const phone = (
+    localStorage.getItem('nearby_customer_phone') ||
+    localStorage.getItem('nearby_vendor_phone') ||
+    ''
+  ).replace(/\D/g, '').slice(-10);
+
+  const name = localStorage.getItem('nearby_customer_name') || 'Customer';
+  const vendorId = localStorage.getItem('nearby_vendor_id') || undefined;
+  const customerId = phone ? `cust-${phone}` : 'cust-anonymous';
+
+  return { cleanPhone: phone, customerId, customerName: name, vendorId };
+}
+
+// Generate deterministic conversation ID
+export function getConversationId(vendorId: string, customerId: string): string {
+  const cleanV = vendorId.replace(/^conv-/, '');
+  const cleanC = customerId.replace(/^cust-/, '');
+  return `conv-${cleanV}-${cleanC}`;
+}
+
+const getStorageConvsKey = () => {
+  const ctx = getActiveChatContext();
+  return `nearby_chat_conversations_v3_${ctx.cleanPhone || 'guest'}`;
+};
+
+const getStorageMsgsKey = () => {
+  const ctx = getActiveChatContext();
+  return `nearby_chat_messages_v3_${ctx.cleanPhone || 'guest'}`;
+};
 
 const INITIAL_CONVERSATIONS: ChatConversation[] = [];
-
 const INITIAL_MESSAGES: Record<string, ChatMessage[]> = {};
 
 // Helper: load conversations from local storage
 export function getSavedConversations(): ChatConversation[] {
   try {
-    const raw = localStorage.getItem(STORAGE_CONVERSATIONS_KEY);
-    if (!raw) {
-      localStorage.setItem(STORAGE_CONVERSATIONS_KEY, JSON.stringify(INITIAL_CONVERSATIONS));
-      return INITIAL_CONVERSATIONS;
-    }
+    const raw = localStorage.getItem(getStorageConvsKey());
+    if (!raw) return INITIAL_CONVERSATIONS;
     return JSON.parse(raw);
   } catch {
     return INITIAL_CONVERSATIONS;
@@ -62,7 +92,7 @@ export function getSavedConversations(): ChatConversation[] {
 // Helper: save conversations to local storage
 export function saveConversations(conversations: ChatConversation[]): void {
   try {
-    localStorage.setItem(STORAGE_CONVERSATIONS_KEY, JSON.stringify(conversations));
+    localStorage.setItem(getStorageConvsKey(), JSON.stringify(conversations));
   } catch (err) {
     console.error('Error saving conversations:', err);
   }
@@ -71,11 +101,8 @@ export function saveConversations(conversations: ChatConversation[]): void {
 // Helper: load messages map
 export function getSavedMessagesMap(): Record<string, ChatMessage[]> {
   try {
-    const raw = localStorage.getItem(STORAGE_MESSAGES_KEY);
-    if (!raw) {
-      localStorage.setItem(STORAGE_MESSAGES_KEY, JSON.stringify(INITIAL_MESSAGES));
-      return INITIAL_MESSAGES;
-    }
+    const raw = localStorage.getItem(getStorageMsgsKey());
+    if (!raw) return INITIAL_MESSAGES;
     return JSON.parse(raw);
   } catch {
     return INITIAL_MESSAGES;
@@ -85,7 +112,7 @@ export function getSavedMessagesMap(): Record<string, ChatMessage[]> {
 // Helper: save messages map
 export function saveMessagesMap(messagesMap: Record<string, ChatMessage[]>): void {
   try {
-    localStorage.setItem(STORAGE_MESSAGES_KEY, JSON.stringify(messagesMap));
+    localStorage.setItem(getStorageMsgsKey(), JSON.stringify(messagesMap));
   } catch (err) {
     console.error('Error saving messages:', err);
   }
@@ -95,36 +122,45 @@ export function saveMessagesMap(messagesMap: Record<string, ChatMessage[]>): voi
 export function getOrCreateConversation({
   vendorId,
   vendorName,
+  vendorPhone,
   vendorShopPhoto,
   vendorSubService,
-  customerId = 'cust-current',
-  customerName = 'Verified Customer',
-  customerPhone = '+91 9876543210',
+  customerId,
+  customerName,
+  customerPhone,
 }: {
   vendorId: string;
   vendorName: string;
+  vendorPhone?: string;
   vendorShopPhoto?: string;
   vendorSubService?: string;
   customerId?: string;
   customerName?: string;
   customerPhone?: string;
 }): ChatConversation {
+  const ctx = getActiveChatContext();
+  const effectiveCustomerId = customerId || ctx.customerId;
+  const effectiveCustomerName = customerName || ctx.customerName;
+  const effectiveCustomerPhone = customerPhone || ctx.cleanPhone;
+  const convId = getConversationId(vendorId, effectiveCustomerId);
+
   const conversations = getSavedConversations();
   const existing = conversations.find(
-    (c) => c.vendorId === vendorId && c.customerId === customerId
+    (c) => c.id === convId || (c.vendorId === vendorId && c.customerId === effectiveCustomerId)
   );
 
   if (existing) return existing;
 
   const newConv: ChatConversation = {
-    id: `conv-${Date.now()}`,
+    id: convId,
     vendorId,
     vendorName,
+    vendorPhone,
     vendorShopPhoto,
     vendorSubService,
-    customerId,
-    customerName,
-    customerPhone,
+    customerId: effectiveCustomerId,
+    customerName: effectiveCustomerName,
+    customerPhone: effectiveCustomerPhone,
     lastMessage: 'Chat started',
     lastMessageTime: new Date().toISOString(),
     unreadCountCustomer: 0,
@@ -157,16 +193,41 @@ export function getConversationMessages(conversationId: string): ChatMessage[] {
   return map[conversationId] || [];
 }
 
-// Asynchronously sync chat messages with Supabase for real-time cross-device messaging
+// Asynchronously sync chat messages with Supabase with STRICT privacy filtering
 export function syncSupabaseChatMessages(onUpdated?: () => void): void {
   (async () => {
     try {
+      const ctx = getActiveChatContext();
+      if (!ctx.cleanPhone && !ctx.customerId) return;
+
       const { data, error } = await supabase
         .from('chat_messages')
         .select('*')
+        .neq('conversation_id', '__system__')
         .order('created_at', { ascending: true });
 
       if (error || !data || !Array.isArray(data) || data.length === 0) return;
+
+      // Filter: only keep messages belonging strictly to current user as customer OR as vendor
+      const filteredData = data.filter((row: any) => {
+        if (!row.conversation_id || row.conversation_id === '__system__') return false;
+        const rCustPhone = (row.customer_phone || '').replace(/\D/g, '').slice(-10);
+        const rVendPhone = (row.vendor_phone || '').replace(/\D/g, '').slice(-10);
+        const rCustId = row.customer_id || '';
+        const rVendId = row.vendor_id || '';
+
+        const isAsCustomer =
+          (ctx.cleanPhone && rCustPhone === ctx.cleanPhone) ||
+          (ctx.customerId && rCustId === ctx.customerId) ||
+          (ctx.cleanPhone && rCustId.includes(ctx.cleanPhone));
+
+        const isAsVendor =
+          (ctx.vendorId && (rVendId === ctx.vendorId || rVendId.includes(ctx.vendorId))) ||
+          (ctx.cleanPhone && rVendPhone === ctx.cleanPhone) ||
+          (ctx.cleanPhone && rVendId.includes(ctx.cleanPhone));
+
+        return isAsCustomer || isAsVendor;
+      });
 
       const localConvs = getSavedConversations();
       const localMap = getSavedMessagesMap();
@@ -174,8 +235,8 @@ export function syncSupabaseChatMessages(onUpdated?: () => void): void {
 
       // Group messages by conversation_id
       const grouped: Record<string, any[]> = {};
-      data.forEach((row: any) => {
-        const convId = row.conversation_id || `conv-${row.vendor_id}`;
+      filteredData.forEach((row: any) => {
+        const convId = row.conversation_id || `conv-${row.vendor_id}-${row.customer_id}`;
         if (!grouped[convId]) grouped[convId] = [];
         grouped[convId].push(row);
       });
@@ -192,7 +253,7 @@ export function syncSupabaseChatMessages(onUpdated?: () => void): void {
         ).length;
 
         // Ensure conversation exists locally
-        let conv = localConvs.find((c) => c.id === convId || c.vendorId === first.vendor_id);
+        let conv = localConvs.find((c) => c.id === convId);
         if (!conv) {
           conv = {
             id: convId,
@@ -201,7 +262,7 @@ export function syncSupabaseChatMessages(onUpdated?: () => void): void {
             vendorPhone: first.vendor_phone,
             vendorShopPhoto: first.vendor_shop_photo,
             vendorSubService: first.vendor_sub_service || 'General Services',
-            customerId: first.customer_id || 'cust-current',
+            customerId: first.customer_id,
             customerName: first.customer_name || 'Customer',
             customerPhone: first.customer_phone || '',
             lastMessage: last.text || 'Message received',
@@ -224,7 +285,7 @@ export function syncSupabaseChatMessages(onUpdated?: () => void): void {
           hasChanges = true;
         }
 
-        // Map messages and merge with recent local optimistic messages so in-flight messages do not flicker
+        // Map messages and merge with recent local optimistic messages
         const existingLocal = localMap[convId] || [];
         const dbIds = new Set(rows.map((r: any) => r.id));
         const pendingOptimistic = existingLocal.filter(

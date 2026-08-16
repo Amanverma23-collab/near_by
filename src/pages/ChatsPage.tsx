@@ -89,21 +89,30 @@ export default function ChatsPage() {
   };
 
   const filteredConversations = conversations.filter((conv) => {
+    if (!conv || conv.id === '__system__' || conv.vendorId === '__system__') return false;
+
     if (userRole === 'vendor') {
       const convVendorPhone = (conv.vendorPhone || conv.vendorId || '').replace(/\D/g, '').slice(-10);
       const matchesVendor =
         conv.vendorId === user?.id ||
         (userCleanPhone && convVendorPhone === userCleanPhone) ||
-        (userCleanPhone && conv.vendorId.includes(userCleanPhone)) ||
-        true; // Ensure all vendor customer chats show in vendor view
+        (userCleanPhone && conv.vendorId.includes(userCleanPhone));
       if (!matchesVendor) return false;
+    } else {
+      // Customer mode: strictly show only conversations started by this customer
+      const convCustomerPhone = (conv.customerPhone || '').replace(/\D/g, '').slice(-10);
+      const matchesCustomer =
+        (userCleanPhone && convCustomerPhone === userCleanPhone) ||
+        (user?.id && conv.customerId === user.id) ||
+        (userCleanPhone && conv.customerId.includes(userCleanPhone));
+      if (!matchesCustomer) return false;
     }
 
-    const name = userRole === 'customer' ? conv.vendorName : conv.customerName;
+    const name = userRole === 'customer' ? (conv.vendorName || 'Nearby Shop') : (conv.customerName || 'Customer');
     const q = searchQuery.toLowerCase().trim();
     return (
       name.toLowerCase().includes(q) ||
-      conv.lastMessage.toLowerCase().includes(q) ||
+      (conv.lastMessage && conv.lastMessage.toLowerCase().includes(q)) ||
       (conv.vendorSubService && conv.vendorSubService.toLowerCase().includes(q))
     );
   });

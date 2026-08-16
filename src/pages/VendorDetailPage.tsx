@@ -124,11 +124,27 @@ export default function VendorDetailPage() {
 
   const handleStartChat = () => {
     if (!vendor) return;
+    const cleanCustomerPhone = (
+      localStorage.getItem('nearby_customer_phone') ||
+      user?.phone ||
+      user?.user_metadata?.phone_number ||
+      ''
+    ).replace(/\D/g, '').slice(-10);
+    const customerDisplayName =
+      localStorage.getItem('nearby_customer_name') ||
+      user?.user_metadata?.full_name ||
+      'Customer';
+    const effectiveCustomerId = user?.id || (cleanCustomerPhone ? `cust-${cleanCustomerPhone}` : 'cust-guest');
+
     const conv = getOrCreateConversation({
       vendorId: vendor.id || vendorId || 'v-1',
       vendorName: vendor.name,
+      vendorPhone: vendor.phoneNumber,
       vendorShopPhoto: vendor.shopImages?.[0],
       vendorSubService: vendor.subService,
+      customerId: effectiveCustomerId,
+      customerName: customerDisplayName,
+      customerPhone: cleanCustomerPhone,
     });
     setActiveChatConv(conv);
     setIsChatModalOpen(true);
