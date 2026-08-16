@@ -16,11 +16,6 @@ import ChatBoxModal from '../components/chat/ChatBoxModal';
 import { getOrCreateConversation } from '../utils/chatStorage';
 import type { ChatConversation } from '../utils/chatStorage';
 import BrandLoader from '../components/ui/BrandLoader';
-import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { useGSAP } from '@gsap/react';
-
-gsap.registerPlugin(ScrollTrigger);
 
 /* ──────────────────── WhatsApp SVG Icon ──────────────────── */
 const WhatsAppIcon = ({ size = 16, className = '' }) => (
@@ -211,122 +206,6 @@ export default function VendorDetailPage() {
 
   const waMsg = encodeURIComponent('Hi, I found your business on NearBy and would like to inquire about your services.');
 
-  /* ── GSAP ScrollTrigger Animation Refs ── */
-  const pageContainerRef = useRef<HTMLDivElement>(null);
-  const heroImageRef = useRef<HTMLDivElement>(null);
-  const actionButtonsRef = useRef<HTMLDivElement>(null);
-  const locationCardRef = useRef<HTMLDivElement>(null);
-  const servicesListRef = useRef<HTMLDivElement>(null);
-  const reviewsBreakdownRef = useRef<HTMLDivElement>(null);
-
-  /* ── GSAP ScrollTrigger Integration ── */
-  useGSAP(
-    () => {
-      if (!vendor) return;
-
-      // 1. Parallax Hero Image scaling & subtle translateY on scroll
-      if (heroImageRef.current) {
-        gsap.to(heroImageRef.current, {
-          yPercent: 18,
-          scale: 1.06,
-          ease: 'none',
-          scrollTrigger: {
-            trigger: heroImageRef.current,
-            start: 'top top',
-            end: 'bottom top',
-            scrub: 0.5,
-          },
-        });
-      }
-
-      // 2. Action buttons spring reveal
-      if (actionButtonsRef.current) {
-        gsap.from(actionButtonsRef.current.children, {
-          y: 20,
-          opacity: 0,
-          stagger: 0.07,
-          duration: 0.5,
-          ease: 'back.out(1.5)',
-          scrollTrigger: {
-            trigger: actionButtonsRef.current,
-            start: 'top 92%',
-            toggleActions: 'play none none none',
-          },
-        });
-      }
-
-      // 3. Location map card smooth slide up
-      if (locationCardRef.current) {
-        gsap.from(locationCardRef.current, {
-          y: 30,
-          opacity: 0,
-          duration: 0.6,
-          ease: 'power2.out',
-          scrollTrigger: {
-            trigger: locationCardRef.current,
-            start: 'top 88%',
-            toggleActions: 'play none none none',
-          },
-        });
-      }
-
-      // 4. Services list items stagger reveal
-      if (servicesListRef.current) {
-        const items = servicesListRef.current.querySelectorAll('.service-row-item');
-        if (items.length > 0) {
-          gsap.from(items, {
-            y: 18,
-            opacity: 0,
-            stagger: 0.05,
-            duration: 0.45,
-            ease: 'power2.out',
-            scrollTrigger: {
-              trigger: servicesListRef.current,
-              start: 'top 88%',
-              toggleActions: 'play none none none',
-            },
-          });
-        }
-      }
-
-      // 5. Reviews breakdown card & bars animation
-      if (reviewsBreakdownRef.current) {
-        const bars = reviewsBreakdownRef.current.querySelectorAll('.rating-progress-bar');
-        if (bars.length > 0) {
-          gsap.from(bars, {
-            scaleX: 0,
-            transformOrigin: 'left center',
-            duration: 0.7,
-            stagger: 0.08,
-            ease: 'power3.out',
-            scrollTrigger: {
-              trigger: reviewsBreakdownRef.current,
-              start: 'top 85%',
-              toggleActions: 'play none none none',
-            },
-          });
-        }
-      }
-
-      // 6. Review cards batch entrance
-      ScrollTrigger.batch('.review-card-item', {
-        interval: 0.1,
-        batchMax: 3,
-        onEnter: (batch) => {
-          gsap.fromTo(
-            batch,
-            { opacity: 0, y: 25, scale: 0.98 },
-            { opacity: 1, y: 0, scale: 1, stagger: 0.1, duration: 0.5, ease: 'power2.out', overwrite: 'auto' }
-          );
-        },
-        start: 'top 92%',
-      });
-
-      ScrollTrigger.refresh();
-    },
-    { dependencies: [vendor?.id, customReviews.length], scope: pageContainerRef }
-  );
-
   /* ── Loading Guard ── */
   if (loading && !vendor) {
     return <BrandLoader />;
@@ -347,17 +226,15 @@ export default function VendorDetailPage() {
 
   return (
     <motion.div
-      ref={pageContainerRef}
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 30 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="min-h-screen bg-surface pb-24 sm:pb-6 overflow-x-hidden"
+      className="min-h-screen bg-surface pb-24 sm:pb-6"
     >
       {/* ═══════════ A — IMAGE GALLERY ═══════════ */}
       <div
-        ref={heroImageRef}
-        className="relative w-full aspect-[3/2] sm:aspect-[2/1] bg-ink/5 overflow-hidden select-none will-change-transform"
+        className="relative w-full aspect-[3/2] sm:aspect-[2/1] bg-ink/5 overflow-hidden select-none"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -507,7 +384,7 @@ export default function VendorDetailPage() {
 
         {/* ═══════════ C — ACTION BUTTONS ═══════════ */}
         <FadeInSection delay={0.12} className="mb-6">
-          <div ref={actionButtonsRef} className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             {/* Call */}
             <a
               href={`tel:${vendor.phoneNumber}`}
@@ -554,7 +431,7 @@ export default function VendorDetailPage() {
 
         {/* ═══════════ D — LOCATION SECTION ═══════════ */}
         <FadeInSection delay={0.18} className="mb-6">
-          <div ref={locationCardRef} className="bg-surface-card rounded-[var(--radius-lg)] border border-border-light shadow-sm overflow-hidden">
+          <div className="bg-surface-card rounded-[var(--radius-lg)] border border-border-light shadow-sm overflow-hidden">
             {/* Embedded Map */}
             <div className="w-full aspect-[16/9] bg-border">
               <iframe
@@ -586,9 +463,9 @@ export default function VendorDetailPage() {
         {/* ═══════════ E — SERVICES & PRICING ═══════════ */}
         <FadeInSection delay={0.24} className="mb-6">
           <h3 className="text-sm font-display font-extrabold text-ink mb-3">Services Offered</h3>
-          <div ref={servicesListRef} className="bg-surface-card rounded-[var(--radius-lg)] border border-border-light shadow-sm overflow-hidden divide-y divide-border-light/60">
+          <div className="bg-surface-card rounded-[var(--radius-lg)] border border-border-light shadow-sm overflow-hidden divide-y divide-border-light/60">
             {vendor.servicesOffered.map((svc, i) => (
-              <div key={i} className="service-row-item flex items-center justify-between gap-4 px-4 py-3">
+              <div key={i} className="flex items-center justify-between gap-4 px-4 py-3">
                 <span className="text-xs font-body text-ink">{svc.name}</span>
                 {svc.price ? (
                   <span className="text-xs font-display font-bold text-ink shrink-0">{svc.price}</span>
@@ -678,7 +555,7 @@ export default function VendorDetailPage() {
                 </AnimatePresence>
 
                 {/* ── GOOGLE REVIEWS BREAKDOWN CARD ── */}
-                <div ref={reviewsBreakdownRef} className="bg-white rounded-3xl p-5 border border-border-light shadow-card space-y-4">
+                <div className="bg-white rounded-3xl p-5 border border-border-light shadow-card space-y-4">
                   <div className="flex flex-col sm:flex-row items-center gap-6">
                     {/* Left Score */}
                     <div className="text-center sm:text-left shrink-0">
@@ -704,7 +581,7 @@ export default function VendorDetailPage() {
                               initial={{ width: 0 }}
                               animate={{ width: `${pct}%` }}
                               transition={{ duration: 0.6, ease: 'easeOut' }}
-                              className="rating-progress-bar h-full bg-amber-400 rounded-full"
+                              className="h-full bg-amber-400 rounded-full"
                             />
                           </div>
                           <span className="w-5 text-[11px] text-ink-muted text-right font-mono font-bold">
@@ -749,7 +626,7 @@ export default function VendorDetailPage() {
                       return (
                         <div
                           key={review.id}
-                          className={`review-card-item bg-white rounded-2xl p-4 sm:p-5 border shadow-xs space-y-3 relative ${
+                          className={`bg-white rounded-2xl p-4 sm:p-5 border shadow-xs space-y-3 relative ${
                             isMyReview ? 'border-amber-300 ring-2 ring-amber-100' : 'border-border-light'
                           }`}
                         >
