@@ -83,12 +83,15 @@ export function getVendorDashboardState(vendor: any): VendorDashboardState {
   }
 
   if (vendor.verification_status === 'approved' || vendor.is_verified) {
-    const hasActiveSubscription = Boolean(
+    const isStatusSubscribed =
       vendor.subscription_status &&
-      ['trial', 'active', 'pro'].includes(vendor.subscription_status) &&
-      vendor.subscription_expires_at &&
-      new Date(vendor.subscription_expires_at) > new Date()
-    );
+      ['trial', 'active', 'pro'].includes(vendor.subscription_status);
+
+    const isNotExpired =
+      !vendor.subscription_expires_at ||
+      new Date(vendor.subscription_expires_at) > new Date();
+
+    const hasActiveSubscription = Boolean(isStatusSubscribed && isNotExpired);
 
     return hasActiveSubscription ? 'ACTIVE_DASHBOARD' : 'VERIFIED_AWAITING_SUBSCRIPTION';
   }
