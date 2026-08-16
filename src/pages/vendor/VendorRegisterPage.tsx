@@ -916,19 +916,6 @@ export default function VendorRegisterPage() {
         finalVendorId = insertedV?.id || null;
       }
 
-      if (finalVendorId && cleanReferredByCode) {
-        try {
-          await processReferralReward({
-            id: finalVendorId,
-            referral_code: assignedReferralCode,
-            referred_by_code: cleanReferredByCode,
-            referral_counted: existingVendor?.referral_counted || false,
-          });
-        } catch (refErr) {
-          console.warn('Referral reward processing error:', refErr);
-        }
-      }
-
       window.dispatchEvent(new Event('nearby_vendor_updated'));
 
       // Clear draft on successful submission

@@ -184,23 +184,52 @@ export async function grantFreeMonth(vendorId: string): Promise<{ success: boole
 }
 
 /**
- * Processes referral logic when a new vendor completes shop registration.
+ * Processes referral logic ONLY when a referred vendor is verified AND has activated a subscription/trial plan.
  * Idempotent: Only executes once per referred vendor.
  */
-export async function processReferralReward(newVendor: {
+export async function processReferralReward(referredVendor: {
   id: string;
   referral_code?: string;
   referred_by_code?: string | null;
   referral_counted?: boolean;
+  is_verified?: boolean;
+  verification_status?: string | null;
+  subscription_status?: string | null;
 }): Promise<{ processed: boolean; referrerId?: string; freeMonthGranted?: boolean }> {
-  if (!newVendor.referred_by_code || newVendor.referral_counted) {
+  if (!referredVendor.referred_by_code || referredVendor.referral_counted) {
     return { processed: false };
   }
 
-  const cleanReferredCode = newVendor.referred_by_code.trim().toUpperCase();
+  // 1. Verify that referred vendor is BOTH verified AND has an active subscription/trial plan
+  let isVerified = referredVendor.is_verified || referredVendor.verification_status === 'approved';
+  let hasActivePlan = Boolean(referredVendor.subscription_status && referredVendor.subscription_status !== 'expired');
+
+  if (!isVerified || !hasActivePlan) {
+    try {
+      const { data: currentV } = await supabase
+        .from('vendors')
+        .select('is_verified, verification_status, subscription_status')
+        .eq('id', referredVendor.id)
+        .maybeSingle();
+
+      if (currentV) {
+        isVerified = currentV.is_verified || currentV.verification_status === 'approved';
+        hasActivePlan = Boolean(currentV.subscription_status && currentV.subscription_status !== 'expired');
+      }
+    } catch (e) {
+      console.warn('Could not verify vendor status for referral reward:', e);
+    }
+  }
+
+  // Referral counts as successful ONLY when admin has verified AND vendor has activated a plan!
+  if (!isVerified || !hasActivePlan) {
+    return { processed: false };
+  }
+
+  const cleanReferredCode = referredVendor.referred_by_code.trim().toUpperCase();
 
   // Edge case 1: Prevent self-referral
-  if (newVendor.referral_code && cleanReferredCode === newVendor.referral_code.trim().toUpperCase()) {
+  if (referredVendor.referral_code && cleanReferredCode === referredVendor.referral_code.trim().toUpperCase()) {
     console.log('Self-referral ignored.');
     return { processed: false };
   }
@@ -213,7 +242,7 @@ export async function processReferralReward(newVendor: {
       .eq('referral_code', cleanReferredCode)
       .maybeSingle();
 
-    if (referrerError || !referrer || referrer.id === newVendor.id) {
+    if (referrerError || !referrer || referrer.id === referredVendor.id) {
       // Unknown referral code or self ID: silently ignore
       return { processed: false };
     }
@@ -231,7 +260,7 @@ export async function processReferralReward(newVendor: {
     await supabase
       .from('vendors')
       .update({ referral_counted: true })
-      .eq('id', newVendor.id);
+      .eq('id', referredVendor.id);
 
     let freeMonthGranted = false;
 

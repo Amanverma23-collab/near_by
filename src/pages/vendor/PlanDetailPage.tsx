@@ -5,6 +5,7 @@ import { ArrowLeft, Check, Sparkles, Tag, X, ShieldCheck, ArrowRight } from 'luc
 import { getDynamicPlans, fetchRemotePlans, validatePromoCode, type PromoResult, type Plan } from '../../data/plans';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { processReferralReward } from '../../utils/referral';
 
 export default function PlanDetailPage() {
   const { planId } = useParams<{ planId: string }>();
@@ -38,17 +39,17 @@ export default function PlanDetailPage() {
   useEffect(() => {
     if (plan.isFree && user) {
       const cleanPhone = (user.phone || '').replace(/\D/g, '').slice(-10);
-      const isTrialUsed =
-        Boolean(vendorRecord?.has_used_trial) ||
-        Boolean(vendorRecord?.subscription_status) ||
+      const hasUsed =
         localStorage.getItem(`nearby_trial_used_${user.id}`) === 'true' ||
-        (cleanPhone ? localStorage.getItem(`nearby_trial_used_${cleanPhone}`) === 'true' : false);
+        localStorage.getItem('nearby_has_used_trial') === 'true' ||
+        (cleanPhone ? localStorage.getItem(`nearby_trial_used_${cleanPhone}`) === 'true' : false) ||
+        (vendorRecord?.subscription_status && vendorRecord?.subscription_status !== 'trial');
 
-      if (isTrialUsed) {
-        navigate('/vendor/subscriptions', { replace: true });
+      if (hasUsed) {
+        navigate('/vendor/subscription', { replace: true });
       }
     }
-  }, [plan, user, vendorRecord, navigate]);
+  }, [plan.isFree, user, vendorRecord, navigate]);
 
   const [promoInput, setPromoInput] = useState('');
   const [appliedPromo, setAppliedPromo] = useState<PromoResult | null>(null);
@@ -134,6 +135,28 @@ export default function PlanDetailPage() {
           .or(`phone_number.eq.${cleanPhone},phone_number.eq.+91${cleanPhone},whatsapp_number.eq.${cleanPhone}`);
       }
 
+      // Process referral reward for the referring vendor now that plan is active
+      try {
+        const { data: vRecord } = await supabase
+          .from('vendors')
+          .select('id, referral_code, referred_by_code, referral_counted, is_verified, verification_status, subscription_status')
+          .eq('auth_user_id', user.id)
+          .maybeSingle();
+
+        if (vRecord && vRecord.referred_by_code && !vRecord.referral_counted) {
+          await processReferralReward({
+            id: vRecord.id,
+            referral_code: vRecord.referral_code,
+            referred_by_code: vRecord.referred_by_code,
+            referral_counted: false,
+            is_verified: true,
+            subscription_status: 'trial',
+          });
+        }
+      } catch (refErr) {
+        console.warn('Referral processing error on trial activation:', refErr);
+      }
+
       window.dispatchEvent(new Event('nearby_vendor_updated'));
       setTimeout(() => {
         navigate('/vendor/dashboard', { replace: true });
@@ -199,6 +222,28 @@ export default function PlanDetailPage() {
           .from('vendors')
           .update(subData)
           .or(`phone_number.eq.${cleanPhone},phone_number.eq.+91${cleanPhone},whatsapp_number.eq.${cleanPhone}`);
+      }
+
+      // Process referral reward for the referring vendor now that plan is active
+      try {
+        const { data: vRecord } = await supabase
+          .from('vendors')
+          .select('id, referral_code, referred_by_code, referral_counted, is_verified, verification_status, subscription_status')
+          .eq('auth_user_id', user.id)
+          .maybeSingle();
+
+        if (vRecord && vRecord.referred_by_code && !vRecord.referral_counted) {
+          await processReferralReward({
+            id: vRecord.id,
+            referral_code: vRecord.referral_code,
+            referred_by_code: vRecord.referred_by_code,
+            referral_counted: false,
+            is_verified: true,
+            subscription_status: status,
+          });
+        }
+      } catch (refErr) {
+        console.warn('Referral processing error on payment activation:', refErr);
       }
 
       window.dispatchEvent(new Event('nearby_vendor_updated'));
