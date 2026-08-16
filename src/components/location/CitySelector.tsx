@@ -2,15 +2,56 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, MapPin, X, Loader2 } from 'lucide-react';
 
+export interface LocationCoordinates {
+  latitude: number;
+  longitude: number;
+}
+
 interface CitySelectorProps {
-  onSelect: (city: string) => void;
+  onSelect: (city: string, coords?: LocationCoordinates) => void;
 }
 
 interface LocationResult {
   title: string;
   subtitle: string;
   fullLocation: string;
+  latitude?: number;
+  longitude?: number;
 }
+
+export const INDIAN_CITY_COORDINATES: Record<string, LocationCoordinates> = {
+  'Sikar': { latitude: 27.6094, longitude: 75.1398 },
+  'सीकर': { latitude: 27.6094, longitude: 75.1398 },
+  'Jaipur': { latitude: 26.9124, longitude: 75.7873 },
+  'Delhi': { latitude: 28.6139, longitude: 77.2090 },
+  'Bangalore': { latitude: 12.9716, longitude: 77.5946 },
+  'Mumbai': { latitude: 19.0760, longitude: 72.8777 },
+  'Pune': { latitude: 18.5204, longitude: 73.8567 },
+  'Gurugram': { latitude: 28.4595, longitude: 77.0266 },
+  'Noida': { latitude: 28.5355, longitude: 77.3910 },
+  'Kolkata': { latitude: 22.5726, longitude: 88.3639 },
+  'Ahmedabad': { latitude: 23.0225, longitude: 72.5714 },
+  'Surat': { latitude: 21.1702, longitude: 72.8311 },
+  'Hyderabad': { latitude: 17.3850, longitude: 78.4867 },
+  'Chennai': { latitude: 13.0827, longitude: 80.2707 },
+  'Lucknow': { latitude: 26.8467, longitude: 80.9462 },
+  'Chandigarh': { latitude: 30.7333, longitude: 76.7794 },
+  'Indore': { latitude: 22.7196, longitude: 75.8577 },
+  'Bhopal': { latitude: 23.2599, longitude: 77.4126 },
+  'Patna': { latitude: 25.5941, longitude: 85.1376 },
+  'Kochi': { latitude: 9.9312, longitude: 76.2673 },
+  'Faridabad': { latitude: 28.4089, longitude: 77.3178 },
+  'Ghaziabad': { latitude: 28.6692, longitude: 77.4538 },
+  'Kota': { latitude: 25.2138, longitude: 75.8648 },
+  'Jodhpur': { latitude: 26.2389, longitude: 73.0243 },
+  'Udaipur': { latitude: 24.5854, longitude: 73.7125 },
+  'Ajmer': { latitude: 26.4499, longitude: 74.6399 },
+  'Bikaner': { latitude: 28.0229, longitude: 73.3119 },
+  'Jhunjhunu': { latitude: 28.1289, longitude: 75.3995 },
+  'Churu': { latitude: 28.2900, longitude: 74.9600 },
+  'Neem Ka Thana': { latitude: 27.7394, longitude: 75.7865 },
+  'Alwar': { latitude: 27.5530, longitude: 76.6346 },
+};
 
 const INDIAN_CITIES = [
   // Metro Cities & Major Hubs
@@ -189,6 +230,8 @@ export default function CitySelector({ onSelect }: CitySelectorProps) {
               title: mainName,
               subtitle: subtitle,
               fullLocation: item.display_name,
+              latitude: Number(item.lat),
+              longitude: Number(item.lon),
             };
           });
           setLiveResults(formatted);
@@ -207,9 +250,10 @@ export default function CitySelector({ onSelect }: CitySelectorProps) {
 
   const handleSubmit = () => {
     if (cleanQuery) {
-      onSelect(cleanQuery);
+      const coords = INDIAN_CITY_COORDINATES[cleanQuery];
+      onSelect(cleanQuery, coords);
     } else {
-      onSelect('Bangalore');
+      onSelect('Bangalore', INDIAN_CITY_COORDINATES['Bangalore']);
     }
   };
 
@@ -256,7 +300,7 @@ export default function CitySelector({ onSelect }: CitySelectorProps) {
           {!exactMatch && (
             <button
               type="button"
-              onClick={() => onSelect(cleanQuery)}
+              onClick={() => onSelect(cleanQuery, INDIAN_CITY_COORDINATES[cleanQuery])}
               className="w-full px-4 py-3 text-left flex items-center justify-between text-xs font-display font-extrabold text-orange-600 hover:bg-orange-50/80 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-2.5 min-w-0">
@@ -276,7 +320,14 @@ export default function CitySelector({ onSelect }: CitySelectorProps) {
             <button
               key={`${loc.title}-${i}`}
               type="button"
-              onClick={() => onSelect(loc.title)}
+              onClick={() =>
+                onSelect(
+                  loc.title,
+                  loc.latitude && loc.longitude
+                    ? { latitude: loc.latitude, longitude: loc.longitude }
+                    : undefined
+                )
+              }
               className="w-full px-4 py-2.5 text-left flex items-start gap-2.5 hover:bg-orange-50/50 transition-colors cursor-pointer group"
             >
               <MapPin size={15} className="text-orange-500 shrink-0 mt-0.5" />
@@ -296,7 +347,7 @@ export default function CitySelector({ onSelect }: CitySelectorProps) {
             <button
               key={`preset-${city}`}
               type="button"
-              onClick={() => onSelect(city)}
+              onClick={() => onSelect(city, INDIAN_CITY_COORDINATES[city])}
               className="w-full px-4 py-2.5 text-left flex items-center gap-2.5 text-xs font-body font-semibold text-gray-800 hover:bg-orange-50/50 hover:text-orange-600 transition-colors cursor-pointer"
             >
               <MapPin size={14} className="text-gray-400 shrink-0" />
@@ -318,7 +369,7 @@ export default function CitySelector({ onSelect }: CitySelectorProps) {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: i * 0.02 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => onSelect(city)}
+                onClick={() => onSelect(city, INDIAN_CITY_COORDINATES[city])}
                 className="px-3.5 py-1.5 text-xs font-body font-semibold bg-gray-50 border border-gray-200/80 rounded-full text-gray-700 hover:border-orange-400 hover:text-orange-600 hover:bg-orange-50 transition-all duration-150 cursor-pointer"
               >
                 {city}

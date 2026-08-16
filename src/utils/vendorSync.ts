@@ -1,13 +1,107 @@
 import { supabase } from '../lib/supabase';
 import { dummyVendors, type Vendor } from '../data/dummyVendors';
 import { getEffectiveShopStatus } from './shopTiming';
+import { INDIAN_CITY_COORDINATES } from '../components/location/CitySelector';
 
 /**
- * Fetches all registered live vendors from Supabase / database and merges them
- * with default listings so newly registered shops appear dynamically across the Customer App.
+ * Haversine formula to compute great-circle distance between two GPS points in Kilometers.
  */
-export async function fetchCombinedVendors(): Promise<Vendor[]> {
+export function calculateHaversineDistanceKm(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  if (
+    typeof lat1 !== 'number' ||
+    typeof lon1 !== 'number' ||
+    typeof lat2 !== 'number' ||
+    typeof lon2 !== 'number' ||
+    isNaN(lat1) ||
+    isNaN(lon1) ||
+    isNaN(lat2) ||
+    isNaN(lon2)
+  ) {
+    return 1.2;
+  }
+
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+
+  if (distance < 0.1) {
+    return 0.1; // Within 100 meters
+  }
+
+  return Math.round(distance * 10) / 10;
+}
+
+/**
+ * Resolves current customer GPS or city coordinates from localStorage
+ */
+export function getUserCurrentCoordinates(): { latitude: number; longitude: number } {
+  // 1. Try active live GPS coordinates cached in localStorage
   try {
+    const rawGps = localStorage.getItem('nearby_current_gps');
+    if (rawGps) {
+      const parsed = JSON.parse(rawGps);
+      if (parsed && typeof parsed.latitude === 'number' && typeof parsed.longitude === 'number') {
+        return { latitude: Number(parsed.latitude), longitude: Number(parsed.longitude) };
+      }
+    }
+  } catch {}
+
+  // 2. Try nearby_location from LocationContext
+  try {
+    const rawLoc = localStorage.getItem('nearby_location');
+    if (rawLoc) {
+      const parsed = JSON.parse(rawLoc);
+      if (parsed) {
+        if (typeof parsed.latitude === 'number' && typeof parsed.longitude === 'number' && parsed.latitude !== 0) {
+          return { latitude: Number(parsed.latitude), longitude: Number(parsed.longitude) };
+        }
+        if (parsed.city && INDIAN_CITY_COORDINATES[parsed.city]) {
+          return INDIAN_CITY_COORDINATES[parsed.city];
+        }
+      }
+    }
+  } catch {}
+
+  // 3. Try nearby_selected_city
+  try {
+    const selectedCity = localStorage.getItem('nearby_selected_city');
+    if (selectedCity && INDIAN_CITY_COORDINATES[selectedCity]) {
+      return INDIAN_CITY_COORDINATES[selectedCity];
+    }
+  } catch {}
+
+  // 4. Default fallback: Sikar, Rajasthan (27.6094, 75.1398)
+  return { latitude: 27.6094, longitude: 75.1398 };
+}
+
+/**
+ * Fetches all registered live vendors from Supabase / database, computes their real
+ * dynamic GPS distance based on customer position, and returns them sorted by closest first.
+ */
+export async function fetchCombinedVendors(
+  userCoords?: { latitude?: number | null; longitude?: number | null } | null
+): Promise<Vendor[]> {
+  try {
+    const activeCoords =
+      userCoords && typeof userCoords.latitude === 'number' && typeof userCoords.longitude === 'number'
+        ? { latitude: userCoords.latitude, longitude: userCoords.longitude }
+        : getUserCurrentCoordinates();
+
     const { data } = await supabase.from('vendors').select('*');
 
     if (data && Array.isArray(data) && data.length > 0) {
@@ -47,12 +141,22 @@ export async function fetchCombinedVendors(): Promise<Vendor[]> {
         // Compute real dynamic open/closed status based on opening hours & manual toggle
         const timingStatus = getEffectiveShopStatus(v);
 
+        // Calculate REAL Haversine distance between customer location and vendor location
+        const vendorLat = typeof v.latitude === 'number' && !isNaN(v.latitude) ? v.latitude : (27.6094 + idx * 0.005);
+        const vendorLng = typeof v.longitude === 'number' && !isNaN(v.longitude) ? v.longitude : (75.1398 + idx * 0.005);
+        const realCalculatedDistance = calculateHaversineDistanceKm(
+          activeCoords.latitude,
+          activeCoords.longitude,
+          vendorLat,
+          vendorLng
+        );
+
         return {
           id: v.id || `real-v-${idx}`,
           name: v.name || v.shop_name || 'Nearby Shop',
           category: v.category || 'vehicle-emergency',
           subService: v.sub_service || 'General Services',
-          distanceKm: v.distance_km || (0.4 + idx * 0.2),
+          distanceKm: realCalculatedDistance,
           address: v.address || 'Local Market',
           isOpenNow: timingStatus.isOpen,
           openingHours: hoursText,
@@ -63,8 +167,8 @@ export async function fetchCombinedVendors(): Promise<Vendor[]> {
           ownerName: v.owner_name || 'Shop Owner',
           shopImages: images,
           imageUrl: images[0],
-          latitude: v.latitude || 28.6519,
-          longitude: v.longitude || 77.1905,
+          latitude: vendorLat,
+          longitude: vendorLng,
           servicesOffered: Array.isArray(v.services_offered)
             ? v.services_offered.map((s: any) => ({ name: s.name, price: s.price }))
             : [{ name: 'Standard Service', price: '₹150' }],
@@ -77,11 +181,25 @@ export async function fetchCombinedVendors(): Promise<Vendor[]> {
         };
       });
 
-      // Combine real registered vendors with sample dummy vendors so customers always see rich listings
+      // Combine real registered vendors with sample dummy vendors and sort by distance (nearest first)
       const existingIds = new Set(realVendors.map((rv) => rv.id));
-      const nonDuplicateDummies = dummyVendors.filter((dv) => !existingIds.has(dv.id));
+      const nonDuplicateDummies = dummyVendors
+        .filter((dv) => !existingIds.has(dv.id))
+        .map((dv) => ({
+          ...dv,
+          distanceKm: calculateHaversineDistanceKm(
+            activeCoords.latitude,
+            activeCoords.longitude,
+            dv.latitude,
+            dv.longitude
+          ),
+        }));
 
-      return [...realVendors, ...nonDuplicateDummies];
+      const merged = [...realVendors, ...nonDuplicateDummies];
+      // Sort nearest first
+      merged.sort((a, b) => a.distanceKm - b.distanceKm);
+
+      return merged;
     }
   } catch (err) {
     console.error('Error fetching registered vendors for customer app:', err);

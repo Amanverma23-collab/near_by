@@ -13,7 +13,7 @@ interface LocationContextType {
   locationSet: boolean;
   loading: boolean;
   setLocation: (data: LocationData) => void;
-  setCityManually: (city: string) => void;
+  setCityManually: (city: string, coords?: { latitude: number; longitude: number }) => void;
   clearLocation: () => void;
 }
 
@@ -70,11 +70,11 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     })();
   };
 
-  const setCityManually = (city: string) => {
+  const setCityManually = (city: string, coords?: { latitude: number; longitude: number }) => {
     const data: LocationData = {
       city: city || DEFAULT_CITY,
-      latitude: null,
-      longitude: null,
+      latitude: coords?.latitude ?? null,
+      longitude: coords?.longitude ?? null,
     };
     setLocation(data);
   };

@@ -6,6 +6,7 @@ import { dummyVendors, type Vendor } from '../data/dummyVendors';
 import { fetchCombinedVendors } from '../utils/vendorSync';
 import SaveHeartButton from '../components/ui/SaveHeartButton';
 import { useLanguage } from '../context/LanguageContext';
+import { useLocation } from '../context/LocationContext';
 
 const POPULAR_SEARCHES = [
   'Puncture Repair',
@@ -19,15 +20,21 @@ const POPULAR_SEARCHES = [
 export default function SearchPage() {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { location: userLocation } = useLocation();
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [allVendors, setAllVendors] = useState<Vendor[]>(dummyVendors);
 
   useEffect(() => {
-    fetchCombinedVendors().then((vendors) => {
+    const coords =
+      userLocation && userLocation.latitude && userLocation.longitude
+        ? { latitude: userLocation.latitude, longitude: userLocation.longitude }
+        : null;
+
+    fetchCombinedVendors(coords).then((vendors) => {
       setAllVendors(vendors);
     });
-  }, []);
+  }, [userLocation]);
 
   // Filter vendors based on search query & category
   const filteredVendors = allVendors.filter((vendor) => {

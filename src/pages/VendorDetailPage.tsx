@@ -11,6 +11,7 @@ import { fetchCombinedVendors, trackVendorCall, trackVendorWhatsApp, trackVendor
 import AddReviewModal from '../components/customer/AddReviewModal';
 import { getSavedReviews, saveNewReview, deleteReview } from '../utils/reviewStorage';
 import { useAuth } from '../context/AuthContext';
+import { useLocation } from '../context/LocationContext';
 import SaveHeartButton from '../components/ui/SaveHeartButton';
 import BrandLoader from '../components/ui/BrandLoader';
 
@@ -63,13 +64,19 @@ function FadeInSection({ children, delay = 0, className = '' }: { children: Reac
 export default function VendorDetailPage() {
   const { vendorId } = useParams<{ vendorId: string }>();
   const navigate = useNavigate();
+  const { location: userLocation } = useLocation();
 
   const [allVendors, setAllVendors] = useState<Vendor[]>(dummyVendors);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    fetchCombinedVendors()
+    const coords =
+      userLocation && userLocation.latitude && userLocation.longitude
+        ? { latitude: userLocation.latitude, longitude: userLocation.longitude }
+        : null;
+
+    fetchCombinedVendors(coords)
       .then((vendors) => {
         setAllVendors(vendors);
         setLoading(false);
@@ -84,7 +91,7 @@ export default function VendorDetailPage() {
         setCustomReviews(revs);
       });
     }
-  }, [vendorId]);
+  }, [vendorId, userLocation]);
 
   const vendor = allVendors.find((v) => v.id === vendorId) || dummyVendors.find((v) => v.id === vendorId);
   const effectiveStatus = getEffectiveShopStatus(vendor || {});

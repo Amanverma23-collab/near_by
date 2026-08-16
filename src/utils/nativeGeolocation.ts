@@ -14,10 +14,14 @@ export async function getCurrentLocation(): Promise<LocationCoordinates> {
       enableHighAccuracy: true,
       timeout: 10000,
     });
-    return {
+    const coords = {
       latitude: position.coords.latitude,
       longitude: position.coords.longitude,
     };
+    try {
+      localStorage.setItem('nearby_current_gps', JSON.stringify(coords));
+    } catch {}
+    return coords;
   } catch (err) {
     console.warn('Capacitor Geolocation error, falling back to navigator.geolocation:', err);
     return new Promise((resolve, reject) => {
@@ -27,10 +31,14 @@ export async function getCurrentLocation(): Promise<LocationCoordinates> {
       }
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          resolve({
+          const coords = {
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
-          });
+          };
+          try {
+            localStorage.setItem('nearby_current_gps', JSON.stringify(coords));
+          } catch {}
+          resolve(coords);
         },
         (error) => reject(error),
         { enableHighAccuracy: true, timeout: 10000 }

@@ -64,8 +64,8 @@ export default function LocationPage() {
     }
   };
 
-  const handleCitySelect = (city: string) => {
-    setCityManually(city);
+  const handleCitySelect = (city: string, coords?: { latitude: number; longitude: number }) => {
+    setCityManually(city, coords);
     navigate('/dashboard', { replace: true });
   };
 

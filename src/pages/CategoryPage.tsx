@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useNavigate, useParams, useLocation as useRouterLocation } from 'react-router-dom';
 import { ArrowLeft, MapPin, Star, BadgeCheck, Phone, AlertCircle, Clock } from 'lucide-react';
 import { dummyVendors, type Vendor } from '../data/dummyVendors';
 import { getEffectiveShopStatus } from '../utils/shopTiming';
 import { fetchCombinedVendors, trackVendorCall, trackVendorWhatsApp } from '../utils/vendorSync';
 import SaveHeartButton from '../components/ui/SaveHeartButton';
+import { useLocation as useAppLocation } from '../context/LocationContext';
 
 const categoryNames: Record<string, string> = {
   'vehicle-emergency': 'Vehicle & Emergency Support',
@@ -50,9 +51,10 @@ function SkeletonCard() {
 export default function CategoryPage() {
   const { slug } = useParams<{ slug: string; }>();
   const navigate = useNavigate();
-  const location = useLocation();
+  const routerLocation = useRouterLocation();
+  const { location: userLocation } = useAppLocation();
   const [selectedFilter, setSelectedFilter] = useState(() => {
-    return (location.state as { initialFilter?: string })?.initialFilter || 'All';
+    return (routerLocation.state as { initialFilter?: string })?.initialFilter || 'All';
   });
   const [isLoading, setIsLoading] = useState(true);
   const [allVendors, setAllVendors] = useState<Vendor[]>(dummyVendors);
@@ -73,17 +75,22 @@ export default function CategoryPage() {
 
   useEffect(() => {
     setIsLoading(true);
-    if (location.state && (location.state as any).initialFilter) {
-      setSelectedFilter((location.state as any).initialFilter);
+    if (routerLocation.state && (routerLocation.state as any).initialFilter) {
+      setSelectedFilter((routerLocation.state as any).initialFilter);
     } else {
       setSelectedFilter('All');
     }
 
-    fetchCombinedVendors().then((vendors) => {
+    const coords =
+      userLocation && userLocation.latitude && userLocation.longitude
+        ? { latitude: userLocation.latitude, longitude: userLocation.longitude }
+        : null;
+
+    fetchCombinedVendors(coords).then((vendors) => {
       setAllVendors(vendors);
       setIsLoading(false);
     });
-  }, [slug, location.state]);
+  }, [slug, routerLocation.state, userLocation]);
 
   // Motion Variants
   const listContainerVariants = {
