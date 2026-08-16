@@ -71,26 +71,43 @@ export default function VendorDetailPage() {
 
   useEffect(() => {
     setLoading(true);
-    const coords =
-      userLocation && userLocation.latitude && userLocation.longitude
-        ? { latitude: userLocation.latitude, longitude: userLocation.longitude }
-        : null;
 
-    fetchCombinedVendors(coords)
-      .then((vendors) => {
-        setAllVendors(vendors);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error('Error loading vendors:', err);
-        setLoading(false);
-      });
+    const loadVendors = (activeCoords?: { latitude?: number | null; longitude?: number | null } | null) => {
+      const coords =
+        activeCoords && activeCoords.latitude && activeCoords.longitude
+          ? { latitude: activeCoords.latitude, longitude: activeCoords.longitude }
+          : userLocation && userLocation.latitude && userLocation.longitude
+          ? { latitude: userLocation.latitude, longitude: userLocation.longitude }
+          : null;
+
+      fetchCombinedVendors(coords)
+        .then((vendors) => {
+          setAllVendors(vendors);
+          setLoading(false);
+        })
+        .catch((err) => {
+          console.error('Error loading vendors:', err);
+          setLoading(false);
+        });
+    };
+
+    loadVendors();
+
+    const handleGpsUpdate = (e: any) => {
+      if (e.detail?.latitude && e.detail?.longitude) {
+        loadVendors(e.detail);
+      }
+    };
+
+    window.addEventListener('nearby_gps_updated', handleGpsUpdate);
 
     if (vendorId) {
       getSavedReviews(vendorId).then((revs) => {
         setCustomReviews(revs);
       });
     }
+
+    return () => window.removeEventListener('nearby_gps_updated', handleGpsUpdate);
   }, [vendorId, userLocation]);
 
   const vendor = allVendors.find((v) => v.id === vendorId) || dummyVendors.find((v) => v.id === vendorId);

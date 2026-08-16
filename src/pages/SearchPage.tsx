@@ -26,14 +26,29 @@ export default function SearchPage() {
   const [allVendors, setAllVendors] = useState<Vendor[]>(dummyVendors);
 
   useEffect(() => {
-    const coords =
-      userLocation && userLocation.latitude && userLocation.longitude
-        ? { latitude: userLocation.latitude, longitude: userLocation.longitude }
-        : null;
+    const loadVendors = (activeCoords?: { latitude?: number | null; longitude?: number | null } | null) => {
+      const coords =
+        activeCoords && activeCoords.latitude && activeCoords.longitude
+          ? { latitude: activeCoords.latitude, longitude: activeCoords.longitude }
+          : userLocation && userLocation.latitude && userLocation.longitude
+          ? { latitude: userLocation.latitude, longitude: userLocation.longitude }
+          : null;
 
-    fetchCombinedVendors(coords).then((vendors) => {
-      setAllVendors(vendors);
-    });
+      fetchCombinedVendors(coords).then((vendors) => {
+        setAllVendors(vendors);
+      });
+    };
+
+    loadVendors();
+
+    const handleGpsUpdate = (e: any) => {
+      if (e.detail?.latitude && e.detail?.longitude) {
+        loadVendors(e.detail);
+      }
+    };
+
+    window.addEventListener('nearby_gps_updated', handleGpsUpdate);
+    return () => window.removeEventListener('nearby_gps_updated', handleGpsUpdate);
   }, [userLocation]);
 
   // Filter vendors based on search query & category

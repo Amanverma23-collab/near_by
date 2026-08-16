@@ -28,12 +28,14 @@ const LocationContext = createContext<LocationContextType>({
   clearLocation: () => {},
 });
 
+import { getCurrentLocation, startWatchingLocation } from '../utils/nativeGeolocation';
+
 export function LocationProvider({ children }: { children: ReactNode }) {
   const [location, setLocationState] = useState<LocationData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Load from localStorage on mount
+    // 1. Load from localStorage on mount
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
@@ -44,6 +46,46 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       // Ignore parse errors
     }
     setLoading(false);
+
+    // 2. Silently acquire fresh live device GPS coordinates
+    getCurrentLocation()
+      .then((coords) => {
+        setLocationState((prev) => {
+          const updated: LocationData = {
+            city: prev?.city || DEFAULT_CITY,
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+          };
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+            localStorage.setItem('nearby_current_gps', JSON.stringify(coords));
+          } catch {}
+          return updated;
+        });
+      })
+      .catch((e) => {
+        console.warn('Silent live GPS acquisition notice:', e);
+      });
+
+    // 3. Watch for live device movement continuously
+    const cleanupWatcher = startWatchingLocation((coords) => {
+      setLocationState((prev) => {
+        const updated: LocationData = {
+          city: prev?.city || DEFAULT_CITY,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        };
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+          localStorage.setItem('nearby_current_gps', JSON.stringify(coords));
+        } catch {}
+        return updated;
+      });
+    });
+
+    return () => {
+      cleanupWatcher();
+    };
   }, []);
 
   const setLocation = (data: LocationData) => {

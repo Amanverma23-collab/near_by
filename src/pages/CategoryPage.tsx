@@ -81,15 +81,30 @@ export default function CategoryPage() {
       setSelectedFilter('All');
     }
 
-    const coords =
-      userLocation && userLocation.latitude && userLocation.longitude
-        ? { latitude: userLocation.latitude, longitude: userLocation.longitude }
-        : null;
+    const loadVendors = (activeCoords?: { latitude?: number | null; longitude?: number | null } | null) => {
+      const coords =
+        activeCoords && activeCoords.latitude && activeCoords.longitude
+          ? { latitude: activeCoords.latitude, longitude: activeCoords.longitude }
+          : userLocation && userLocation.latitude && userLocation.longitude
+          ? { latitude: userLocation.latitude, longitude: userLocation.longitude }
+          : null;
 
-    fetchCombinedVendors(coords).then((vendors) => {
-      setAllVendors(vendors);
-      setIsLoading(false);
-    });
+      fetchCombinedVendors(coords).then((vendors) => {
+        setAllVendors(vendors);
+        setIsLoading(false);
+      });
+    };
+
+    loadVendors();
+
+    const handleGpsUpdate = (e: any) => {
+      if (e.detail?.latitude && e.detail?.longitude) {
+        loadVendors(e.detail);
+      }
+    };
+
+    window.addEventListener('nearby_gps_updated', handleGpsUpdate);
+    return () => window.removeEventListener('nearby_gps_updated', handleGpsUpdate);
   }, [slug, routerLocation.state, userLocation]);
 
   // Motion Variants
