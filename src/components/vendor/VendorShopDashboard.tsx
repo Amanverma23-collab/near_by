@@ -414,11 +414,14 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
             </span>
           </div>
 
-          {/* Bottom-Left Corner: Shop Name */}
-          <div className="relative z-10 p-4 sm:p-5">
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-display font-extrabold text-white tracking-tight drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)] truncate">
-              {vendor?.name || 'Your Business Name'}
-            </h1>
+          {/* Bottom-Left Corner: Shop Name inside a styled Box */}
+          <div className="relative z-10 p-3.5 sm:p-5">
+            <div className="inline-flex items-center gap-2.5 px-4 py-2 sm:px-5 sm:py-2.5 rounded-2xl bg-black/65 backdrop-blur-md border border-white/25 shadow-lg max-w-full">
+              <div className="w-2.5 h-2.5 rounded-full bg-brand shrink-0" />
+              <h1 className="text-lg sm:text-2xl lg:text-3xl font-display font-extrabold text-white tracking-tight truncate capitalize">
+                {vendor?.name || 'Your Business Name'}
+              </h1>
+            </div>
           </div>
         </motion.section>
 
