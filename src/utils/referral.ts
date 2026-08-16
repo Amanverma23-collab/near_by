@@ -184,6 +184,43 @@ export async function grantFreeMonth(vendorId: string): Promise<{ success: boole
 }
 
 /**
+ * Helper to generate all candidate referral codes for a vendor (handles legacy & deterministic codes)
+ */
+export function getVendorCandidateCodes(v: {
+  id?: string;
+  name?: string;
+  owner_name?: string;
+  phone_number?: string;
+  referral_code?: string;
+}): string[] {
+  const codes = new Set<string>();
+  if (v.referral_code) {
+    codes.add(v.referral_code.trim().toUpperCase());
+  }
+
+  const cleanPhone = (v.phone_number || '').replace(/\D/g, '').slice(-10);
+  const cleanOwner = (v.owner_name || '').replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 4);
+  const cleanShop = (v.name || '').replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 4);
+
+  if (cleanPhone.length >= 4) {
+    const last4 = cleanPhone.slice(-4);
+    if (cleanOwner.length >= 3) {
+      codes.add(`${cleanOwner.padEnd(4, 'X')}${last4}`);
+    }
+    if (cleanShop.length >= 3) {
+      codes.add(`${cleanShop.padEnd(4, 'X')}${last4}`);
+    }
+    codes.add(`SHOP${last4}`);
+  }
+
+  if (cleanPhone.length === 10) {
+    codes.add(cleanPhone);
+  }
+
+  return Array.from(codes);
+}
+
+/**
  * Processes referral logic ONLY when a referred vendor is verified AND has activated a subscription/trial plan.
  * Idempotent: Only executes once per referred vendor.
  */
@@ -235,14 +272,32 @@ export async function processReferralReward(referredVendor: {
   }
 
   try {
-    // Find the referring vendor by referral_code
-    const { data: referrer, error: referrerError } = await supabase
+    // Find the referring vendor by referral_code or candidate code
+    let referrer: any = null;
+    const { data: directReferrer } = await supabase
       .from('vendors')
-      .select('id, auth_user_id, referral_code, successful_referral_count, subscription_expires_at, subscription_status')
+      .select('id, auth_user_id, referral_code, owner_name, name, phone_number, successful_referral_count, subscription_expires_at, subscription_status')
       .eq('referral_code', cleanReferredCode)
       .maybeSingle();
 
-    if (referrerError || !referrer || referrer.id === referredVendor.id) {
+    if (directReferrer && directReferrer.id !== referredVendor.id) {
+      referrer = directReferrer;
+    } else {
+      // Lookup across all vendors by candidate code
+      const { data: allVendors } = await supabase
+        .from('vendors')
+        .select('id, auth_user_id, referral_code, owner_name, name, phone_number, successful_referral_count, subscription_expires_at, subscription_status');
+
+      if (allVendors) {
+        referrer = allVendors.find((v) => {
+          if (v.id === referredVendor.id) return false;
+          const candidateCodes = getVendorCandidateCodes(v);
+          return candidateCodes.includes(cleanReferredCode);
+        });
+      }
+    }
+
+    if (!referrer || referrer.id === referredVendor.id) {
       // Unknown referral code or self ID: silently ignore
       return { processed: false };
     }
