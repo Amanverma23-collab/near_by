@@ -47,13 +47,19 @@ export default function Navbar() {
               whileTap={{ scale: 0.92 }}
               whileHover={{ scale: 1.05 }}
               onClick={handleShopClick}
-              className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-brand/10 hover:bg-brand/20 text-brand flex items-center gap-1.5 transition-all border border-brand/20 cursor-pointer shadow-xs"
-              title="Register Your Shop"
-              aria-label="Register Your Shop"
+              className={`px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-xl flex items-center gap-1.5 transition-all border cursor-pointer shadow-xs ${
+                vendorStatus === 'approved'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
+                  : vendorStatus === 'pending'
+                  ? 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100'
+                  : 'bg-brand/10 hover:bg-brand/20 text-brand border-brand/20'
+              }`}
+              title={vendorStatus === 'approved' ? 'My Shop Dashboard' : vendorStatus === 'pending' ? 'Shop Verification Under Review' : 'Register Your Shop'}
+              aria-label="Shop status"
             >
-              <Store size={20} className="text-brand" />
-              <span className="hidden sm:inline text-xs font-display font-extrabold">
-                {vendorStatus === 'approved' ? 'My Shop' : 'Register Shop'}
+              <Store size={18} className={vendorStatus === 'approved' ? 'text-emerald-700' : vendorStatus === 'pending' ? 'text-amber-700' : 'text-brand'} />
+              <span className="text-xs font-display font-extrabold">
+                {vendorStatus === 'approved' ? 'My Shop' : vendorStatus === 'pending' ? 'Under Review' : 'Register Shop'}
               </span>
             </motion.button>
 

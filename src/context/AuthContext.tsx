@@ -62,35 +62,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.getItem('nearby_customer_phone') ||
         localStorage.getItem('nearby_vendor_phone') ||
         (u.phone ? u.phone.replace(/\D/g, '').slice(-10) : '') ||
-        (u.email?.includes('@nearbe.app') ? u.email.split('@')[0] : '');
+        (u.user_metadata?.phone_number ? u.user_metadata.phone_number.replace(/\D/g, '').slice(-10) : '') ||
+        (u.email?.includes('@nearbe.app') ? u.email.split('@')[0].replace(/\D/g, '').slice(-10) : '');
 
-      const vendorQueryPromise = (async () => {
-        let { data: vendors } = await supabase
-          .from('vendors')
-          .select('*')
-          .eq('auth_user_id', u.id);
+      // 1. Build unified search query for vendor record
+      let orFilter = `auth_user_id.eq.${u.id}`;
+      if (cleanPhone) {
+        orFilter += `,phone_number.eq.${cleanPhone},phone_number.eq.+91${cleanPhone},whatsapp_number.eq.${cleanPhone},whatsapp_number.eq.+91${cleanPhone}`;
+      }
 
-        if ((!vendors || vendors.length === 0) && cleanPhone) {
-          const { data: phoneVendors } = await supabase
-            .from('vendors')
-            .select('*')
-            .or(`phone_number.eq.${cleanPhone},phone_number.eq.+91${cleanPhone},whatsapp_number.eq.${cleanPhone},whatsapp_number.eq.+91${cleanPhone}`);
-          vendors = phoneVendors;
-        }
-        return vendors;
-      })();
+      const { data: vendors, error: vErr } = await supabase
+        .from('vendors')
+        .select('*')
+        .or(orFilter);
 
-      // Timeout query after 1.5s to prevent hanging
-      const vendors = await Promise.race([
-        vendorQueryPromise,
-        new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 1500)),
-      ]);
+      if (vErr) {
+        console.warn('Vendor lookup error in AuthContext:', vErr);
+      }
 
       if (vendors && vendors.length > 0) {
         let realVendor =
           vendors.find((v) => v.name && v.name !== 'Pending Shop Registration' && v.is_verified) ||
           vendors.find((v) => v.name && v.name !== 'Pending Shop Registration') ||
           vendors[0];
+
+        // If this vendor record does not have the current user's auth_user_id linked yet, link it now
+        if (realVendor.id && (!realVendor.auth_user_id || realVendor.auth_user_id !== u.id)) {
+          supabase
+            .from('vendors')
+            .update({ auth_user_id: u.id })
+            .eq('id', realVendor.id)
+            .then();
+        }
 
         // Ensure verified vendor gets trial status automatically
         if (realVendor.is_verified || realVendor.verification_status === 'approved') {
@@ -110,6 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (realVendor.is_verified || realVendor.verification_status === 'approved') {
           setHasShop(true);
           setVendorStatus('approved');
+          if (cleanPhone) localStorage.setItem(`nearby_cached_vstatus_${cleanPhone}`, 'approved');
         } else if (
           realVendor.verification_status === 'pending' ||
           realVendor.verification_requested_at ||
@@ -117,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ) {
           setHasShop(true);
           setVendorStatus('pending');
+          if (cleanPhone) localStorage.setItem(`nearby_cached_vstatus_${cleanPhone}`, 'pending');
         } else if (realVendor.verification_status === 'rejected') {
           setHasShop(true);
           setVendorStatus('rejected');
@@ -125,15 +130,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setVendorStatus('unregistered');
         }
       } else {
+        // Fallback to local cache if offline or slow network
+        const cachedStatus = cleanPhone ? localStorage.getItem(`nearby_cached_vstatus_${cleanPhone}`) : null;
+        if (cachedStatus === 'approved' || cachedStatus === 'pending') {
+          setHasShop(true);
+          setVendorStatus(cachedStatus as any);
+        } else {
+          setHasShop(false);
+          setVendorStatus('unregistered');
+          setVendorRecord(null);
+        }
+      }
+    } catch (err) {
+      console.warn('Error fetching vendor status:', err);
+      const cleanPhone = (u.phone ? u.phone.replace(/\D/g, '').slice(-10) : '') || (u.email?.includes('@nearbe.app') ? u.email.split('@')[0].replace(/\D/g, '').slice(-10) : '');
+      const cachedStatus = cleanPhone ? localStorage.getItem(`nearby_cached_vstatus_${cleanPhone}`) : null;
+      if (cachedStatus === 'approved' || cachedStatus === 'pending') {
+        setHasShop(true);
+        setVendorStatus(cachedStatus as any);
+      } else {
         setHasShop(false);
         setVendorStatus('unregistered');
         setVendorRecord(null);
       }
-    } catch (err) {
-      console.warn('Error fetching vendor status:', err);
-      setHasShop(false);
-      setVendorStatus('unregistered');
-      setVendorRecord(null);
     }
   }, []);
 
