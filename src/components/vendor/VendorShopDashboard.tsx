@@ -38,7 +38,7 @@ import ShopTimingModal from './ShopTimingModal';
 import VendorReviewsModal from './VendorReviewsModal';
 import ShopPhotosModal from './ShopPhotosModal';
 import { getEffectiveShopStatus } from '../../utils/shopTiming';
-import { calculateReferralProgress, ensureUniqueReferralCode } from '../../utils/referral';
+import { calculateReferralProgress, ensureUniqueReferralCode, generatePermanentReferralCode } from '../../utils/referral';
 
 interface VendorShopDashboardProps {
   vendor: any;
@@ -125,20 +125,32 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
 
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
-  const [vendorReferralCode, setVendorReferralCode] = useState<string>(() => vendor?.referral_code || '');
 
-  // Auto-generate unique referral code if vendor doesn't have one yet
+  // Permanent, deterministic referral code (stays constant per user/mobile)
+  const [vendorReferralCode, setVendorReferralCode] = useState<string>(() => {
+    return (
+      vendor?.referral_code ||
+      (vendor?.auth_user_id ? localStorage.getItem(`nearby_permanent_ref_code_${vendor.auth_user_id}`) : null) ||
+      (cleanPhone ? localStorage.getItem(`nearby_permanent_ref_code_${cleanPhone}`) : null) ||
+      generatePermanentReferralCode(vendor?.owner_name || vendor?.name, vendor?.phone_number, vendor?.auth_user_id)
+    );
+  });
+
+  // Ensure persistent referral code in database & localStorage
   useEffect(() => {
-    if (vendor?.id && !vendor.referral_code) {
-      ensureUniqueReferralCode(vendor.owner_name || vendor.name).then(async (code) => {
-        setVendorReferralCode(code);
-        await supabase.from('vendors').update({ referral_code: code }).eq('id', vendor.id);
-        if (onRefreshVendor) onRefreshVendor();
-      });
-    } else if (vendor?.referral_code) {
-      setVendorReferralCode(vendor.referral_code);
+    if (vendor?.id) {
+      if (!vendor.referral_code) {
+        ensureUniqueReferralCode(vendor.owner_name || vendor.name, vendor.phone_number, vendor.auth_user_id, vendor.id).then(async (code) => {
+          setVendorReferralCode(code);
+          await supabase.from('vendors').update({ referral_code: code }).eq('id', vendor.id);
+        });
+      } else {
+        setVendorReferralCode(vendor.referral_code);
+        if (vendor.auth_user_id) localStorage.setItem(`nearby_permanent_ref_code_${vendor.auth_user_id}`, vendor.referral_code);
+        if (cleanPhone) localStorage.setItem(`nearby_permanent_ref_code_${cleanPhone}`, vendor.referral_code);
+      }
     }
-  }, [vendor?.id, vendor?.referral_code]);
+  }, [vendor?.id, vendor?.referral_code, vendor?.phone_number]);
 
   const referralMetrics = calculateReferralProgress(Number(vendor?.successful_referral_count || 0));
   const referralLink = `${window.location.origin}/vendor/register?ref=${vendorReferralCode || ''}`;

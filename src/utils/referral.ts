@@ -1,25 +1,91 @@
 import { supabase } from '../lib/supabase';
 
 /**
- * Generates a clean, readable referral code like "RAJU4821" or "NEAR8923".
+ * Generates a deterministic, permanent, clean referral code like "AMAN3210" or "RAJU4821".
+ * Uses the user's name prefix (4 chars) + the last 4 digits of their mobile number.
+ * This guarantees the referral code NEVER changes across reloads or re-renders.
  */
-export function generateBaseReferralCode(ownerName?: string): string {
+export function generatePermanentReferralCode(
+  ownerName?: string,
+  phoneNumber?: string,
+  userId?: string
+): string {
   const cleanName = (ownerName || 'NEAR')
     .replace(/[^a-zA-Z]/g, '')
     .toUpperCase()
     .slice(0, 4);
 
   const prefix = cleanName.length >= 3 ? cleanName.padEnd(4, 'X') : 'SHOP';
-  const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-  return `${prefix}${randomSuffix}`;
+
+  // 1. If mobile number is available, use last 4 digits (e.g. 9876543210 -> 3210)
+  const cleanPhone = (phoneNumber || '').replace(/\D/g, '').slice(-10);
+  if (cleanPhone.length >= 4) {
+    return `${prefix}${cleanPhone.slice(-4)}`;
+  }
+
+  // 2. If userId is available, derive 4 alphanumeric chars deterministically
+  if (userId) {
+    const cleanId = userId.replace(/[^a-zA-Z0-9]/g, '').slice(-4).toUpperCase();
+    if (cleanId.length === 4) {
+      return `${prefix}${cleanId}`;
+    }
+  }
+
+  return `${prefix}7799`;
 }
 
 /**
- * Ensures unique referral code by checking database with retry on conflict.
+ * Alias for backward compatibility
  */
-export async function ensureUniqueReferralCode(ownerName?: string): Promise<string> {
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const candidate = generateBaseReferralCode(ownerName);
+export const generateBaseReferralCode = generatePermanentReferralCode;
+
+/**
+ * Ensures unique and permanent referral code for each user/vendor by checking database and saving to permanent cache.
+ */
+export async function ensureUniqueReferralCode(
+  ownerName?: string,
+  phoneNumber?: string,
+  userId?: string,
+  vendorId?: string
+): Promise<string> {
+  const cleanPhone = (phoneNumber || '').replace(/\D/g, '').slice(-10);
+
+  // 1. Check if user already has a saved permanent referral code in localStorage
+  if (userId) {
+    const localCode = localStorage.getItem(`nearby_permanent_ref_code_${userId}`);
+    if (localCode) return localCode;
+  }
+  if (cleanPhone) {
+    const localCodePhone = localStorage.getItem(`nearby_permanent_ref_code_${cleanPhone}`);
+    if (localCodePhone) return localCodePhone;
+  }
+
+  // 2. Generate the deterministic permanent code for this mobile number / name
+  const baseCode = generatePermanentReferralCode(ownerName, phoneNumber, userId);
+
+  // 3. Check if baseCode is available or already owned by this vendor in Supabase
+  try {
+    const { data: existingVendor } = await supabase
+      .from('vendors')
+      .select('id, referral_code')
+      .eq('referral_code', baseCode)
+      .maybeSingle();
+
+    if (!existingVendor || (vendorId && existingVendor.id === vendorId)) {
+      if (userId) localStorage.setItem(`nearby_permanent_ref_code_${userId}`, baseCode);
+      if (cleanPhone) localStorage.setItem(`nearby_permanent_ref_code_${cleanPhone}`, baseCode);
+      return baseCode;
+    }
+  } catch (e) {
+    console.warn('Error checking unique referral code in db:', e);
+  }
+
+  // 4. In case of rare conflict, append index deterministically
+  for (let attempt = 1; attempt <= 9; attempt++) {
+    const namePrefix = baseCode.slice(0, 4);
+    const phonePrefix = (cleanPhone || '9999').slice(-3);
+    const candidate = `${namePrefix}${phonePrefix}${attempt}`;
+
     try {
       const { data } = await supabase
         .from('vendors')
@@ -27,16 +93,19 @@ export async function ensureUniqueReferralCode(ownerName?: string): Promise<stri
         .eq('referral_code', candidate)
         .maybeSingle();
 
-      if (!data) {
+      if (!data || (vendorId && data.id === vendorId)) {
+        if (userId) localStorage.setItem(`nearby_permanent_ref_code_${userId}`, candidate);
+        if (cleanPhone) localStorage.setItem(`nearby_permanent_ref_code_${cleanPhone}`, candidate);
         return candidate;
       }
     } catch {
-      // If table query fails, fallback to candidate
       return candidate;
     }
   }
-  // Ultimate fallback with timestamp
-  return `REF${Date.now().toString().slice(-5)}`;
+
+  if (userId) localStorage.setItem(`nearby_permanent_ref_code_${userId}`, baseCode);
+  if (cleanPhone) localStorage.setItem(`nearby_permanent_ref_code_${cleanPhone}`, baseCode);
+  return baseCode;
 }
 
 /**

@@ -852,8 +852,13 @@ export default function VendorRegisterPage() {
       const existingVendor = existingVendors.length > 0 ? existingVendors[0] : null;
       const existingId = existingVendor?.id || null;
 
-      // Assign or keep unique referral code
-      const assignedReferralCode = existingVendor?.referral_code || (await ensureUniqueReferralCode(wizardData.fullName));
+      // Assign or keep unique permanent referral code
+      const assignedReferralCode =
+        existingVendor?.referral_code ||
+        (user?.id ? localStorage.getItem(`nearby_permanent_ref_code_${user.id}`) : null) ||
+        (wizardData.mobileNumber ? localStorage.getItem(`nearby_permanent_ref_code_${wizardData.mobileNumber}`) : null) ||
+        (await ensureUniqueReferralCode(wizardData.fullName, wizardData.mobileNumber, user.id, existingId));
+
       const cleanReferredByCode = wizardData.referredByCode?.trim().toUpperCase() || existingVendor?.referred_by_code || null;
 
       const fullPayload = {
