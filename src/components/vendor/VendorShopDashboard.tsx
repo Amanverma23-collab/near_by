@@ -382,80 +382,103 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
           variants={sectionVariants}
           initial="hidden"
           animate="show"
-          className="relative rounded-3xl overflow-hidden shadow-card border border-border-light bg-black min-h-[220px] sm:aspect-[6/3] flex flex-col justify-between"
+          className="relative rounded-3xl overflow-hidden shadow-card border border-border-light min-h-[200px] sm:min-h-[240px] flex flex-col justify-between"
         >
-          {/* Background Image with Scrim */}
+          {/* Background Image - Bright, Vibrant, High Visibility */}
           <div className="absolute inset-0 z-0">
             <img
               src={shopImage}
               alt={vendor?.name || 'Shop'}
-              className="w-full h-full object-cover opacity-45"
+              className="w-full h-full object-cover"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/20" />
+            {/* Soft bottom vignette gradient for crisp shop name readability without dimming the photo */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-black/30" />
           </div>
 
-          <div className="relative z-10 p-4 sm:p-8 flex flex-col justify-between h-full text-white space-y-3 sm:space-y-4">
-            {/* Top Bar inside Hero: LIVE Badge & Category Tag */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1 rounded-full bg-teal-500/25 border border-teal-400/40 backdrop-blur-md shrink-0">
-                {/* Pulsing Dot */}
-                <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75" style={{ animationDuration: '2s' }} />
-                  <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-teal-400" />
-                </span>
-                <span className="text-[10px] sm:text-[11px] font-display font-extrabold text-teal-200 uppercase tracking-wider">
-                  LIVE ON NEARBY
-                </span>
-              </div>
-
-              {/* Category tag */}
-              <span className="text-[10px] sm:text-[11px] font-display font-bold px-2.5 py-1 sm:px-3 sm:py-1 rounded-full bg-white/15 backdrop-blur-md text-white border border-white/20 capitalize truncate max-w-[130px] sm:max-w-none">
-                {vendor?.category || 'General Merchant'}
+          {/* Top Bar inside Hero: LIVE Badge & Category Tag */}
+          <div className="relative z-10 p-4 sm:p-5 flex items-center justify-between gap-2">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1 rounded-full bg-emerald-500/30 border border-emerald-400/50 backdrop-blur-md shrink-0 shadow-xs">
+              {/* Pulsing Dot */}
+              <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" style={{ animationDuration: '2s' }} />
+                <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-emerald-400" />
+              </span>
+              <span className="text-[10px] sm:text-[11px] font-display font-extrabold text-emerald-200 uppercase tracking-wider">
+                LIVE ON NEARBY
               </span>
             </div>
 
-            {/* Shop Details */}
-            <div className="space-y-0.5">
-              <h1 className="text-xl sm:text-3xl lg:text-4xl font-display font-extrabold text-white tracking-tight drop-shadow-md truncate">
-                {vendor?.name || 'Your Business Name'}
-              </h1>
-            </div>
+            {/* Category tag */}
+            <span className="text-[10px] sm:text-[11px] font-display font-bold px-2.5 py-1 sm:px-3 sm:py-1 rounded-full bg-black/40 backdrop-blur-md text-white border border-white/20 capitalize truncate max-w-[130px] sm:max-w-none shadow-xs">
+              {vendor?.category || 'General Merchant'}
+            </span>
+          </div>
 
-            {/* Subscription Line */}
-            <div className="pt-2 border-t border-white/20 flex flex-wrap items-center justify-between gap-2 text-[11px] sm:text-xs">
-              <div className="flex items-center gap-1.5 text-teal-200 font-display font-medium min-w-0">
-                <Sparkles size={13} className="text-amber-300 shrink-0" />
-                <span className="truncate">
-                  {isTrial ? 'Starter Free Trial' : 'NearBy Partner Pro'} —{' '}
-                  <strong className="text-white font-bold">{formattedExpiry}</strong>
+          {/* Bottom-Left Corner: Shop Name */}
+          <div className="relative z-10 p-4 sm:p-5">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-display font-extrabold text-white tracking-tight drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)] truncate">
+              {vendor?.name || 'Your Business Name'}
+            </h1>
+          </div>
+        </motion.section>
+
+        {/* SECTION 1.5: SUBSCRIPTION & STARTER FREE TRIAL STATUS (Below Photo) */}
+        <motion.div
+          custom={0.2}
+          variants={sectionVariants}
+          initial="hidden"
+          animate="show"
+          className="bg-white rounded-2xl p-3.5 sm:p-4 border border-border-light shadow-xs flex items-center justify-between gap-3"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/80 shrink-0">
+              <Sparkles size={18} />
+            </div>
+            <div className="min-w-0 space-y-0.5">
+              <div className="flex items-center gap-2">
+                <span className="text-xs sm:text-sm font-display font-extrabold text-ink truncate">
+                  {isTrial ? 'Starter Free Trial' : 'NearBy Partner Pro'}
+                </span>
+                <span className="text-[9px] sm:text-[10px] font-display font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase tracking-wider">
+                  Active
                 </span>
               </div>
-
-              <button
-                onClick={() => navigate('/vendor/subscriptions')}
-                className="text-[11px] sm:text-xs font-display font-bold text-amber-300 hover:text-amber-200 underline cursor-pointer shrink-0"
-              >
-                Manage Subscription &rarr;
-              </button>
+              <p className="text-[11px] text-ink-muted truncate font-medium">
+                {formattedExpiry}
+              </p>
             </div>
           </div>
 
-          {/* Expiration Warning Banner */}
-          {isExpiringSoon && (
-            <div className="bg-amber-500 text-amber-950 px-6 py-2.5 flex items-center justify-between gap-3 text-xs font-display font-bold">
-              <div className="flex items-center gap-2">
-                <AlertTriangle size={16} className="shrink-0" />
-                <span>Your subscription plan expires soon — renew to stay live and visible to local customers.</span>
-              </div>
-              <button
-                onClick={() => navigate('/vendor/subscriptions')}
-                className="px-3 py-1 bg-amber-950 text-amber-200 hover:bg-black rounded-lg text-[11px] font-extrabold transition-colors cursor-pointer shrink-0"
-              >
-                Renew Now
-              </button>
+          <button
+            onClick={() => navigate('/vendor/subscriptions')}
+            className="px-3.5 py-2 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-xl text-xs font-display font-extrabold transition-colors cursor-pointer shrink-0 flex items-center gap-1"
+          >
+            <span>Manage Plan</span>
+            <ChevronRight size={14} />
+          </button>
+        </motion.div>
+
+        {/* Expiration Warning Banner */}
+        {isExpiringSoon && (
+          <motion.div
+            custom={0.3}
+            variants={sectionVariants}
+            initial="hidden"
+            animate="show"
+            className="bg-amber-500 text-amber-950 px-4 sm:px-6 py-3 rounded-2xl shadow-xs flex items-center justify-between gap-3 text-xs font-display font-bold"
+          >
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={16} className="shrink-0 text-amber-950" />
+              <span>Your subscription plan expires soon — renew to stay live and visible to local customers.</span>
             </div>
-          )}
-        </motion.section>
+            <button
+              onClick={() => navigate('/vendor/subscriptions')}
+              className="px-3 py-1 bg-amber-950 text-amber-200 hover:bg-black rounded-lg text-[11px] font-extrabold transition-colors cursor-pointer shrink-0"
+            >
+              Renew Now
+            </button>
+          </motion.div>
+        )}
 
         {/* SHOP ADDRESS CARD (Underneath Hero Image) */}
         {(vendor?.address || vendor?.city) && (
