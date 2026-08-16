@@ -509,19 +509,19 @@ export default function PlanDetailPage() {
                   </button>
                 </motion.div>
               ) : (
-                <form onSubmit={handleApplyPromo} className="space-y-2">
-                  <div className="flex gap-2">
+                <form onSubmit={handleApplyPromo} className="space-y-2.5">
+                  <div className="relative flex items-center bg-surface border-2 border-border-light focus-within:border-brand rounded-2xl p-1 transition-all">
                     <input
                       type="text"
                       value={promoInput}
                       onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
-                      placeholder="e.g. WELCOME10"
-                      className="flex-1 px-4 py-2.5 text-sm font-mono uppercase bg-surface border-2 border-border-light rounded-xl outline-none hover:border-ink-muted focus:border-brand transition-all"
+                      placeholder="E.G. WELCOME10"
+                      className="w-full min-w-0 bg-transparent px-3.5 py-2 text-xs sm:text-sm font-mono uppercase text-ink placeholder:text-ink-muted/50 outline-none"
                     />
                     <button
                       type="submit"
                       disabled={!promoInput.trim()}
-                      className="px-5 py-2.5 bg-brand hover:bg-brand-dark text-white font-display font-extrabold text-xs rounded-xl shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                      className="px-4 py-2 bg-brand hover:bg-brand-dark text-white font-display font-extrabold text-xs rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                     >
                       Apply
                     </button>
@@ -538,9 +538,23 @@ export default function PlanDetailPage() {
                       </motion.p>
                     )}
                   </AnimatePresence>
-                  <p className="text-[11px] text-ink-muted px-1">
-                    Try using test codes: <code className="font-mono text-brand">WELCOME10</code> (10% off), <code className="font-mono text-brand">NEARBY20</code> (20% off)
-                  </p>
+                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5 text-[11px] text-ink-muted px-1">
+                    <span>Quick apply:</span>
+                    <button
+                      type="button"
+                      onClick={() => setPromoInput('WELCOME10')}
+                      className="px-2 py-0.5 bg-teal-50 hover:bg-teal-100 text-brand font-mono font-bold rounded-md border border-teal-200 transition-colors cursor-pointer"
+                    >
+                      WELCOME10 (10% off)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPromoInput('NEARBY20')}
+                      className="px-2 py-0.5 bg-teal-50 hover:bg-teal-100 text-brand font-mono font-bold rounded-md border border-teal-200 transition-colors cursor-pointer"
+                    >
+                      NEARBY20 (20% off)
+                    </button>
+                  </div>
                 </form>
               )}
             </motion.div>
