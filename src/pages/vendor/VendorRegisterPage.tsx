@@ -940,6 +940,9 @@ export default function VendorRegisterPage() {
       localStorage.removeItem('nearby_vendor_draft_data');
       localStorage.removeItem('nearby_vendor_draft_step');
 
+      // Set flag indicating this active session just submitted a new shop registration awaiting verification
+      localStorage.setItem(`nearby_vendor_registration_in_progress_${user.id}`, 'true');
+
       // Redirect to Pending Verification screen
       navigate('/vendor/pending');
     } catch (err: any) {
