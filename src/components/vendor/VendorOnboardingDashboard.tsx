@@ -374,22 +374,22 @@ export default function VendorOnboardingDashboard() {
         {/* Header */}
         <header className="sticky top-0 z-40 w-full bg-white/80 backdrop-blur-md border-b border-border-light">
           <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl font-extrabold font-display">
+            <div className="flex flex-col justify-center">
+              <span className="text-xl sm:text-2xl font-extrabold font-display leading-none tracking-tight">
                 <span className="text-ink">Near</span>
                 <span className="text-brand">By</span>
               </span>
-              <span className="text-[10px] sm:text-xs font-display font-extrabold px-2 py-0.5 rounded-full bg-brand/10 text-brand uppercase tracking-wider">
+              <span className="text-[8px] sm:text-[9px] font-display font-extrabold text-brand uppercase tracking-widest mt-0.5 leading-none">
                 Business
               </span>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => navigate('/dashboard')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-teal-200 bg-teal-50 text-teal-800 hover:bg-teal-100 transition-colors cursor-pointer text-xs font-display font-extrabold"
+                className="p-2 rounded-full border border-teal-200 bg-teal-50 text-teal-800 hover:bg-teal-100 transition-colors cursor-pointer shadow-xs"
+                title="Customer App"
               >
-                <Home size={14} className="text-teal-700" />
-                <span>Customer App</span>
+                <Home size={18} className="text-teal-700" />
               </button>
               <button
                 onClick={handleSignOut}
@@ -523,12 +523,12 @@ export default function VendorOnboardingDashboard() {
         {/* Header */}
         <header className="sticky top-0 z-40 w-full bg-white/80 backdrop-blur-md border-b border-border-light">
           <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl font-extrabold font-display">
+            <div className="flex flex-col justify-center">
+              <span className="text-xl sm:text-2xl font-extrabold font-display leading-none tracking-tight">
                 <span className="text-ink">Near</span>
                 <span className="text-brand">By</span>
               </span>
-              <span className="text-[10px] sm:text-xs font-display font-extrabold px-2 py-0.5 rounded-full bg-brand/10 text-brand uppercase tracking-wider">
+              <span className="text-[8px] sm:text-[9px] font-display font-extrabold text-brand uppercase tracking-widest mt-0.5 leading-none">
                 Business
               </span>
             </div>
@@ -642,22 +642,22 @@ export default function VendorOnboardingDashboard() {
       {/* Header */}
       <header className="sticky top-0 z-40 w-full bg-white/80 backdrop-blur-md border-b border-border-light">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl font-extrabold font-display">
+          <div className="flex flex-col justify-center">
+            <span className="text-xl sm:text-2xl font-extrabold font-display leading-none tracking-tight">
               <span className="text-ink">Near</span>
               <span className="text-brand">By</span>
             </span>
-            <span className="text-[10px] sm:text-xs font-display font-extrabold px-2 py-0.5 rounded-full bg-brand/10 text-brand uppercase tracking-wider">
+            <span className="text-[8px] sm:text-[9px] font-display font-extrabold text-brand uppercase tracking-widest mt-0.5 leading-none">
               Business
             </span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => navigate('/dashboard')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-teal-200 bg-teal-50 text-teal-800 hover:bg-teal-100 transition-colors cursor-pointer text-xs font-display font-extrabold"
+              className="p-2 rounded-full border border-teal-200 bg-teal-50 text-teal-800 hover:bg-teal-100 transition-colors cursor-pointer shadow-xs"
+              title="Customer App"
             >
-              <Home size={14} className="text-teal-700" />
-              <span>Customer App</span>
+              <Home size={18} className="text-teal-700" />
             </button>
             <button
               onClick={handleSignOut}

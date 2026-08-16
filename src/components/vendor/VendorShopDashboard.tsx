@@ -29,6 +29,7 @@ import {
   Home,
   Gift,
   Award,
+  MapPin,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useUnread } from '../../context/UnreadContext';
@@ -241,28 +242,26 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
       {/* ────────────────── TOP NAVBAR ────────────────── */}
       <header className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-border-light shadow-xs">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl font-extrabold font-display">
+          <div className="flex flex-col justify-center">
+            <span className="text-xl sm:text-2xl font-extrabold font-display leading-none tracking-tight">
               <span className="text-ink">Near</span>
               <span className="text-brand">By</span>
             </span>
-            <span className="text-[10px] sm:text-xs font-display font-extrabold px-2.5 py-0.5 rounded-full bg-brand/10 text-brand uppercase tracking-wider">
+            <span className="text-[8px] sm:text-[9px] font-display font-extrabold text-brand uppercase tracking-widest mt-0.5 leading-none">
               Business
             </span>
           </div>
 
           {/* Top Header Actions */}
           <div className="flex items-center gap-2">
-            {/* Switch to Customer App Pill Button */}
+            {/* Switch to Customer App Icon Button */}
             <motion.button
-              whileTap={{ scale: 0.95 }}
+              whileTap={{ scale: 0.92 }}
               onClick={() => navigate('/dashboard')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-teal-200 bg-teal-50 text-teal-800 hover:bg-teal-100 transition-colors cursor-pointer text-xs font-display font-extrabold"
-              title="Return to Customer App"
+              className="p-2 rounded-full border border-teal-200 bg-teal-50 text-teal-800 hover:bg-teal-100 transition-colors cursor-pointer shadow-xs"
+              title="Customer App"
             >
-              <Home size={14} className="text-teal-700" />
-              <span className="hidden sm:inline">Customer App</span>
-              <span className="sm:hidden">App</span>
+              <Home size={18} className="text-teal-700" />
             </motion.button>
 
             {/* Quick Chats Icon Button */}
@@ -416,13 +415,10 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
             </div>
 
             {/* Shop Details */}
-            <div className="space-y-0.5 sm:space-y-1">
+            <div className="space-y-0.5">
               <h1 className="text-xl sm:text-3xl lg:text-4xl font-display font-extrabold text-white tracking-tight drop-shadow-md truncate">
                 {vendor?.name || 'Your Business Name'}
               </h1>
-              <p className="text-[11px] sm:text-xs text-gray-200 truncate">
-                📍 {vendor?.address || vendor?.city || 'Location not specified'}
-              </p>
             </div>
 
             {/* Subscription Line */}
@@ -460,6 +456,29 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
             </div>
           )}
         </motion.section>
+
+        {/* SHOP ADDRESS CARD (Underneath Hero Image) */}
+        {(vendor?.address || vendor?.city) && (
+          <motion.div
+            custom={0.5}
+            variants={sectionVariants}
+            initial="hidden"
+            animate="show"
+            className="flex items-center gap-3 px-4 py-3 bg-white rounded-2xl border border-border-light shadow-xs text-xs font-body text-ink"
+          >
+            <div className="w-7 h-7 rounded-xl bg-rose-50 border border-rose-100 text-rose-500 flex items-center justify-center shrink-0 shadow-2xs">
+              <MapPin size={14} className="text-rose-500" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] uppercase tracking-wider font-display font-extrabold text-ink-muted block leading-none mb-0.5">
+                Shop Location
+              </span>
+              <p className="font-medium text-ink truncate leading-tight">
+                {vendor?.address || vendor?.city}
+              </p>
+            </div>
+          </motion.div>
+        )}
 
         {/* SECTION 2: QUICK STATS ROW */}
         <motion.section
