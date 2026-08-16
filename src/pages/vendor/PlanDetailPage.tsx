@@ -117,6 +117,11 @@ export default function PlanDetailPage() {
         localStorage.setItem(`nearby_trial_used_${cleanPhone}`, 'true');
       }
 
+      // Update by vendor id directly if available
+      if (vendorRecord?.id) {
+        await supabase.from('vendors').update(subData).eq('id', vendorRecord.id);
+      }
+
       // Update by auth_user_id
       const { error: err1 } = await supabase
         .from('vendors')
@@ -140,7 +145,7 @@ export default function PlanDetailPage() {
         const { data: vRecord } = await supabase
           .from('vendors')
           .select('id, referral_code, referred_by_code, referral_counted, is_verified, verification_status, subscription_status')
-          .eq('auth_user_id', user.id)
+          .or(`auth_user_id.eq.${user.id},phone_number.eq.${cleanPhone},phone_number.eq.+91${cleanPhone}`)
           .maybeSingle();
 
         if (vRecord && vRecord.referred_by_code && !vRecord.referral_counted) {
@@ -206,6 +211,11 @@ export default function PlanDetailPage() {
         localStorage.setItem(`nearby_trial_used_${cleanPhone}`, 'true');
       }
 
+      // Update by vendor id directly if available
+      if (vendorRecord?.id) {
+        await supabase.from('vendors').update(subData).eq('id', vendorRecord.id);
+      }
+
       // Update by auth_user_id
       const { error: err1 } = await supabase
         .from('vendors')
@@ -229,7 +239,7 @@ export default function PlanDetailPage() {
         const { data: vRecord } = await supabase
           .from('vendors')
           .select('id, referral_code, referred_by_code, referral_counted, is_verified, verification_status, subscription_status')
-          .eq('auth_user_id', user.id)
+          .or(`auth_user_id.eq.${user.id},phone_number.eq.${cleanPhone},phone_number.eq.+91${cleanPhone}`)
           .maybeSingle();
 
         if (vRecord && vRecord.referred_by_code && !vRecord.referral_counted) {

@@ -74,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const { data: phoneVendors } = await supabase
             .from('vendors')
             .select('*')
-            .or(`phone_number.eq.${cleanPhone},phone_number.eq.+91${cleanPhone}`);
+            .or(`phone_number.eq.${cleanPhone},phone_number.eq.+91${cleanPhone},whatsapp_number.eq.${cleanPhone},whatsapp_number.eq.+91${cleanPhone}`);
           vendors = phoneVendors;
         }
         return vendors;
@@ -87,10 +87,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ]);
 
       if (vendors && vendors.length > 0) {
-        const realVendor =
+        let realVendor =
           vendors.find((v) => v.name && v.name !== 'Pending Shop Registration' && v.is_verified) ||
           vendors.find((v) => v.name && v.name !== 'Pending Shop Registration') ||
           vendors[0];
+
+        // Ensure verified vendor gets trial status automatically
+        if (realVendor.is_verified || realVendor.verification_status === 'approved') {
+          if (!realVendor.subscription_status) {
+            realVendor = {
+              ...realVendor,
+              is_verified: true,
+              verification_status: 'approved',
+              subscription_status: 'trial',
+              subscription_expires_at: realVendor.subscription_expires_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            };
+          }
+        }
 
         setVendorRecord(realVendor);
 

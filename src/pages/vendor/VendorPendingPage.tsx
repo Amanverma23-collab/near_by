@@ -181,15 +181,15 @@ export default function VendorPendingPage() {
                 </p>
               </div>
 
-              {/* Action Button: NEXT */}
+              {/* Action Button: Open Shop Dashboard */}
               <div>
                 <motion.button
                   whileHover={{ scale: 1.02, boxShadow: "0 8px 24px rgba(13, 148, 136, 0.25)" }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => navigate('/vendor/subscriptions')}
+                  onClick={() => navigate('/vendor/dashboard')}
                   className="w-full py-4 bg-brand hover:bg-brand-dark text-white font-display font-extrabold rounded-2xl border-2 border-amber-400 hover:border-amber-500 shadow-brand text-sm cursor-pointer transition-all flex items-center justify-center gap-2"
                 >
-                  <span>Next: Choose Subscription Plan</span>
+                  <span>Open Shop Dashboard</span>
                   <ArrowRight size={18} />
                 </motion.button>
               </div>

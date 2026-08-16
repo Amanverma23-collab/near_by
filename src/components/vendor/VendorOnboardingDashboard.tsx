@@ -151,6 +151,32 @@ export default function VendorOnboardingDashboard() {
           }
         }
 
+        // Ensure verified vendor gets active trial status automatically so dashboard opens immediately on any device
+        if (bestVendor.is_verified || bestVendor.verification_status === 'approved') {
+          if (!bestVendor.subscription_status) {
+            const now = new Date();
+            const expires30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+            bestVendor = {
+              ...bestVendor,
+              subscription_status: 'trial',
+              subscription_expires_at: bestVendor.subscription_expires_at || expires30Days,
+            };
+
+            if (bestVendor.id) {
+              supabase
+                .from('vendors')
+                .update({
+                  subscription_status: 'trial',
+                  subscription_expires_at: bestVendor.subscription_expires_at || expires30Days,
+                  is_verified: true,
+                  verification_status: 'approved',
+                })
+                .eq('id', bestVendor.id)
+                .then();
+            }
+          }
+        }
+
         setVendor(bestVendor);
         try {
           sessionStorage.setItem('nearby_cached_vendor_dashboard', JSON.stringify(bestVendor));
@@ -455,10 +481,27 @@ export default function VendorOnboardingDashboard() {
               <motion.button
                 whileHover={{ scale: 1.02, boxShadow: "0 8px 24px rgba(13, 148, 136, 0.25)" }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => navigate('/vendor/subscriptions')}
+                onClick={() => {
+                  const now = new Date();
+                  const expires30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+                  const updatedVendor = {
+                    ...vendor,
+                    subscription_status: vendor.subscription_status || 'trial',
+                    subscription_expires_at: vendor.subscription_expires_at || expires30Days,
+                  };
+                  setVendor(updatedVendor);
+                  if (vendor.id) {
+                    supabase.from('vendors').update({
+                      subscription_status: updatedVendor.subscription_status,
+                      subscription_expires_at: updatedVendor.subscription_expires_at,
+                      is_verified: true,
+                      verification_status: 'approved',
+                    }).eq('id', vendor.id).then();
+                  }
+                }}
                 className="w-full py-4 bg-brand hover:bg-brand-dark text-white font-display font-extrabold rounded-[var(--radius-md)] border-2 border-amber-400 hover:border-amber-500 shadow-[0_4px_14px_rgba(245,158,11,0.12)] text-sm cursor-pointer transition-all duration-300"
               >
-                Continue to Subscription Plans
+                Go to Shop Dashboard
               </motion.button>
             </div>
           </motion.div>
