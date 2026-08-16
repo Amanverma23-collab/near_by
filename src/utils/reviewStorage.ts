@@ -82,11 +82,12 @@ export async function getSavedReviews(vendorId: string): Promise<SavedReview[]> 
  */
 export async function saveNewReview(
   vendorId: string,
-  reviewData: { reviewerName: string; rating: number; comment?: string; photoUrl?: string; vendorName?: string }
+  reviewData: { reviewerName: string; reviewerPhone?: string; rating: number; comment?: string; photoUrl?: string; vendorName?: string }
 ): Promise<SavedReview> {
   purgeLegacyLocalStorageReviews();
 
   const currentPhone =
+    reviewData.reviewerPhone ||
     localStorage.getItem('nearby_customer_phone') ||
     localStorage.getItem('nearby_vendor_phone') ||
     undefined;
