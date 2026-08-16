@@ -71,6 +71,8 @@ export async function initiateRazorpayPayment({
 
     // 2. If Razorpay JS is available in window, launch checkout modal
     if (typeof window !== 'undefined' && window.Razorpay) {
+      let isCompleted = false;
+
       const options: any = {
         key: razorpayKey,
         amount: orderAmount,
@@ -92,6 +94,7 @@ export async function initiateRazorpayPayment({
           color: '#0D9488', // Vendor teal brand theme
         },
         handler: async function (response: any) {
+          isCompleted = true;
           try {
             // Verify payment signature via Edge Function
             const { data: verifyData } = await supabase.functions.invoke(
@@ -126,7 +129,9 @@ export async function initiateRazorpayPayment({
         },
         modal: {
           ondismiss: function () {
-            onFailure('Payment was cancelled by the user.');
+            if (!isCompleted) {
+              onFailure('Payment was cancelled by the user.');
+            }
           },
         },
       };
@@ -137,11 +142,13 @@ export async function initiateRazorpayPayment({
 
       const rzp = new window.Razorpay(options);
       rzp.on('payment.failed', function (response: any) {
-        onFailure(
-          response?.error?.description ||
-            response?.error?.reason ||
-            'UPI Payment failed. Please try again with a valid UPI ID (e.g. success@razorpay).'
-        );
+        if (!isCompleted) {
+          onFailure(
+            response?.error?.description ||
+              response?.error?.reason ||
+              'UPI Payment failed. Please try again with a valid UPI ID (e.g. success@razorpay).'
+          );
+        }
       });
 
       rzp.open();

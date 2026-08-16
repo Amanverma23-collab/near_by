@@ -303,6 +303,7 @@ export default function PlanDetailPage() {
       ownerPhone: cleanPhone || vendorRecord?.phone_number || '',
       ownerEmail: user.email || '',
       onSuccess: async (details) => {
+        setPaymentError(null);
         await activateSubscriptionRecord(details.paymentId);
       },
       onFailure: (errorMsg) => {
