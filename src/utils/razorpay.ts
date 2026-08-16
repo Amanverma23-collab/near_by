@@ -45,6 +45,19 @@ export async function initiateRazorpayPayment({
         }
       );
 
+      if (orderData?.error) {
+        const errorDesc =
+          typeof orderData.error === 'object'
+            ? orderData.error.description || orderData.error.message || JSON.stringify(orderData.error)
+            : orderData.error;
+        console.error('Razorpay Order Error:', errorDesc);
+
+        if (errorDesc.toLowerCase().includes('auth')) {
+          onFailure('Razorpay Authentication Failed: Please check your API Key & Secret in Razorpay Dashboard and ensure you clicked "Save your API key".');
+          return;
+        }
+      }
+
       if (!orderErr && orderData?.id) {
         orderId = orderData.id;
         orderAmount = orderData.amount || orderAmount;
