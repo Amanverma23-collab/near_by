@@ -14,7 +14,6 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import BrandLoader from '../ui/BrandLoader';
 import VerificationTimer from './VerificationTimer';
-import DevApproveButton from './DevApproveButton';
 import VendorShopDashboard from './VendorShopDashboard';
 
 import VerifiedBadgeIcon from './icons/VerifiedBadgeIcon';
@@ -64,15 +63,28 @@ const ConfettiLite = () => {
 };
 
 export default function VendorOnboardingDashboard() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [showStickyBtn, setShowStickyBtn] = useState(false);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
-  const [vendor, setVendor] = useState<any>(null);
+  const [vendor, setVendor] = useState<any>(() => {
+    try {
+      const cached = sessionStorage.getItem('nearby_cached_vendor_dashboard');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
   const [loading, setLoading] = useState(true);
 
   const fetchVendorStatus = async () => {
+    if (authLoading) return;
+
     if (!user) {
+      setVendor(null);
+      try {
+        sessionStorage.removeItem('nearby_cached_vendor_dashboard');
+      } catch {}
       setLoading(false);
       return;
     }
@@ -140,6 +152,9 @@ export default function VendorOnboardingDashboard() {
         }
 
         setVendor(bestVendor);
+        try {
+          sessionStorage.setItem('nearby_cached_vendor_dashboard', JSON.stringify(bestVendor));
+        } catch {}
       } else {
         // Fallback: Check if draft was submitted or localStorage subscription exists
         const cleanPhone = resolvedPhone;
@@ -153,7 +168,7 @@ export default function VendorOnboardingDashboard() {
             if (localSub?.status) {
               const draftDataStr = localStorage.getItem('nearby_vendor_draft_data');
               const draftData = draftDataStr ? JSON.parse(draftDataStr) : {};
-              setVendor({
+              const fallbackVendor = {
                 id: 'vendor-' + user.id,
                 name: draftData.shopName || 'My Shop',
                 owner_name: draftData.fullName || user.user_metadata?.full_name || 'Owner',
@@ -170,7 +185,11 @@ export default function VendorOnboardingDashboard() {
                 review_count: 0,
                 is_open_now: true,
                 opening_hours: '9:00 AM - 9:00 PM',
-              });
+              };
+              setVendor(fallbackVendor);
+              try {
+                sessionStorage.setItem('nearby_cached_vendor_dashboard', JSON.stringify(fallbackVendor));
+              } catch {}
               setLoading(false);
               return;
             }
@@ -178,6 +197,9 @@ export default function VendorOnboardingDashboard() {
         }
 
         setVendor(null);
+        try {
+          sessionStorage.removeItem('nearby_cached_vendor_dashboard');
+        } catch {}
       }
     } catch (err) {
       console.error('Error fetching vendor status:', err);
@@ -187,7 +209,9 @@ export default function VendorOnboardingDashboard() {
   };
 
   useEffect(() => {
-    fetchVendorStatus();
+    if (!authLoading) {
+      fetchVendorStatus();
+    }
 
     const handleVendorUpdated = () => {
       fetchVendorStatus();
@@ -195,7 +219,7 @@ export default function VendorOnboardingDashboard() {
 
     window.addEventListener('nearby_vendor_updated', handleVendorUpdated);
     return () => window.removeEventListener('nearby_vendor_updated', handleVendorUpdated);
-  }, [user]);
+  }, [user, authLoading]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -277,7 +301,18 @@ export default function VendorOnboardingDashboard() {
     }
   };
 
-  if (loading) {
+  const handleSignOut = async () => {
+    try {
+      sessionStorage.removeItem('nearby_cached_vendor_dashboard');
+    } catch {}
+    await signOut();
+  };
+
+  if (authLoading && !vendor) {
+    return <BrandLoader />;
+  }
+
+  if (loading && !vendor) {
     return <BrandLoader />;
   }
 
@@ -331,7 +366,7 @@ export default function VendorOnboardingDashboard() {
                 <span>Customer App</span>
               </button>
               <button
-                onClick={signOut}
+                onClick={handleSignOut}
                 className="text-xs font-display font-bold text-ink-muted hover:text-ink cursor-pointer border border-border px-3.5 py-1.5 rounded-full hover:bg-surface transition-colors"
               >
                 Logout
@@ -582,7 +617,7 @@ export default function VendorOnboardingDashboard() {
               <span>Customer App</span>
             </button>
             <button
-              onClick={signOut}
+              onClick={handleSignOut}
               className="text-xs font-display font-bold text-ink-muted hover:text-ink cursor-pointer border border-border px-3.5 py-1.5 rounded-full hover:bg-surface transition-colors"
             >
               Logout

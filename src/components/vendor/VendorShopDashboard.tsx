@@ -27,6 +27,8 @@ import {
   Camera,
   ArrowLeft,
   Home,
+  Gift,
+  Award,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useUnread } from '../../context/UnreadContext';
@@ -36,6 +38,7 @@ import ShopTimingModal from './ShopTimingModal';
 import VendorReviewsModal from './VendorReviewsModal';
 import ShopPhotosModal from './ShopPhotosModal';
 import { getEffectiveShopStatus } from '../../utils/shopTiming';
+import { calculateReferralProgress, ensureUniqueReferralCode } from '../../utils/referral';
 
 interface VendorShopDashboardProps {
   vendor: any;
@@ -86,10 +89,20 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
     }
   }
 
-  // Real stats computation directly from vendor database record
-  const localViews = Number(localStorage.getItem(`nearby_views_${vendor?.id}`) || 0);
-  const localCalls = Number(localStorage.getItem(`nearby_calls_${vendor?.id}`) || 0);
-  const localWa = Number(localStorage.getItem(`nearby_wa_${vendor?.id}`) || 0);
+  // Real stats computation directly from vendor database record & live interactions
+  const cleanPhone = (vendor?.phone_number || '').replace(/\D/g, '').slice(-10);
+  const localViews = Math.max(
+    Number(localStorage.getItem(`nearby_views_${vendor?.id}`) || 0),
+    cleanPhone ? Number(localStorage.getItem(`nearby_views_${cleanPhone}`) || 0) : 0
+  );
+  const localCalls = Math.max(
+    Number(localStorage.getItem(`nearby_calls_${vendor?.id}`) || 0),
+    cleanPhone ? Number(localStorage.getItem(`nearby_calls_${cleanPhone}`) || 0) : 0
+  );
+  const localWa = Math.max(
+    Number(localStorage.getItem(`nearby_wa_${vendor?.id}`) || 0),
+    cleanPhone ? Number(localStorage.getItem(`nearby_wa_${cleanPhone}`) || 0) : 0
+  );
 
   const allVendorReviews: any[] = Array.isArray(vendor?.reviews) ? vendor.reviews : [];
   const realReviewCount = allVendorReviews.length;
@@ -98,7 +111,7 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
   if (realReviewCount > 0) {
     const sum = allVendorReviews.reduce((acc: number, r: any) => acc + Number(r.rating || 5), 0);
     realRating = Math.round((sum / realReviewCount) * 10) / 10;
-  } else if (vendor?.rating) {
+  } else if (vendor?.rating && Number(vendor.rating) > 0 && Number(vendor?.review_count || 0) > 0) {
     realRating = Number(vendor.rating);
   }
 
@@ -106,15 +119,50 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
     views: Number(vendor?.profile_views || vendor?.views_count || localViews || 0),
     callClicks: Number(vendor?.call_clicks || vendor?.calls_count || localCalls || 0),
     whatsappClicks: Number(vendor?.whatsapp_clicks || vendor?.whatsapp_count || localWa || 0),
-    rating: realRating > 0 ? realRating : 0.0,
-    reviewCount: realReviewCount,
+    rating: realReviewCount > 0 ? realRating : (vendor?.rating && Number(vendor?.review_count || 0) > 0 ? Number(vendor.rating) : 0.0),
+    reviewCount: realReviewCount || Number(vendor?.review_count || 0),
   };
 
-  const handleCopyReferral = () => {
-    const referralUrl = `https://nearbe.app/join?ref=${vendor?.phone_number || 'NEARBY50'}`;
-    navigator.clipboard.writeText(referralUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [vendorReferralCode, setVendorReferralCode] = useState<string>(() => vendor?.referral_code || '');
+
+  // Auto-generate unique referral code if vendor doesn't have one yet
+  useEffect(() => {
+    if (vendor?.id && !vendor.referral_code) {
+      ensureUniqueReferralCode(vendor.owner_name || vendor.name).then(async (code) => {
+        setVendorReferralCode(code);
+        await supabase.from('vendors').update({ referral_code: code }).eq('id', vendor.id);
+        if (onRefreshVendor) onRefreshVendor();
+      });
+    } else if (vendor?.referral_code) {
+      setVendorReferralCode(vendor.referral_code);
+    }
+  }, [vendor?.id, vendor?.referral_code]);
+
+  const referralMetrics = calculateReferralProgress(Number(vendor?.successful_referral_count || 0));
+  const referralLink = `${window.location.origin}/vendor/register?ref=${vendorReferralCode || ''}`;
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(referralLink);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    } catch {
+      // fallback
+    }
+  };
+
+  const handleCopyCode = async () => {
+    try {
+      if (vendorReferralCode) {
+        await navigator.clipboard.writeText(vendorReferralCode);
+        setCopiedCode(true);
+        setTimeout(() => setCopiedCode(false), 2500);
+      }
+    } catch {
+      // fallback
+    }
   };
 
   // Section entrance animation variants
@@ -314,7 +362,7 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
                 {vendor?.name || 'Your Business Name'}
               </h1>
               <p className="text-[11px] sm:text-xs text-gray-200 truncate">
-                📍 {vendor?.address || 'Bangalore'}
+                📍 {vendor?.address || vendor?.city || 'Location not specified'}
               </p>
             </div>
 
@@ -424,12 +472,23 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
                   <Star size={18} className="fill-amber-400 text-amber-400" />
                 </div>
               </div>
-              <div className="text-2xl sm:text-3xl font-extrabold font-display text-ink flex items-center gap-1">
-                <span>{stats.rating}</span>
-                <span className="text-xs font-bold text-amber-500">★</span>
+              <div className="text-2xl sm:text-3xl font-extrabold font-display text-ink flex items-center gap-1.5">
+                {stats.reviewCount > 0 ? (
+                  <>
+                    <span>{stats.rating.toFixed(1)}</span>
+                    <span className="text-xs font-bold text-amber-500">★</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-xl sm:text-2xl text-ink font-extrabold">New</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold border border-amber-200">
+                      0.0 ★
+                    </span>
+                  </>
+                )}
               </div>
               <div className="flex items-center justify-between text-[10px] text-ink-muted font-bold pt-0.5">
-                <span>Based on {stats.reviewCount} reviews</span>
+                <span>{stats.reviewCount > 0 ? `Based on ${stats.reviewCount} reviews` : 'No reviews yet'}</span>
                 <span className="text-brand font-extrabold group-hover:underline">View All &rarr;</span>
               </div>
             </motion.div>
@@ -637,43 +696,105 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
           variants={sectionVariants}
           initial="hidden"
           animate="show"
-          className="bg-gradient-to-br from-teal-900 via-brand-dark to-teal-950 rounded-3xl p-6 sm:p-8 text-white shadow-card relative overflow-hidden space-y-5"
+          className="bg-gradient-to-br from-teal-900 via-brand-dark to-teal-950 rounded-3xl p-6 sm:p-8 text-white shadow-card relative overflow-hidden space-y-6"
         >
           {/* Decorative Sparkle */}
-          <div className="absolute top-4 right-4 text-teal-300/30">
-            <Sparkles size={64} />
+          <div className="absolute top-4 right-4 text-teal-300/20 pointer-events-none">
+            <Sparkles size={80} />
           </div>
 
           <div className="relative z-10 space-y-2 max-w-xl">
-            <span className="text-[10px] font-display font-extrabold px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 uppercase tracking-wider border border-amber-300/30 inline-block">
-              Vendor Referral Program
-            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-display font-extrabold px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 uppercase tracking-wider border border-amber-300/30 inline-flex items-center gap-1.5">
+                <Gift size={12} />
+                <span>Vendor Referral Program</span>
+              </span>
+              {referralMetrics.totalFreeMonthsEarned > 0 && (
+                <span className="text-[10px] font-display font-extrabold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 inline-flex items-center gap-1">
+                  <Award size={12} />
+                  <span>{referralMetrics.totalFreeMonthsEarned} Month{referralMetrics.totalFreeMonthsEarned > 1 ? 's' : ''} Free Earned!</span>
+                </span>
+              )}
+            </div>
             <h3 className="text-xl sm:text-2xl font-display font-extrabold text-white">
               Refer 5 vendors, get 1 month free 🎉
             </h3>
             <p className="text-xs sm:text-sm text-teal-100/80 leading-relaxed">
-              Share your referral link with other local merchants in your area. When 5 vendors complete shop verification, you get 30 days of Partner Pro subscription absolutely free!
+              Share your referral code or link with fellow local merchants. When a shop completes registration with your code, you earn progress. For every 5 shops, you get 1 free month of subscription automatically added!
             </p>
           </div>
 
-          {/* Progress Bar */}
-          <div className="relative z-10 space-y-1.5 max-w-md">
-            <div className="flex justify-between text-xs font-display font-bold text-teal-200">
-              <span>Referral Progress</span>
-              <span>0 / 5 Referrals</span>
+          {/* Real Referral Stats Grid */}
+          <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl">
+            {/* Code Box */}
+            <div className="bg-black/30 backdrop-blur-sm border border-white/10 rounded-2xl p-3 flex flex-col justify-between">
+              <span className="text-[10px] font-bold text-teal-200 uppercase tracking-wider">
+                Your Referral Code
+              </span>
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-base font-mono font-extrabold text-amber-300 tracking-wider">
+                  {vendorReferralCode || 'GENERATING...'}
+                </span>
+                <button
+                  onClick={handleCopyCode}
+                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                  title="Copy Referral Code"
+                >
+                  {copiedCode ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                </button>
+              </div>
             </div>
-            <div className="w-full h-2.5 bg-black/40 rounded-full overflow-hidden border border-white/10">
-              <div className="h-full bg-gradient-to-r from-amber-400 to-amber-300 rounded-full w-0 transition-all duration-500" />
+
+            {/* Total Referrals */}
+            <div className="bg-black/30 backdrop-blur-sm border border-white/10 rounded-2xl p-3 flex flex-col justify-between">
+              <span className="text-[10px] font-bold text-teal-200 uppercase tracking-wider">
+                Shops Referred
+              </span>
+              <div className="flex items-baseline gap-1 mt-1">
+                <span className="text-xl font-display font-black text-white">
+                  {referralMetrics.totalCount}
+                </span>
+                <span className="text-[11px] text-teal-200">shops</span>
+              </div>
+            </div>
+
+            {/* Next Reward Target */}
+            <div className="bg-black/30 backdrop-blur-sm border border-white/10 rounded-2xl p-3 flex flex-col justify-between">
+              <span className="text-[10px] font-bold text-teal-200 uppercase tracking-wider">
+                Next Free Month In
+              </span>
+              <div className="flex items-baseline gap-1 mt-1">
+                <span className="text-xl font-display font-black text-amber-300">
+                  {referralMetrics.neededForNext}
+                </span>
+                <span className="text-[11px] text-teal-200">more shop{referralMetrics.neededForNext > 1 ? 's' : ''}</span>
+              </div>
             </div>
           </div>
 
-          {/* Copy Share Link Button */}
-          <div className="relative z-10 pt-1">
+          {/* Progress Bar with Real Cycle Progress */}
+          <div className="relative z-10 space-y-1.5 max-w-md">
+            <div className="flex justify-between text-xs font-display font-bold text-teal-200">
+              <span>Current Cycle Progress</span>
+              <span>{referralMetrics.currentCycleProgress} / 5 Referrals</span>
+            </div>
+            <div className="w-full h-3 bg-black/40 rounded-full overflow-hidden border border-white/10">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${referralMetrics.progressPercent}%` }}
+                transition={{ duration: 0.6, ease: 'easeOut' }}
+                className="h-full bg-gradient-to-r from-amber-400 to-amber-300 rounded-full"
+              />
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="relative z-10 pt-1 flex flex-wrap items-center gap-3">
             <button
-              onClick={handleCopyReferral}
+              onClick={handleCopyLink}
               className="px-6 py-3 bg-amber-400 hover:bg-amber-300 text-amber-950 font-display font-extrabold text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer border border-amber-300"
             >
-              {copied ? (
+              {copiedLink ? (
                 <>
                   <Check size={16} className="text-amber-950" />
                   <span>Referral Link Copied!</span>
@@ -682,6 +803,23 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
                 <>
                   <Share2 size={16} />
                   <span>Share Referral Link</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handleCopyCode}
+              className="px-4 py-3 bg-white/10 hover:bg-white/20 text-white font-display font-bold text-xs sm:text-sm rounded-xl transition-all flex items-center gap-2 cursor-pointer border border-white/15"
+            >
+              {copiedCode ? (
+                <>
+                  <Check size={15} className="text-emerald-300" />
+                  <span>Code Copied: {vendorReferralCode}</span>
+                </>
+              ) : (
+                <>
+                  <Copy size={15} />
+                  <span>Copy Code: {vendorReferralCode || '...'}</span>
                 </>
               )}
             </button>

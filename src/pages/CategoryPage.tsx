@@ -4,7 +4,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, MapPin, Star, BadgeCheck, Phone, AlertCircle, Clock } from 'lucide-react';
 import { dummyVendors, type Vendor } from '../data/dummyVendors';
 import { getEffectiveShopStatus } from '../utils/shopTiming';
-import { fetchCombinedVendors } from '../utils/vendorSync';
+import { fetchCombinedVendors, trackVendorCall, trackVendorWhatsApp } from '../utils/vendorSync';
 import SaveHeartButton from '../components/ui/SaveHeartButton';
 
 const categoryNames: Record<string, string> = {
@@ -224,7 +224,7 @@ export default function CategoryPage() {
                     <div className="flex items-center gap-0.5 px-2 py-0.5 bg-[#FFFBEB] border border-[#FEF3C7] rounded-[var(--radius-sm)] shrink-0">
                       <Star size={11} className="text-amber-500 fill-amber-500" />
                       <span className="text-[10px] font-display font-bold text-amber-800">
-                        {vendor.rating.toFixed(1)}
+                        {vendor.rating > 0 ? vendor.rating.toFixed(1) : 'New'}
                       </span>
                     </div>
                   </div>
@@ -271,7 +271,10 @@ export default function CategoryPage() {
                     {/* Call CTA */}
                     <a
                       href={`tel:${vendor.phoneNumber}`}
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        trackVendorCall(vendor.id, vendor.phoneNumber);
+                      }}
                       className="flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white py-2.5 rounded-[var(--radius-md)] text-xs sm:text-sm font-display font-bold transition-colors shadow-sm shadow-brand/10 cursor-pointer"
                     >
                       <Phone size={14} className="fill-white/10" />
@@ -284,7 +287,10 @@ export default function CategoryPage() {
                       )}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        trackVendorWhatsApp(vendor.id, vendor.whatsappNumber);
+                      }}
                       className="flex items-center justify-center gap-2 border border-[#25D366]/40 hover:bg-[#25D366]/5 text-[#128C7E] py-2.5 rounded-[var(--radius-md)] text-xs sm:text-sm font-display font-bold transition-colors cursor-pointer"
                     >
                       <WhatsAppIcon size={14} className="text-[#25D366]" />

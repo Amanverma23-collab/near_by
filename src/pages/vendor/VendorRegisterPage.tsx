@@ -15,7 +15,8 @@ import {
   Navigation,
   Plus,
   Trash2,
-  Clock
+  Clock,
+  Gift
 } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -25,6 +26,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useBackButton } from '../../hooks/useBackButton';
 import { capturePhoto as captureNativePhoto } from '../../utils/nativeCamera';
 import { getCurrentLocation } from '../../utils/nativeGeolocation';
+import { ensureUniqueReferralCode, processReferralReward } from '../../utils/referral';
 
 interface ServiceItem {
   name: string;
@@ -37,6 +39,7 @@ interface WizardData {
   mobileNumber: string;
   whatsappNumber: string;
   homeAddress: string;
+  referredByCode?: string;
   // Step 2
   shopName: string;
   latitude: number;
@@ -50,6 +53,7 @@ interface WizardData {
   closingTime: string;
   closedDays: string[];
   isOpen24Hours: boolean;
+  city?: string;
 }
 
 // Category Configuration with Customer-side colors
@@ -276,6 +280,9 @@ export default function VendorRegisterPage() {
         console.warn('Error reading saved draft:', e);
       }
 
+      const urlParams = new URLSearchParams(window.location.search);
+      const refFromUrl = (urlParams.get('ref') || urlParams.get('referral') || '').trim().toUpperCase();
+
       const customerName =
         localStorage.getItem('nearby_customer_name') ||
         user?.user_metadata?.full_name ||
@@ -291,7 +298,7 @@ export default function VendorRegisterPage() {
         try {
           const { data, error } = await supabase
             .from('vendors')
-            .select('owner_name, phone_number, whatsapp_number')
+            .select('owner_name, phone_number, whatsapp_number, referral_code, referred_by_code')
             .eq('auth_user_id', user.id)
             .maybeSingle();
 
@@ -306,6 +313,7 @@ export default function VendorRegisterPage() {
       const resolvedFullName = savedDraft?.fullName || dbData?.owner_name || customerName || '';
       const resolvedPhone = savedDraft?.mobileNumber || dbData?.phone_number || customerPhone || '';
       const resolvedWhatsapp = savedDraft?.whatsappNumber || dbData?.whatsapp_number || resolvedPhone || customerPhone || '';
+      const resolvedReferredBy = refFromUrl || savedDraft?.referredByCode || dbData?.referred_by_code || '';
 
       const mergedData: WizardData = {
         ownerPhoto: savedDraft?.ownerPhoto || null,
@@ -313,6 +321,7 @@ export default function VendorRegisterPage() {
         mobileNumber: resolvedPhone,
         whatsappNumber: resolvedWhatsapp,
         homeAddress: savedDraft?.homeAddress || '',
+        referredByCode: resolvedReferredBy,
         shopName: savedDraft?.shopName || '',
         latitude: savedDraft?.latitude || 27.6094,
         longitude: savedDraft?.longitude || 75.1398,
@@ -401,7 +410,20 @@ export default function VendorRegisterPage() {
       );
       const data = await response.json();
       if (data && data.display_name) {
-        setWizardData(prev => ({ ...prev, shopAddress: data.display_name }));
+        const detectedCity =
+          data.address?.city ||
+          data.address?.town ||
+          data.address?.municipality ||
+          data.address?.district ||
+          data.address?.state_district ||
+          data.address?.county ||
+          data.address?.state ||
+          '';
+        setWizardData(prev => ({
+          ...prev,
+          shopAddress: data.display_name,
+          city: detectedCity || prev.city || '',
+        }));
       }
     } catch (err) {
       console.error('Reverse geocoding error:', err);
@@ -775,6 +797,11 @@ export default function VendorRegisterPage() {
         ? `Open 24 Hours (${closedDaysText})`
         : `${formattedOpen} - ${formattedClose} (${closedDaysText})`;
 
+      const selectedCityFromStorage =
+        localStorage.getItem('nearby_selected_city') ||
+        localStorage.getItem('nearby_user_city');
+      const resolvedCity = wizardData.city?.trim() || selectedCityFromStorage || 'Not Specified';
+
       // 3. Update database row with all required columns matching Supabase schema
       const updatePayload: any = {
         name: wizardData.shopName.trim(),
@@ -790,30 +817,37 @@ export default function VendorRegisterPage() {
         is_verified: false,
         whatsapp_number: wizardData.whatsappNumber || wizardData.mobileNumber,
         opening_hours: computedOpeningHours,
-        city: 'Bangalore',
+        city: resolvedCity,
       };
 
-      // Check if vendor row already exists by auth_user_id or phone_number (safely without maybeSingle)
+      // Check if vendor row already exists by auth_user_id or phone_number
       const { data: authVendors } = await supabase
         .from('vendors')
-        .select('id')
+        .select('id, referral_code, referred_by_code, referral_counted')
         .eq('auth_user_id', user.id);
 
       const { data: phoneVendors } = (!authVendors || authVendors.length === 0) && wizardData.mobileNumber
         ? await supabase
           .from('vendors')
-          .select('id')
+          .select('id, referral_code, referred_by_code, referral_counted')
           .eq('phone_number', wizardData.mobileNumber)
         : { data: null };
 
       const existingVendors = (authVendors && authVendors.length > 0) ? authVendors : (phoneVendors || []);
-      const existingId = existingVendors.length > 0 ? existingVendors[0].id : null;
+      const existingVendor = existingVendors.length > 0 ? existingVendors[0] : null;
+      const existingId = existingVendor?.id || null;
+
+      // Assign or keep unique referral code
+      const assignedReferralCode = existingVendor?.referral_code || (await ensureUniqueReferralCode(wizardData.fullName));
+      const cleanReferredByCode = wizardData.referredByCode?.trim().toUpperCase() || existingVendor?.referred_by_code || null;
 
       const fullPayload = {
         ...updatePayload,
         auth_user_id: user.id,
         verification_status: 'pending',
-        verification_requested_at: new Date().toISOString()
+        verification_requested_at: new Date().toISOString(),
+        referral_code: assignedReferralCode,
+        ...(cleanReferredByCode ? { referred_by_code: cleanReferredByCode } : {}),
       };
 
       if (existingId) {
@@ -846,6 +880,30 @@ export default function VendorRegisterPage() {
               auth_user_id: user.id
             });
           if (basicErr) throw basicErr;
+        }
+      }
+
+      // Process Vendor-to-Vendor referral reward if referred_by_code is provided
+      let finalVendorId = existingId;
+      if (!finalVendorId) {
+        const { data: insertedV } = await supabase
+          .from('vendors')
+          .select('id')
+          .eq('auth_user_id', user.id)
+          .maybeSingle();
+        finalVendorId = insertedV?.id || null;
+      }
+
+      if (finalVendorId && cleanReferredByCode) {
+        try {
+          await processReferralReward({
+            id: finalVendorId,
+            referral_code: assignedReferralCode,
+            referred_by_code: cleanReferredByCode,
+            referral_counted: existingVendor?.referral_counted || false,
+          });
+        } catch (refErr) {
+          console.warn('Referral reward processing error:', refErr);
         }
       }
 
@@ -1344,6 +1402,46 @@ export default function VendorRegisterPage() {
                   />
                   <span className="text-[10px] text-ink-muted block mt-1">
                     Minimum 10 characters required.
+                  </span>
+                </motion.div>
+
+                {/* Field 5: Referral Code (Optional) */}
+                <motion.div variants={itemVariants} className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-display font-bold text-ink-light flex items-center gap-1.5">
+                      <Gift size={14} className="text-brand" />
+                      <span>Referral Code (Optional)</span>
+                    </label>
+                    {wizardData.referredByCode && (
+                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        Code Linked
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative rounded-[var(--radius-md)] overflow-hidden bg-white border border-border-light focus-within:border-brand focus-within:ring-2 focus-within:ring-brand-glow flex items-center pr-3 transition-all">
+                    <input
+                      type="text"
+                      maxLength={12}
+                      value={wizardData.referredByCode || ''}
+                      onChange={(e) => {
+                        const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                        setWizardData(prev => ({ ...prev, referredByCode: val }));
+                      }}
+                      placeholder="e.g. RAJU4821"
+                      className="w-full py-3 px-4 text-sm font-mono uppercase text-ink placeholder:text-ink-muted focus:outline-none bg-transparent"
+                    />
+                    {wizardData.referredByCode && (
+                      <button
+                        type="button"
+                        onClick={() => setWizardData(prev => ({ ...prev, referredByCode: '' }))}
+                        className="text-xs text-ink-muted hover:text-ink font-bold px-1.5 py-0.5 cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-ink-muted block">
+                    Have a referral code from a fellow merchant? Enter it to link their invite.
                   </span>
                 </motion.div>
 

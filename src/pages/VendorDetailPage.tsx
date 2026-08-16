@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { dummyVendors, type Vendor } from '../data/dummyVendors';
 import { getEffectiveShopStatus } from '../utils/shopTiming';
-import { fetchCombinedVendors } from '../utils/vendorSync';
+import { fetchCombinedVendors, trackVendorCall, trackVendorWhatsApp } from '../utils/vendorSync';
 import AddReviewModal from '../components/customer/AddReviewModal';
 import { getSavedReviews, saveNewReview, deleteReview } from '../utils/reviewStorage';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +15,7 @@ import SaveHeartButton from '../components/ui/SaveHeartButton';
 import ChatBoxModal from '../components/chat/ChatBoxModal';
 import { getOrCreateConversation } from '../utils/chatStorage';
 import type { ChatConversation } from '../utils/chatStorage';
+import BrandLoader from '../components/ui/BrandLoader';
 
 /* ──────────────────── WhatsApp SVG Icon ──────────────────── */
 const WhatsAppIcon = ({ size = 16, className = '' }) => (
@@ -67,11 +68,25 @@ export default function VendorDetailPage() {
   const navigate = useNavigate();
 
   const [allVendors, setAllVendors] = useState<Vendor[]>(dummyVendors);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchCombinedVendors().then((vendors) => {
-      setAllVendors(vendors);
-    });
+    setLoading(true);
+    fetchCombinedVendors()
+      .then((vendors) => {
+        setAllVendors(vendors);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('Error loading vendors:', err);
+        setLoading(false);
+      });
+
+    if (vendorId) {
+      getSavedReviews(vendorId).then((revs) => {
+        setCustomReviews(revs);
+      });
+    }
   }, [vendorId]);
 
   const vendor = allVendors.find((v) => v.id === vendorId) || dummyVendors.find((v) => v.id === vendorId);
@@ -96,6 +111,7 @@ export default function VendorDetailPage() {
 
   const [activeChatConv, setActiveChatConv] = useState<ChatConversation | null>(null);
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+  const viewTrackedRef = useRef<string | null>(null);
 
   const handleDeleteUserReview = async (reviewId: string) => {
     if (!vendor) return;
@@ -124,29 +140,22 @@ export default function VendorDetailPage() {
         setCustomReviews(saved);
       });
 
-      // Track real profile view
-      const viewKey = `nearby_views_${vendorId}`;
-      const currentViews = Number(localStorage.getItem(viewKey) || 0);
-      localStorage.setItem(viewKey, String(currentViews + 1));
+      // Track real profile view exactly 1 time per page visit
+      if (viewTrackedRef.current !== vendorId) {
+        viewTrackedRef.current = vendorId;
+        const viewKey = `nearby_views_${vendorId}`;
+        const currentViews = Number(localStorage.getItem(viewKey) || 0);
+        localStorage.setItem(viewKey, String(currentViews + 1));
+      }
     }
   }, [vendorId]);
 
   const handleCallClick = () => {
-    const targetId = vendor?.id || vendorId;
-    if (targetId) {
-      const key = `nearby_calls_${targetId}`;
-      const current = Number(localStorage.getItem(key) || 0);
-      localStorage.setItem(key, String(current + 1));
-    }
+    trackVendorCall(vendor?.id || vendorId, vendor?.phoneNumber);
   };
 
   const handleWhatsAppClick = () => {
-    const targetId = vendor?.id || vendorId;
-    if (targetId) {
-      const key = `nearby_wa_${targetId}`;
-      const current = Number(localStorage.getItem(key) || 0);
-      localStorage.setItem(key, String(current + 1));
-    }
+    trackVendorWhatsApp(vendor?.id || vendorId, vendor?.whatsappNumber || vendor?.phoneNumber);
   };
 
   /* ── Gallery state ── */
@@ -182,6 +191,11 @@ export default function VendorDetailPage() {
   };
 
   const waMsg = encodeURIComponent('Hi, I found your business on NearBy and would like to inquire about your services.');
+
+  /* ── Loading Guard ── */
+  if (loading && !vendor) {
+    return <BrandLoader />;
+  }
 
   /* ── 404 ── */
   if (!vendor) {
@@ -325,10 +339,12 @@ export default function VendorDetailPage() {
           >
             <div className="flex items-center gap-0.5 px-2 py-0.5 bg-[#FFFBEB] border border-[#FEF3C7] rounded-[var(--radius-sm)]">
               <Star size={12} className="text-amber-500 fill-amber-500" />
-              <span className="text-xs font-display font-bold text-amber-800">{vendor.rating.toFixed(1)}</span>
+              <span className="text-xs font-display font-bold text-amber-800">
+                {vendor.rating > 0 ? vendor.rating.toFixed(1) : 'New'}
+              </span>
             </div>
             <span className="text-xs text-ink-muted font-body group-hover:text-brand transition-colors">
-              ({vendor.reviewCount} reviews)
+              {vendor.reviewCount > 0 ? `(${vendor.reviewCount} reviews)` : '(No reviews yet)'}
             </span>
           </button>
 
@@ -358,6 +374,7 @@ export default function VendorDetailPage() {
             {/* Call */}
             <a
               href={`tel:${vendor.phoneNumber}`}
+              onClick={handleCallClick}
               className="flex items-center justify-center gap-1 bg-brand hover:bg-brand-dark text-white py-3 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors shadow-sm shadow-brand/10 cursor-pointer"
             >
               <Phone size={14} />
@@ -367,6 +384,7 @@ export default function VendorDetailPage() {
             {/* WhatsApp */}
             <a
               href={`https://wa.me/91${vendor.whatsappNumber}?text=${waMsg}`}
+              onClick={handleWhatsAppClick}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-1 border border-[#25D366]/40 hover:bg-[#25D366]/5 text-[#128C7E] py-3 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors cursor-pointer"
@@ -447,10 +465,10 @@ export default function VendorDetailPage() {
 
         {/* ═══════════ F — REVIEWS SECTION (GOOGLE REVIEWS STYLE) ═══════════ */}
         {(() => {
-          const allReviewsList = [...customReviews, ...(vendor.reviews || [])];
-          const totalReviewCount = (vendor.reviewCount || 0) + customReviews.length;
+          const allReviewsList = customReviews;
+          const totalReviewCount = allReviewsList.length;
           const avgRatingScore = (
-            allReviewsList.reduce((acc, r) => acc + r.rating, 0) / (allReviewsList.length || 1)
+            allReviewsList.reduce((acc, r) => acc + Number(r.rating || 5), 0) / (totalReviewCount || 1)
           ).toFixed(1);
 
           // Find if the logged in customer has already submitted a review
@@ -528,13 +546,13 @@ export default function VendorDetailPage() {
                     {/* Left Score */}
                     <div className="text-center sm:text-left shrink-0">
                       <div className="text-5xl font-extrabold font-display text-ink tracking-tight">
-                        {avgRatingScore}
+                        {totalReviewCount > 0 ? avgRatingScore : '0.0'}
                       </div>
                       <div className="flex items-center justify-center sm:justify-start gap-1 my-1.5">
-                        <RatingStars rating={Number(avgRatingScore)} size={18} />
+                        <RatingStars rating={totalReviewCount > 0 ? Number(avgRatingScore) : 0} size={18} />
                       </div>
                       <span className="text-xs text-ink-muted font-display font-bold">
-                        {totalReviewCount} verified ratings
+                        {totalReviewCount > 0 ? `${totalReviewCount} verified ratings` : 'No ratings yet'}
                       </span>
                     </div>
 
@@ -563,90 +581,109 @@ export default function VendorDetailPage() {
 
                 {/* ── INDIVIDUAL REVIEW CARDS ── */}
                 <div className="space-y-3 pt-1">
-                  {allReviewsList.map((review, idx) => {
-                    const isMyReview = existingUserReview && review.id === existingUserReview.id;
-                    const avatarColor = [
-                      'bg-teal-500 text-white',
-                      'bg-amber-500 text-white',
-                      'bg-emerald-500 text-white',
-                      'bg-rose-500 text-white',
-                      'bg-indigo-500 text-white',
-                    ][idx % 5];
-
-                    return (
-                      <motion.div
-                        key={review.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.05 }}
-                        className={`bg-white rounded-2xl p-4 sm:p-5 border shadow-xs space-y-3 relative ${
-                          isMyReview ? 'border-amber-300 ring-2 ring-amber-100' : 'border-border-light'
-                        }`}
+                  {allReviewsList.length === 0 ? (
+                    <div className="bg-white rounded-3xl p-8 border border-border-light shadow-card text-center space-y-3">
+                      <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center mx-auto">
+                        <Star size={24} className="fill-amber-400 text-amber-400" />
+                      </div>
+                      <h4 className="text-sm font-display font-extrabold text-ink">No Reviews Yet</h4>
+                      <p className="text-xs text-ink-muted max-w-xs mx-auto">
+                        Be the first customer to rate and review this shop!
+                      </p>
+                      <button
+                        onClick={() => setIsAddReviewOpen(true)}
+                        className="px-4 py-2 bg-brand text-white text-xs font-display font-extrabold rounded-xl shadow-brand hover:bg-brand-dark transition-all cursor-pointer inline-flex items-center gap-1.5"
                       >
-                        {/* Header: User Avatar & Name */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-9 h-9 rounded-full ${avatarColor} font-display font-bold text-sm flex items-center justify-center shadow-xs`}>
-                              {(review.reviewerName || 'C')[0]}
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <h4 className="text-sm font-display font-extrabold text-ink leading-tight">
-                                  {review.reviewerName}
-                                </h4>
-                                {isMyReview ? (
-                                  <span className="px-2 py-0.2 bg-amber-50 text-amber-800 text-[9px] font-display font-extrabold rounded-full border border-amber-200 uppercase tracking-wider">
-                                    Your Rating
-                                  </span>
-                                ) : (
-                                  <span className="px-2 py-0.2 bg-teal-50 text-teal-700 text-[9px] font-display font-extrabold rounded-full border border-teal-100 uppercase tracking-wider">
-                                    Verified Customer
-                                  </span>
-                                )}
+                        <Plus size={14} />
+                        <span>Write First Review</span>
+                      </button>
+                    </div>
+                  ) : (
+                    allReviewsList.map((review, idx) => {
+                      const isMyReview = existingUserReview && review.id === existingUserReview.id;
+                      const avatarColor = [
+                        'bg-teal-500 text-white',
+                        'bg-amber-500 text-white',
+                        'bg-emerald-500 text-white',
+                        'bg-rose-500 text-white',
+                        'bg-indigo-500 text-white',
+                      ][idx % 5];
+
+                      return (
+                        <motion.div
+                          key={review.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: idx * 0.05 }}
+                          className={`bg-white rounded-2xl p-4 sm:p-5 border shadow-xs space-y-3 relative ${
+                            isMyReview ? 'border-amber-300 ring-2 ring-amber-100' : 'border-border-light'
+                          }`}
+                        >
+                          {/* Header: User Avatar & Name */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-9 h-9 rounded-full ${avatarColor} font-display font-bold text-sm flex items-center justify-center shadow-xs`}>
+                                {(review.reviewerName || 'C')[0]}
                               </div>
-                              <span className="text-[10px] text-ink-muted font-body">
-                                📅 {review.daysAgo === 0 ? 'Today' : review.daysAgo === 1 ? 'Yesterday' : `${review.daysAgo || 1} days ago`}
-                              </span>
+                              <div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <h4 className="text-sm font-display font-extrabold text-ink leading-tight">
+                                    {review.reviewerName}
+                                  </h4>
+                                  {isMyReview ? (
+                                    <span className="px-2 py-0.2 bg-amber-50 text-amber-800 text-[9px] font-display font-extrabold rounded-full border border-amber-200 uppercase tracking-wider">
+                                      Your Rating
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-0.2 bg-teal-50 text-teal-700 text-[9px] font-display font-extrabold rounded-full border border-teal-100 uppercase tracking-wider">
+                                      Verified Customer
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-ink-muted font-body">
+                                  📅 {review.created_at ? new Date(review.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : (review.daysAgo === 0 ? 'Today' : review.daysAgo === 1 ? 'Yesterday' : `${review.daysAgo || 1} days ago`)}
+                                </span>
+                              </div>
                             </div>
+
+                            {/* Delete Rating Button if it's the current user's review */}
+                            {isMyReview && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteUserReview(review.id)}
+                                className="px-2.5 py-1 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-display font-bold cursor-pointer"
+                                title="Delete rating to submit a new one"
+                              >
+                                <Trash2 size={12} />
+                                <span>Delete</span>
+                              </button>
+                            )}
                           </div>
 
-                          {/* Delete Rating Button if it's the current user's review */}
-                          {isMyReview && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteUserReview(review.id)}
-                              className="px-2.5 py-1 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-display font-bold cursor-pointer"
-                              title="Delete rating to submit a new one"
-                            >
-                              <Trash2 size={12} />
-                              <span>Delete</span>
-                            </button>
+                          {/* Rating Stars */}
+                          <div className="flex items-center gap-1">
+                            <RatingStars rating={review.rating} size={14} />
+                          </div>
+
+                          {/* Comment text */}
+                          {review.comment && (
+                            <p className="text-xs text-ink-light font-body leading-relaxed">
+                              "{review.comment}"
+                            </p>
                           )}
-                        </div>
 
-                        {/* Rating Stars */}
-                        <div className="flex items-center gap-1">
-                          <RatingStars rating={review.rating} size={14} />
-                        </div>
-
-                        {/* Comment text */}
-                        {review.comment && (
-                          <p className="text-xs text-ink-light font-body leading-relaxed">
-                            "{review.comment}"
-                          </p>
-                        )}
-
-                        {/* Review Photo Attachment */}
-                        {review.photoUrl && (
-                          <div className="pt-1">
-                            <div className="w-28 h-28 rounded-2xl overflow-hidden border border-border-light shadow-xs hover:opacity-90 transition-opacity">
-                              <img src={review.photoUrl} alt="Customer review" className="w-full h-full object-cover" />
+                          {/* Review Photo Attachment */}
+                          {review.photoUrl && (
+                            <div className="pt-1">
+                              <div className="w-28 h-28 rounded-2xl overflow-hidden border border-border-light shadow-xs hover:opacity-90 transition-opacity">
+                                <img src={review.photoUrl} alt="Customer review" className="w-full h-full object-cover" />
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </motion.div>
-                    );
-                  })}
+                          )}
+                        </motion.div>
+                      );
+                    })
+                  )}
                 </div>
 
                 {/* Add Review Modal */}

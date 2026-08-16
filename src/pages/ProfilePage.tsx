@@ -42,12 +42,22 @@ export default function ProfilePage() {
   const [fullName, setFullName] = useState(
     localStorage.getItem('nearby_customer_name') || user?.user_metadata?.full_name || 'User Account'
   );
-  const [email, setEmail] = useState(
-    user?.email || 'rahul.sharma@example.com'
-  );
-  const [savedAddress, setSavedAddress] = useState(
-    currentAddress || 'Indiranagar 100ft Road, Bangalore'
-  );
+  const [email, setEmail] = useState(() => {
+    const stored = localStorage.getItem('nearby_customer_email');
+    if (stored) return stored;
+    if (user?.user_metadata?.custom_email) return user.user_metadata.custom_email;
+    if (user?.email && !user.email.endsWith('@nearbe.app') && !user.email.includes('example.com')) {
+      return user.email;
+    }
+    return '';
+  });
+  const [savedAddress, setSavedAddress] = useState(() => {
+    const stored = localStorage.getItem('nearby_customer_address');
+    if (stored) return stored;
+    if (user?.user_metadata?.address) return user.user_metadata.address;
+    if (currentAddress && currentAddress !== 'Unknown') return currentAddress;
+    return '';
+  });
   const [savedSuccessMsg, setSavedSuccessMsg] = useState<string | null>(null);
 
   // Profile Image State
@@ -77,8 +87,26 @@ export default function ProfilePage() {
         setFullName(storedName);
         setTempName(storedName);
       }
-      if (storedEmail) setEmail(storedEmail);
-      if (storedAddress) setSavedAddress(storedAddress);
+      if (storedEmail) {
+        setEmail(storedEmail);
+      } else if (user?.user_metadata?.custom_email) {
+        setEmail(user.user_metadata.custom_email);
+      } else if (user?.email && !user.email.endsWith('@nearbe.app') && !user.email.includes('example.com')) {
+        setEmail(user.email);
+      } else {
+        setEmail('');
+      }
+
+      if (storedAddress) {
+        setSavedAddress(storedAddress);
+      } else if (user?.user_metadata?.address) {
+        setSavedAddress(user.user_metadata.address);
+      } else if (currentAddress && currentAddress !== 'Unknown') {
+        setSavedAddress(currentAddress);
+      } else {
+        setSavedAddress('');
+      }
+
       if (storedAvatar) setAvatarUrl(storedAvatar);
     } catch (err) {
       console.error('Error loading stored profile:', err);
@@ -95,9 +123,9 @@ export default function ProfilePage() {
     };
     window.addEventListener('nearby_favorites_changed', handleFavChange);
     return () => window.removeEventListener('nearby_favorites_changed', handleFavChange);
-  }, []);
+  }, [currentAddress, user]);
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       localStorage.setItem('nearby_customer_name', fullName);
@@ -105,9 +133,29 @@ export default function ProfilePage() {
       localStorage.setItem('nearby_customer_address', savedAddress);
 
       if (user) {
-        supabase.auth.updateUser({
-          data: { full_name: fullName },
+        await supabase.auth.updateUser({
+          data: { 
+            full_name: fullName,
+            custom_email: email,
+            address: savedAddress,
+          },
         });
+
+        // Also update customers table in DB if record exists
+        const cleanPhone = (
+          localStorage.getItem('nearby_customer_phone') ||
+          (user.email && user.email.includes('@nearbe.app') ? user.email.split('@')[0] : '')
+        ).replace(/\D/g, '').slice(-10);
+
+        if (cleanPhone) {
+          await supabase
+            .from('customers')
+            .update({
+              full_name: fullName,
+              email: email || null,
+            })
+            .eq('mobile_number', cleanPhone);
+        }
       }
 
       setIsEditing(false);
@@ -382,12 +430,13 @@ export default function ProfilePage() {
               <input
                 type="email"
                 value={email}
+                placeholder={isEditing ? 'e.g. name@gmail.com (Optional)' : 'No email added yet'}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={!isEditing}
                 className={`w-full px-4 py-2.5 text-xs font-body rounded-xl outline-none transition-all ${
                   isEditing
-                    ? 'bg-surface border-2 border-brand text-ink'
-                    : 'bg-surface/50 border border-border-light text-ink-muted'
+                    ? 'bg-surface border-2 border-brand text-ink focus:shadow-brand'
+                    : 'bg-surface/50 border border-border-light text-ink-muted placeholder:text-ink-muted/50'
                 }`}
               />
             </div>
@@ -399,13 +448,14 @@ export default function ProfilePage() {
               </label>
               <textarea
                 value={savedAddress}
+                placeholder={isEditing ? 'e.g. Street, Colony, Landmark or City' : 'No saved address'}
                 onChange={(e) => setSavedAddress(e.target.value)}
                 disabled={!isEditing}
                 rows={2}
                 className={`w-full px-4 py-2.5 text-xs font-body rounded-xl outline-none transition-all resize-none ${
                   isEditing
-                    ? 'bg-surface border-2 border-brand text-ink'
-                    : 'bg-surface/50 border border-border-light text-ink-muted'
+                    ? 'bg-surface border-2 border-brand text-ink focus:shadow-brand'
+                    : 'bg-surface/50 border border-border-light text-ink-muted placeholder:text-ink-muted/50'
                 }`}
               />
             </div>

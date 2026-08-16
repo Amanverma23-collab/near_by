@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Phone, User, ArrowRight, Sparkles, AlertCircle, ShieldCheck } from 'lucide-react';
+import { Phone, User, ArrowRight, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
@@ -65,14 +65,6 @@ export default function UnifiedAuthForm() {
     try {
       const pseudoEmail = getPseudoEmail(mobile);
 
-      // Check if mobile number is already registered in mock user store
-      const mockUsers = JSON.parse(localStorage.getItem('nearby_mock_users') || '{}');
-      if (mockUsers[mobile] || mockUsers[pseudoEmail]) {
-        setError('This mobile number is already registered. Please sign in instead.');
-        setLoading(false);
-        return;
-      }
-
       // Check if user already exists in customers table
       const { data: existingCustomer } = await supabase
         .from('customers')
@@ -101,8 +93,8 @@ export default function UnifiedAuthForm() {
 
       if (signUpError) {
         // Handle case where auth user already exists in Supabase
-        if (signUpError.message?.toLowerCase().includes('already registered')) {
-          setError('This mobile number is already registered. Please switch to Sign In.');
+        if (signUpError.message?.toLowerCase().includes('already registered') || signUpError.message?.toLowerCase().includes('already in use')) {
+          setError('This mobile number is already registered in Supabase Auth. Please switch to Sign In or delete the user from Supabase Auth > Users.');
           setLoading(false);
           return;
         }
@@ -110,7 +102,7 @@ export default function UnifiedAuthForm() {
       }
 
       // Sign in immediately to establish authenticated JWT for RLS policies
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      const { data: signInData } = await supabase.auth.signInWithPassword({
         email: pseudoEmail,
         password: password,
       });
@@ -119,10 +111,12 @@ export default function UnifiedAuthForm() {
 
       // Insert customer profile record with authenticated session
       if (activeUser) {
+        const savedCity = localStorage.getItem('nearby_selected_city') || localStorage.getItem('nearby_user_city');
         const { error: custErr } = await supabase.from('customers').upsert({
           auth_user_id: activeUser.id,
           full_name: fullName.trim(),
           mobile_number: mobile,
+          city: savedCity || null,
         });
 
         if (custErr) {
@@ -130,7 +124,9 @@ export default function UnifiedAuthForm() {
         }
       }
 
+      // Clear any legacy mock entries
       localStorage.removeItem('nearby_mock_session');
+      localStorage.removeItem('nearby_mock_users');
       localStorage.setItem('nearby_customer_name', fullName.trim());
       localStorage.setItem('nearby_customer_phone', mobile);
       localStorage.setItem('nearby_user_role', 'customer');

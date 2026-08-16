@@ -6,7 +6,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useBackButton } from '../../hooks/useBackButton';
 import { supabase } from '../../lib/supabase';
 import VerificationTimer from '../../components/vendor/VerificationTimer';
-import DevApproveButton from '../../components/vendor/DevApproveButton';
 
 export default function VendorPendingPage() {
   const navigate = useNavigate();
@@ -23,10 +22,25 @@ export default function VendorPendingPage() {
     if (!user) return;
     const fetchRequestedTimeAndStatus = async () => {
       try {
-        const { data: vendors } = await supabase
+        const cleanPhone =
+          localStorage.getItem('nearby_customer_phone') ||
+          localStorage.getItem('nearby_vendor_phone') ||
+          (user.phone ? user.phone.replace(/\D/g, '').slice(-10) : '') ||
+          (user.user_metadata?.phone_number ? user.user_metadata.phone_number.replace(/\D/g, '').slice(-10) : '') ||
+          (user.email?.includes('@nearbe.app') ? user.email.split('@')[0].replace(/\D/g, '').slice(-10) : '');
+
+        let { data: vendors } = await supabase
           .from('vendors')
           .select('verification_requested_at, is_verified, verification_status')
           .eq('auth_user_id', user.id);
+
+        if ((!vendors || vendors.length === 0) && cleanPhone) {
+          const { data: phoneVendors } = await supabase
+            .from('vendors')
+            .select('verification_requested_at, is_verified, verification_status')
+            .or(`phone_number.eq.${cleanPhone},phone_number.eq.+91${cleanPhone},whatsapp_number.eq.${cleanPhone}`);
+          vendors = phoneVendors;
+        }
 
         if (vendors && vendors.some(v => v.is_verified || v.verification_status === 'approved')) {
           setIsApproved(true);
@@ -241,12 +255,6 @@ export default function VendorPendingPage() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* 🛠️ TEMPORARY DEV UTILITY — Remove once real Admin Dashboard is built. */}
-        <DevApproveButton
-          userId={user?.id || ''}
-          onApproved={() => setIsApproved(true)}
-        />
       </main>
     </div>
   );

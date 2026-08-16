@@ -58,7 +58,7 @@ export async function fetchCombinedVendors(): Promise<Vendor[]> {
           openingHours: hoursText,
           phoneNumber: v.phone_number || v.whatsapp_number || '9876543210',
           whatsappNumber: v.whatsapp_number || v.phone_number || '9876543210',
-          rating: v.rating || 4.9,
+          rating: v.rating ? Number(v.rating) : (Array.isArray(v.reviews) && v.reviews.length > 0 ? Math.round((v.reviews.reduce((a: number, r: any) => a + Number(r.rating || 5), 0) / v.reviews.length) * 10) / 10 : 0.0),
           isVerified: isVerified,
           ownerName: v.owner_name || 'Shop Owner',
           shopImages: images,
@@ -68,18 +68,8 @@ export async function fetchCombinedVendors(): Promise<Vendor[]> {
           servicesOffered: Array.isArray(v.services_offered)
             ? v.services_offered.map((s: any) => ({ name: s.name, price: s.price }))
             : [{ name: 'Standard Service', price: '₹150' }],
-          reviews: Array.isArray(v.reviews) && v.reviews.length > 0
-            ? v.reviews
-            : [
-                {
-                  id: `r-${idx}`,
-                  reviewerName: 'Verified Customer',
-                  rating: 5,
-                  comment: 'Great verified local service on NearBy!',
-                  daysAgo: 1,
-                },
-              ],
-          reviewCount: v.review_count || 12,
+          reviews: Array.isArray(v.reviews) ? v.reviews : [],
+          reviewCount: Array.isArray(v.reviews) ? v.reviews.length : Number(v.review_count || 0),
           opening_time: v.opening_time || '08:00',
           closing_time: v.closing_time || '21:00',
           manual_status: v.manual_status || 'auto',
@@ -98,4 +88,32 @@ export async function fetchCombinedVendors(): Promise<Vendor[]> {
   }
 
   return dummyVendors;
+}
+
+export function trackVendorCall(vendorId?: string, phoneNumber?: string) {
+  const cleanPhone = (phoneNumber || '').replace(/\D/g, '').slice(-10);
+  if (vendorId) {
+    const key = `nearby_calls_${vendorId}`;
+    const curr = Number(localStorage.getItem(key) || 0);
+    localStorage.setItem(key, String(curr + 1));
+  }
+  if (cleanPhone && cleanPhone !== vendorId) {
+    const key = `nearby_calls_${cleanPhone}`;
+    const curr = Number(localStorage.getItem(key) || 0);
+    localStorage.setItem(key, String(curr + 1));
+  }
+}
+
+export function trackVendorWhatsApp(vendorId?: string, phoneNumber?: string) {
+  const cleanPhone = (phoneNumber || '').replace(/\D/g, '').slice(-10);
+  if (vendorId) {
+    const key = `nearby_wa_${vendorId}`;
+    const curr = Number(localStorage.getItem(key) || 0);
+    localStorage.setItem(key, String(curr + 1));
+  }
+  if (cleanPhone && cleanPhone !== vendorId) {
+    const key = `nearby_wa_${cleanPhone}`;
+    const curr = Number(localStorage.getItem(key) || 0);
+    localStorage.setItem(key, String(curr + 1));
+  }
 }

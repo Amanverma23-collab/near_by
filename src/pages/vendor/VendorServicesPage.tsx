@@ -15,6 +15,7 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useBackButton } from '../../hooks/useBackButton';
 import { supabase } from '../../lib/supabase';
 import BrandLoader from '../../components/ui/BrandLoader';
 
@@ -63,6 +64,10 @@ const QUICK_SUGGESTIONS: Record<string, Array<{ name: string; price: string }>> 
 export default function VendorServicesPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  useBackButton(() => {
+    navigate('/vendor/dashboard');
+  });
 
   const [loading, setLoading] = useState(true);
   const [vendor, setVendor] = useState<any>(null);
@@ -233,7 +238,7 @@ export default function VendorServicesPage() {
       <header className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-border-light">
         <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
           <button
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/vendor/dashboard')}
             className="flex items-center gap-2 text-xs font-display font-extrabold text-ink-muted hover:text-ink transition-colors cursor-pointer"
           >
             <ArrowLeft size={16} />

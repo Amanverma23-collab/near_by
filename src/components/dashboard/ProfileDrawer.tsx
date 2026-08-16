@@ -49,13 +49,13 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
             className="fixed inset-0 z-40 bg-black/10"
           />
 
-          {/* Compact Dropdown Box under burger icon */}
+          {/* Compact Dropdown Box under burger icon (fixed to viewport) */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: -8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -8 }}
             transition={{ duration: 0.15, ease: 'easeOut' }}
-            className="absolute top-14 right-4 z-50 w-64 bg-white rounded-2xl p-2.5 shadow-[0_12px_36px_rgba(0,0,0,0.16)] border border-border-light font-body"
+            className="fixed top-16 right-4 sm:right-6 z-50 w-64 max-w-[calc(100vw-2rem)] bg-white rounded-2xl p-2.5 shadow-[0_12px_36px_rgba(0,0,0,0.18)] border border-border-light font-body"
           >
             {/* Header User Info */}
             <div className="p-2 pb-2.5 mb-1.5 border-b border-border-light/70 flex items-center gap-2.5">

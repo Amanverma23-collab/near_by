@@ -62,6 +62,11 @@ CREATE TABLE IF NOT EXISTS public.vendors (
     verification_status TEXT DEFAULT NULL CHECK (verification_status IN ('pending', 'approved', 'rejected')),
     subscription_status TEXT DEFAULT NULL,
     subscription_expires_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+    referral_code TEXT UNIQUE,
+    referred_by_code TEXT,
+    referral_counted BOOLEAN DEFAULT false,
+    successful_referral_count INTEGER DEFAULT 0,
+    last_referral_reward_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -207,3 +212,52 @@ using (
   bucket_id = 'vendor-verification-photos' 
   and auth.uid()::text = (storage.foldername(name))[1]
 );
+
+-- ==========================================
+-- 4. SUBSCRIPTION PLANS & REFERRAL CODES SCHEMA
+-- ==========================================
+
+-- Alter vendors table to ensure subscription columns exist
+ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS subscription_status TEXT DEFAULT NULL;
+ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMP WITH TIME ZONE DEFAULT NULL;
+ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS has_used_trial BOOLEAN DEFAULT false;
+
+-- Table: subscription_plans
+CREATE TABLE IF NOT EXISTS public.subscription_plans (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    price NUMERIC(10,2) NOT NULL,
+    display_price TEXT NOT NULL,
+    duration TEXT NOT NULL,
+    billing_cycle TEXT NOT NULL,
+    features JSONB DEFAULT '[]',
+    is_popular BOOLEAN DEFAULT false,
+    is_free BOOLEAN DEFAULT false,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.subscription_plans ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read access to subscription_plans" ON public.subscription_plans FOR SELECT USING (true);
+CREATE POLICY "Allow all to modify subscription_plans" ON public.subscription_plans FOR ALL USING (true) WITH CHECK (true);
+
+-- Table: referral_codes
+CREATE TABLE IF NOT EXISTS public.referral_codes (
+    id TEXT PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    plan_id TEXT DEFAULT 'all',
+    plan_name TEXT,
+    discount_percent INTEGER NOT NULL DEFAULT 10,
+    max_uses INTEGER DEFAULT 100,
+    times_used INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    expires_at TIMESTAMP WITH TIME ZONE,
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.referral_codes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read access to referral_codes" ON public.referral_codes FOR SELECT USING (true);
+CREATE POLICY "Allow all to modify referral_codes" ON public.referral_codes FOR ALL USING (true) WITH CHECK (true);
+

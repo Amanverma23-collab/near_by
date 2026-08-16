@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { LocationData } from '../types';
-import { DEFAULT_CITY } from '../lib/supabase';
+import { supabase, DEFAULT_CITY } from '../lib/supabase';
 
 interface LocationContextType {
   location: LocationData | null;
@@ -49,6 +49,25 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   const setLocation = (data: LocationData) => {
     setLocationState(data);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    if (data.city && data.city !== 'Unknown') {
+      localStorage.setItem('nearby_selected_city', data.city);
+    }
+
+    // Sync to Supabase customers table
+    (async () => {
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        if (authData?.user) {
+          await supabase.from('customers').update({
+            city: data.city,
+            latitude: data.latitude,
+            longitude: data.longitude,
+          }).eq('auth_user_id', authData.user.id);
+        }
+      } catch (err) {
+        console.warn('Could not sync customer location to Supabase:', err);
+      }
+    })();
   };
 
   const setCityManually = (city: string) => {

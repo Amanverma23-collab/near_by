@@ -1,12 +1,12 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL =
-  (import.meta.env.VITE_SUPABASE_URL as string) || 'https://rvgimglpwcbyuzmttfln.supabase.co';
+  (import.meta?.env?.VITE_SUPABASE_URL as string) || 'https://rvgimglpwcbyuzmttfln.supabase.co';
 const SUPABASE_ANON_KEY =
-  (import.meta.env.VITE_SUPABASE_ANON_KEY as string) ||
+  (import.meta?.env?.VITE_SUPABASE_ANON_KEY as string) ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2Z2ltZ2xwd2NieXV6bXR0ZmxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NzQwMzcsImV4cCI6MjA5OTM1MDAzN30.jeb1tSBS9RxEuJW5OXKd81yl8sGwu_ENsA79kyDbou8';
 
-export const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
+export const DEV_MODE = import.meta?.env?.VITE_DEV_MODE === 'true';
 
 // Validate URL format
 const isValidUrl = (url: string): boolean => {

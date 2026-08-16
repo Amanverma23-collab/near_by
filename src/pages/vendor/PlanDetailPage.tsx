@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Check, Sparkles, Tag, X, ShieldCheck, ArrowRight } from 'lucide-react';
-import { PLANS, validatePromoCode, type PromoResult } from '../../data/plans';
+import { getDynamicPlans, fetchRemotePlans, validatePromoCode, type PromoResult, type Plan } from '../../data/plans';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 
@@ -11,7 +11,28 @@ export default function PlanDetailPage() {
   const navigate = useNavigate();
   const { user, vendorRecord } = useAuth();
 
-  const plan = PLANS.find((p) => p.id === planId) || PLANS[1]; // fallback to monthly pro
+  const [currentPlans, setCurrentPlans] = useState<Plan[]>(() => getDynamicPlans());
+
+  useEffect(() => {
+    fetchRemotePlans().then((fetched) => {
+      if (fetched && fetched.length > 0) {
+        setCurrentPlans(fetched);
+      }
+    });
+
+    const handlePlansUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) {
+        setCurrentPlans(e.detail);
+      } else {
+        setCurrentPlans(getDynamicPlans());
+      }
+    };
+
+    window.addEventListener('nearby_plans_updated', handlePlansUpdate);
+    return () => window.removeEventListener('nearby_plans_updated', handlePlansUpdate);
+  }, []);
+
+  const plan = currentPlans.find((p) => p.id === planId) || currentPlans[1] || getDynamicPlans()[1];
 
   // If user already used free trial and attempts to view trial plan, redirect to subscriptions
   useEffect(() => {
@@ -46,7 +67,7 @@ export default function PlanDetailPage() {
     if (!promoInput.trim()) return;
 
     setPromoError(null);
-    const result = validatePromoCode(promoInput);
+    const result = validatePromoCode(promoInput, plan.id);
     if (result.valid) {
       setAppliedPromo(result);
       setPromoInput('');
@@ -301,7 +322,39 @@ export default function PlanDetailPage() {
               </h3>
 
               <div className="space-y-4">
-                {plan.features.map((feature, idx) => (
+                {(plan.features && plan.features.length > 0
+                  ? plan.features
+                  : [
+                      {
+                        title: 'Official Verified Blue Badge',
+                        description: 'Boost customer trust & credibility instantly on your shop profile.',
+                      },
+                      {
+                        title: 'Top Priority Local Search Ranking',
+                        description: 'Your shop appears at the top of searches in your neighborhood.',
+                      },
+                      {
+                        title: 'Unlimited Direct Calls & WhatsApp Leads',
+                        description: 'Customers connect directly with 0% commission on orders.',
+                      },
+                      {
+                        title: 'Unlimited Services & Menu Pricing',
+                        description: 'List all your offerings with photos & prices without restrictions.',
+                      },
+                      {
+                        title: 'Live Analytics & Visitor Dashboard',
+                        description: 'Track live store views, customer call clicks & WhatsApp leads.',
+                      },
+                      {
+                        title: 'Zero Commission Forever',
+                        description: 'You keep 100% of every rupee earned from your customers.',
+                      },
+                      {
+                        title: 'Priority Merchant WhatsApp Support',
+                        description: 'Dedicated assistance for account, profile & listing queries.',
+                      },
+                    ]
+                ).map((feature, idx) => (
                   <div key={idx} className="flex items-start gap-3">
                     <div className="p-1 rounded-full bg-brand/10 text-brand mt-0.5 shrink-0">
                       <Check size={14} />

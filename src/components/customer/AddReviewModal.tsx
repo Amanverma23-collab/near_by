@@ -31,9 +31,14 @@ export default function AddReviewModal({
   onDeleteExistingReview,
 }: AddReviewModalProps) {
   const { user } = useAuth();
+  const customerName =
+    localStorage.getItem('nearby_customer_name') ||
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    'Verified Customer';
+
   const [rating, setRating] = useState<number>(0);
   const [hoverRating, setHoverRating] = useState<number>(0);
-  const [reviewerName, setReviewerName] = useState(user?.user_metadata?.full_name || 'Customer');
   const [comment, setComment] = useState('');
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -67,7 +72,7 @@ export default function AddReviewModal({
 
     setTimeout(() => {
       onSubmitReview({
-        reviewerName: reviewerName.trim() || 'Verified Customer',
+        reviewerName: customerName,
         rating,
         comment: comment.trim() || undefined,
         photoUrl: photoUrl || undefined,
@@ -255,17 +260,20 @@ export default function AddReviewModal({
                 </div>
               </div>
 
-              {/* Customer Name */}
+              {/* Customer Name (Locked / Read-Only) */}
               <div className="space-y-1">
-                <label className="block text-xs font-display font-bold text-ink-light">
-                  Your Name
-                </label>
+                <div className="flex justify-between items-center">
+                  <label className="block text-xs font-display font-bold text-ink-light">
+                    Your Name
+                  </label>
+                  <span className="text-[10px] font-mono text-ink-muted">Verified Account</span>
+                </div>
                 <input
                   type="text"
-                  value={reviewerName}
-                  onChange={(e) => setReviewerName(e.target.value)}
-                  placeholder="Enter your name"
-                  className="w-full px-3.5 py-2.5 text-xs font-body bg-surface border border-border-light rounded-xl outline-none focus:border-brand"
+                  value={customerName}
+                  readOnly
+                  disabled
+                  className="w-full px-3.5 py-2.5 text-xs font-body font-medium bg-gray-100 text-ink-muted border border-border-light rounded-xl cursor-not-allowed select-none opacity-85"
                 />
               </div>
 
