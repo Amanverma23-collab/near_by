@@ -50,7 +50,24 @@ export async function ensureUniqueReferralCode(
 ): Promise<string> {
   const cleanPhone = (phoneNumber || '').replace(/\D/g, '').slice(-10);
 
-  // 1. Check if user already has a saved permanent referral code in localStorage
+  // 1. If this vendor already has a referral code in database, use it directly!
+  if (vendorId) {
+    try {
+      const { data: v } = await supabase
+        .from('vendors')
+        .select('referral_code')
+        .eq('id', vendorId)
+        .maybeSingle();
+
+      if (v?.referral_code) {
+        if (userId) localStorage.setItem(`nearby_permanent_ref_code_${userId}`, v.referral_code);
+        if (cleanPhone) localStorage.setItem(`nearby_permanent_ref_code_${cleanPhone}`, v.referral_code);
+        return v.referral_code;
+      }
+    } catch {}
+  }
+
+  // 2. Check local permanent cache
   if (userId) {
     const localCode = localStorage.getItem(`nearby_permanent_ref_code_${userId}`);
     if (localCode) return localCode;
@@ -60,17 +77,18 @@ export async function ensureUniqueReferralCode(
     if (localCodePhone) return localCodePhone;
   }
 
-  // 2. Generate the deterministic permanent code for this mobile number / name
+  // 3. Generate base code: e.g. AMAN + 3210 -> AMAN3210
   const baseCode = generatePermanentReferralCode(ownerName, phoneNumber, userId);
 
-  // 3. Check if baseCode is available or already owned by this vendor in Supabase
+  // 4. Check if baseCode is free in database
   try {
     const { data: existingVendor } = await supabase
       .from('vendors')
-      .select('id, referral_code')
+      .select('id')
       .eq('referral_code', baseCode)
       .maybeSingle();
 
+    // If completely free OR already belongs to this vendor
     if (!existingVendor || (vendorId && existingVendor.id === vendorId)) {
       if (userId) localStorage.setItem(`nearby_permanent_ref_code_${userId}`, baseCode);
       if (cleanPhone) localStorage.setItem(`nearby_permanent_ref_code_${cleanPhone}`, baseCode);
@@ -80,11 +98,11 @@ export async function ensureUniqueReferralCode(
     console.warn('Error checking unique referral code in db:', e);
   }
 
-  // 4. In case of rare conflict, append index deterministically
-  for (let attempt = 1; attempt <= 9; attempt++) {
-    const namePrefix = baseCode.slice(0, 4);
-    const phonePrefix = (cleanPhone || '9999').slice(-3);
-    const candidate = `${namePrefix}${phonePrefix}${attempt}`;
+  // 5. Collision handling: If AMAN3210 is already taken by another person with same name & phone suffix,
+  // append unique suffix (e.g. AMAN3210A, AMAN3210B...)
+  const suffixes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'K', 'X', '1', '2', '3', '4', '5'];
+  for (const suffix of suffixes) {
+    const candidate = `${baseCode}${suffix}`;
 
     try {
       const { data } = await supabase
@@ -103,9 +121,10 @@ export async function ensureUniqueReferralCode(
     }
   }
 
-  if (userId) localStorage.setItem(`nearby_permanent_ref_code_${userId}`, baseCode);
-  if (cleanPhone) localStorage.setItem(`nearby_permanent_ref_code_${cleanPhone}`, baseCode);
-  return baseCode;
+  const fallback = `${baseCode}${Math.floor(10 + Math.random() * 90)}`;
+  if (userId) localStorage.setItem(`nearby_permanent_ref_code_${userId}`, fallback);
+  if (cleanPhone) localStorage.setItem(`nearby_permanent_ref_code_${cleanPhone}`, fallback);
+  return fallback;
 }
 
 /**

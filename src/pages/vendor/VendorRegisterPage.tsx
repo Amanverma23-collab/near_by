@@ -828,6 +828,8 @@ export default function VendorRegisterPage() {
         latitude: wizardData.latitude,
         longitude: wizardData.longitude,
         shop_images: [shopUrl, selfieUrl],
+        owner_selfie_url: selfieUrl,
+        government_id_url: shopUrl,
         services_offered: cleanServices,
         is_verified: false,
         whatsapp_number: wizardData.whatsappNumber || wizardData.mobileNumber,
