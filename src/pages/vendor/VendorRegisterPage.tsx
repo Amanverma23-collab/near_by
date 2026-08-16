@@ -326,10 +326,11 @@ export default function VendorRegisterPage() {
         }
       }
 
+      const pendingReferralCode = (localStorage.getItem('nearby_pending_referral_code') || '').trim().toUpperCase();
       const resolvedFullName = savedDraft?.fullName || dbData?.owner_name || customerName || '';
       const resolvedPhone = savedDraft?.mobileNumber || dbData?.phone_number || customerPhone || '';
       const resolvedWhatsapp = savedDraft?.whatsappNumber || dbData?.whatsapp_number || resolvedPhone || customerPhone || '';
-      const resolvedReferredBy = refFromUrl || savedDraft?.referredByCode || dbData?.referred_by_code || '';
+      const resolvedReferredBy = refFromUrl || pendingReferralCode || savedDraft?.referredByCode || dbData?.referred_by_code || '';
 
       const mergedData: WizardData = {
         ownerPhoto: savedDraft?.ownerPhoto || null,
@@ -860,7 +861,12 @@ export default function VendorRegisterPage() {
         (wizardData.mobileNumber ? localStorage.getItem(`nearby_permanent_ref_code_${wizardData.mobileNumber}`) : null) ||
         (await ensureUniqueReferralCode(wizardData.fullName, wizardData.mobileNumber, user.id, existingId));
 
-      const cleanReferredByCode = wizardData.referredByCode?.trim().toUpperCase() || existingVendor?.referred_by_code || null;
+      const pendingReferralCode = (localStorage.getItem('nearby_pending_referral_code') || '').trim().toUpperCase();
+      const cleanReferredByCode =
+        wizardData.referredByCode?.trim().toUpperCase() ||
+        pendingReferralCode ||
+        existingVendor?.referred_by_code ||
+        null;
 
       const fullPayload = {
         ...updatePayload,
@@ -914,6 +920,22 @@ export default function VendorRegisterPage() {
           .maybeSingle();
         finalVendorId = insertedV?.id || null;
       }
+
+      if (cleanReferredByCode && finalVendorId) {
+        try {
+          await processReferralReward({
+            id: finalVendorId,
+            referral_code: assignedReferralCode,
+            referred_by_code: cleanReferredByCode,
+            referral_counted: false,
+            is_verified: true,
+            subscription_status: 'trial',
+          });
+        } catch (e) {
+          console.warn('Referral reward process error on register submit:', e);
+        }
+      }
+      localStorage.removeItem('nearby_pending_referral_code');
 
       window.dispatchEvent(new Event('nearby_vendor_updated'));
 
