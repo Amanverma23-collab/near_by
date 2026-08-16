@@ -109,7 +109,7 @@ export default function RegisterShopBanner() {
                 {vendorStatus === 'approved'
                   ? 'Go to Vendor Dashboard'
                   : vendorStatus === 'pending'
-                  ? 'Check Verification Status'
+                  ? 'Verify Pending ⏳'
                   : 'Register Your Shop / दुकान जोड़ें'}
               </span>
               <ArrowRight size={15} />

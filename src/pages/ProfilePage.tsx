@@ -609,7 +609,7 @@ export default function ProfilePage() {
               {vendorStatus === 'approved'
                 ? 'Go to Vendor Dashboard'
                 : vendorStatus === 'pending'
-                ? 'Check Verification Status'
+                ? 'Verify Pending'
                 : t('register_shop_btn')}
             </span>
           </button>

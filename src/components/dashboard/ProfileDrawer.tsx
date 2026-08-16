@@ -93,7 +93,7 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
                       {vendorStatus === 'approved'
                         ? 'Vendor Dashboard'
                         : vendorStatus === 'pending'
-                        ? 'Shop Review Pending'
+                        ? 'Verify Pending'
                         : 'Register Your Shop'}
                     </span>
                     <span className={`text-[9px] font-normal block ${vendorStatus === 'unregistered' ? 'text-teal-200' : 'opacity-80'}`}>

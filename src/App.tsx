@@ -87,6 +87,8 @@ function AppRoutes() {
   );
 }
 
+import VerificationApprovedModal from './components/vendor/VerificationApprovedModal';
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -97,6 +99,7 @@ export default function App() {
               <HardwareBackButtonHandler />
               <AppRoutes />
               <CustomerBottomNav />
+              <VerificationApprovedModal />
             </LocationProvider>
           </UnreadProvider>
         </AuthProvider>

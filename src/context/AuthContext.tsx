@@ -95,19 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .then();
         }
 
-        // Ensure verified vendor gets trial status automatically
-        if (realVendor.is_verified || realVendor.verification_status === 'approved') {
-          if (!realVendor.subscription_status) {
-            realVendor = {
-              ...realVendor,
-              is_verified: true,
-              verification_status: 'approved',
-              subscription_status: 'trial',
-              subscription_expires_at: realVendor.subscription_expires_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-            };
-          }
-        }
-
+        // Retain verified and subscription status accurately from DB
         setVendorRecord(realVendor);
 
         if (realVendor.is_verified || realVendor.verification_status === 'approved') {

@@ -59,7 +59,7 @@ export default function Navbar() {
             >
               <Store size={18} className={vendorStatus === 'approved' ? 'text-emerald-700' : vendorStatus === 'pending' ? 'text-amber-700' : 'text-brand'} />
               <span className="text-xs font-display font-extrabold">
-                {vendorStatus === 'approved' ? 'My Shop' : vendorStatus === 'pending' ? 'Under Review' : 'Register Shop'}
+                {vendorStatus === 'approved' ? 'My Shop' : vendorStatus === 'pending' ? 'Verify Pending' : 'Register Shop'}
               </span>
             </motion.button>
 

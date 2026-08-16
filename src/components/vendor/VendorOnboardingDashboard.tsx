@@ -556,6 +556,18 @@ export default function VendorOnboardingDashboard() {
                 Verification usually takes less than 2 hours. We will notify you once your shop listing is approved.
               </p>
             </div>
+
+            {/* Action Button: Go Back to Dashboard */}
+            <div className="pt-2 w-full">
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard', { replace: true })}
+                className="w-full py-3.5 bg-brand hover:bg-brand-dark text-white font-display font-extrabold rounded-2xl shadow-brand text-sm cursor-pointer transition-colors flex items-center justify-center gap-2 border border-accent/20"
+              >
+                <Home size={18} />
+                <span>Go Back to Dashboard</span>
+              </button>
+            </div>
           </motion.div>
         </main>
       </div>
