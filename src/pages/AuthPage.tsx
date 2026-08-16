@@ -9,6 +9,17 @@ export default function AuthPage() {
 
   if (loading) return <BrandLoader />;
   if (session) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const refFromUrl = (urlParams.get('ref') || urlParams.get('referral') || '').trim().toUpperCase();
+    const pendingRedirect = localStorage.getItem('nearby_auth_redirect');
+
+    if (refFromUrl) {
+      return <Navigate to={`/vendor/register?ref=${refFromUrl}`} replace />;
+    }
+    if (pendingRedirect) {
+      localStorage.removeItem('nearby_auth_redirect');
+      return <Navigate to={pendingRedirect} replace />;
+    }
     return <Navigate to="/location" replace />;
   }
 

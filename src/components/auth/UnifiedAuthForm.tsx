@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Phone, User, ArrowRight, AlertCircle } from 'lucide-react';
+import { Phone, User, ArrowRight, AlertCircle, Gift } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
@@ -10,7 +10,28 @@ type AuthMode = 'login' | 'register';
 
 export default function UnifiedAuthForm() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<AuthMode>('login');
+
+  // Detect referral code or registration mode from URL or localStorage
+  const urlParams = new URLSearchParams(window.location.search);
+  const refFromUrl = (urlParams.get('ref') || urlParams.get('referral') || '').trim().toUpperCase();
+  const initialModeFromUrl = urlParams.get('mode') === 'register' ? 'register' : 'login';
+
+  const [mode, setMode] = useState<AuthMode>(() => {
+    if (refFromUrl || initialModeFromUrl === 'register') {
+      return 'register';
+    }
+    return 'login';
+  });
+
+  const [referralCode] = useState<string>(() => {
+    const code = refFromUrl || localStorage.getItem('nearby_pending_referral_code') || '';
+    if (code) {
+      localStorage.setItem('nearby_pending_referral_code', code);
+      localStorage.setItem('nearby_auth_redirect', `/vendor/register?ref=${code}`);
+    }
+    return code;
+  });
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,6 +40,18 @@ export default function UnifiedAuthForm() {
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  const getPostAuthDestination = () => {
+    const pendingRedirect = localStorage.getItem('nearby_auth_redirect');
+    if (pendingRedirect) {
+      localStorage.removeItem('nearby_auth_redirect');
+      return pendingRedirect;
+    }
+    if (referralCode) {
+      return `/vendor/register?ref=${referralCode}`;
+    }
+    return '/location';
+  };
 
   const formatPhone = (num: string) => {
     const cleaned = num.replace(/\D/g, '').slice(0, 10);
@@ -132,7 +165,7 @@ export default function UnifiedAuthForm() {
       localStorage.setItem('nearby_user_role', 'customer');
 
       setTimeout(() => {
-        navigate('/location', { replace: true });
+        navigate(getPostAuthDestination(), { replace: true });
       }, 300);
     } catch (err: any) {
       console.error('Registration error:', err);
@@ -204,7 +237,7 @@ export default function UnifiedAuthForm() {
       localStorage.setItem('nearby_customer_phone', mobile);
       localStorage.setItem('nearby_user_role', 'customer');
 
-      navigate('/location', { replace: true });
+      navigate(getPostAuthDestination(), { replace: true });
     } catch (err: any) {
       console.error('Login error:', err);
       // Offline/Demo network fallback
@@ -228,7 +261,7 @@ export default function UnifiedAuthForm() {
         localStorage.setItem('nearby_customer_phone', mobile);
         localStorage.setItem('nearby_user_role', 'customer');
         setTimeout(() => {
-          navigate('/location', { replace: true });
+          navigate(getPostAuthDestination(), { replace: true });
         }, 400);
         return;
       }
@@ -248,7 +281,28 @@ export default function UnifiedAuthForm() {
   };
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-5">
+      {/* Referral Partner Invitation Notice */}
+      {referralCode && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-3 bg-amber-50 border border-amber-200/90 rounded-2xl flex items-center gap-3 text-amber-900 shadow-xs"
+        >
+          <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700 shrink-0">
+            <Gift size={16} />
+          </div>
+          <div className="text-left">
+            <p className="text-xs font-display font-extrabold leading-tight">
+              Merchant Invitation Applied
+            </p>
+            <p className="text-[10px] text-amber-800/80 mt-0.5 leading-snug">
+              Sign up or log in to complete your shop registration with invite code <span className="font-mono font-bold text-amber-950">{referralCode}</span>.
+            </p>
+          </div>
+        </motion.div>
+      )}
+
       {/* Tab Switcher: Sign In vs Create Account */}
       <div className="flex bg-surface p-1 rounded-2xl border border-border-light relative">
         <button

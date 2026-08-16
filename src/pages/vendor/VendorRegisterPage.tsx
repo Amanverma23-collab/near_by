@@ -184,7 +184,22 @@ function DraggableMarker({
 
 export default function VendorRegisterPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+
+  // If unauthenticated, redirect to Login/Signup page first and remember referral code
+  useEffect(() => {
+    if (!authLoading && !user) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const refFromUrl = (urlParams.get('ref') || urlParams.get('referral') || '').trim().toUpperCase();
+      if (refFromUrl) {
+        localStorage.setItem('nearby_pending_referral_code', refFromUrl);
+        localStorage.setItem('nearby_auth_redirect', `/vendor/register?ref=${refFromUrl}`);
+      } else {
+        localStorage.setItem('nearby_auth_redirect', '/vendor/register');
+      }
+      navigate('/?mode=register' + (refFromUrl ? `&ref=${refFromUrl}` : ''), { replace: true });
+    }
+  }, [user, authLoading, navigate]);
 
   // Wizard state
   const [activeStep, setActiveStep] = useState(1);
