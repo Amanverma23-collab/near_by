@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
+  ArrowRight,
   Camera,
   Check,
   Lock,
@@ -1017,7 +1018,7 @@ export default function VendorRegisterPage() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-lg w-full mx-auto px-4 py-8 flex flex-col justify-center">
+      <main className="flex-1 max-w-lg w-full mx-auto px-4 py-8 pb-28 sm:pb-12 flex flex-col justify-center">
 
         {loadingProfile ? (
           <div className="flex-1 flex flex-col items-center justify-center py-12">
@@ -1454,15 +1455,28 @@ export default function VendorRegisterPage() {
                   </span>
                 </motion.div>
 
-                {/* Bottom Inline Button on Desktop */}
-                <motion.button
-                  variants={itemVariants}
-                  disabled={!isStep1Valid}
-                  onClick={handleNext}
-                  className="w-full hidden sm:flex py-4 bg-brand hover:bg-brand-dark disabled:bg-border-light disabled:text-ink-muted text-white font-display font-extrabold rounded-[var(--radius-md)] shadow-brand text-sm items-center justify-center gap-2 cursor-pointer transition-colors duration-200 border border-accent/10 disabled:border-transparent disabled:shadow-none"
-                >
-                  <span>Next: Shop Details</span>
-                </motion.button>
+                {/* Action Button for Step 1 (Visible on all devices) */}
+                <div className="pt-2">
+                  <motion.button
+                    variants={itemVariants}
+                    disabled={!isStep1Valid}
+                    onClick={handleNext}
+                    className="w-full py-4 bg-brand hover:bg-brand-dark disabled:bg-border-light disabled:text-ink-muted text-white font-display font-extrabold rounded-[var(--radius-md)] shadow-brand text-sm flex items-center justify-center gap-2 cursor-pointer transition-all duration-200 border border-accent/10 disabled:border-transparent disabled:shadow-none"
+                  >
+                    <span>Next: Shop Details</span>
+                    <ArrowRight size={16} />
+                  </motion.button>
+
+                  {!isStep1Valid && (
+                    <p className="text-[11px] text-ink-muted text-center mt-2 font-body">
+                      {!wizardData.ownerPhoto
+                        ? '📸 Please take an owner selfie above to proceed'
+                        : wizardData.homeAddress.trim().length < 10
+                        ? '📍 Please enter at least 10 characters for Home Address'
+                        : 'Please complete all required fields above'}
+                    </p>
+                  )}
+                </div>
               </motion.div>
             ) : (
               // Step 2: Shop Details
@@ -1925,6 +1939,28 @@ export default function VendorRegisterPage() {
           </AnimatePresence>
         )}
       </main>
+
+      {/* Mobile Sticky CTA bar for Step 1 */}
+      {activeStep === 1 && !loadingProfile && (
+        <div className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-border-light p-4 z-30 flex gap-3 sm:hidden shadow-elevated">
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            className="px-4 py-3.5 border border-border text-ink font-display font-bold text-xs rounded-[var(--radius-md)] cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!isStep1Valid}
+            onClick={handleNext}
+            className="flex-1 py-3.5 bg-brand hover:bg-brand-dark disabled:bg-border-light disabled:text-ink-muted text-white font-display font-extrabold rounded-[var(--radius-md)] shadow-brand text-xs flex items-center justify-center gap-2 cursor-pointer border border-accent/10 disabled:border-transparent disabled:shadow-none"
+          >
+            <span>Next: Shop Details</span>
+            <ArrowRight size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Mobile Sticky CTA bar for Step 2 */}
       {activeStep === 2 && !loadingProfile && (
