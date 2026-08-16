@@ -194,9 +194,6 @@ export default function VendorRegisterPage() {
       const refFromUrl = (urlParams.get('ref') || urlParams.get('referral') || '').trim().toUpperCase();
       if (refFromUrl) {
         localStorage.setItem('nearby_pending_referral_code', refFromUrl);
-        localStorage.setItem('nearby_auth_redirect', `/vendor/register?ref=${refFromUrl}`);
-      } else {
-        localStorage.setItem('nearby_auth_redirect', '/vendor/register');
       }
       navigate('/?mode=register' + (refFromUrl ? `&ref=${refFromUrl}` : ''), { replace: true });
     }

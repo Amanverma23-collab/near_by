@@ -27,7 +27,6 @@ export default function UnifiedAuthForm() {
     const code = refFromUrl || localStorage.getItem('nearby_pending_referral_code') || '';
     if (code) {
       localStorage.setItem('nearby_pending_referral_code', code);
-      localStorage.setItem('nearby_auth_redirect', `/vendor/register?ref=${code}`);
     }
     return code;
   });
@@ -42,15 +41,9 @@ export default function UnifiedAuthForm() {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const getPostAuthDestination = () => {
-    const pendingRedirect = localStorage.getItem('nearby_auth_redirect');
-    if (pendingRedirect) {
-      localStorage.removeItem('nearby_auth_redirect');
-      return pendingRedirect;
-    }
-    if (referralCode) {
-      return `/vendor/register?ref=${referralCode}`;
-    }
-    return '/location';
+    localStorage.removeItem('nearby_auth_redirect');
+    const savedCity = localStorage.getItem('nearby_selected_city') || localStorage.getItem('nearby_user_city');
+    return savedCity ? '/dashboard' : '/location';
   };
 
   const formatPhone = (num: string) => {
