@@ -48,6 +48,69 @@ function SkeletonCard() {
   );
 }
 
+const DEFAULT_CATEGORY_SUB_SERVICES: Record<string, string[]> = {
+  'vehicle-emergency': ['Mechanic', 'Towing', 'Puncture Repair', 'Fuel Delivery'],
+  'home-maintenance': ['Electrician', 'Plumber', 'AC Repair', 'Carpenter', 'Cleaning', 'Hardware Shop'],
+  'healthcare-wellness': ['Doctors', 'Clinics', 'Pharmacy', 'Lab Tests', 'Salon'],
+  'daily-needs': ['Grocery/Kirana', 'Hotel', 'Cafe', 'Restaurant', 'Laundry', 'Clothing Shop'],
+  'education-student': ['Coaching/Academy', 'Library', 'Mess', 'Hostel/PG', 'Book Store', 'Cyber Cafe'],
+};
+
+const isVendorMatch = (vendor: Vendor, filter: string): boolean => {
+  if (!filter || filter === 'All') return true;
+
+  const f = filter.toLowerCase().trim();
+  const vs = (vendor.subService || '').toLowerCase();
+  const vn = (vendor.name || '').toLowerCase();
+  const vServices = Array.isArray(vendor.servicesOffered)
+    ? vendor.servicesOffered.map((s) => s.name.toLowerCase()).join(' ')
+    : '';
+
+  // Direct substring check
+  if (vs.includes(f) || f.includes(vs)) return true;
+  if (vn.includes(f) || vServices.includes(f)) return true;
+
+  // Keyword / Synonym mapping
+  const synonymMap: Record<string, string[]> = {
+    'doctors': ['doctor', 'dr', 'physician', 'hospital'],
+    'doctor': ['doctor', 'doctors', 'dr', 'physician', 'hospital'],
+    'clinics': ['clinic', 'clinics', 'dispensary'],
+    'clinic': ['clinic', 'clinics', 'dispensary'],
+    'grocery/kirana': ['grocery', 'kirana', 'store', 'kirana store', 'general store', 'kirana/grocery'],
+    'kirana store': ['grocery', 'kirana', 'grocery/kirana', 'general store'],
+    'cafe': ['cafe', 'coffee', 'tea', 'bistro'],
+    'restaurant': ['restaurant', 'food', 'dining', 'hotel'],
+    'hotel': ['hotel', 'stay', 'rooms', 'lodge'],
+    'laundry': ['laundry', 'dry clean', 'ironing', 'dhobi'],
+    'clothing shop': ['cloth', 'clothing', 'garment', 'fashion', 'wear'],
+    'coaching/academy': ['coaching', 'academy', 'tuition', 'classes', 'institute', 'coaching / academy'],
+    'coaching / academy': ['coaching', 'academy', 'tuition', 'classes', 'institute', 'coaching/academy'],
+    'mess': ['mess', 'tiffin', 'tiffin / mess', 'canteen'],
+    'tiffin / mess': ['mess', 'tiffin', 'tiffin / mess', 'canteen'],
+    'hostel/pg': ['hostel', 'pg', 'paying guest', 'stay', 'hostel / pg', 'pg / hostel'],
+    'hostel / pg': ['hostel', 'pg', 'paying guest', 'stay', 'hostel / pg', 'pg / hostel'],
+    'puncture repair': ['puncture', 'puncher', 'tyre', 'tire'],
+    'mechanic': ['mechanic', 'repair', 'garage', 'auto', 'motor', 'autoworks'],
+    'towing': ['tow', 'towing', 'crane'],
+    'fuel delivery': ['fuel', 'petrol', 'diesel'],
+    'electrician': ['electric', 'electrical', 'wiring'],
+    'plumber': ['plumb', 'plumbing', 'pipe', 'leak'],
+    'ac repair': ['ac', 'air conditioner', 'cooling'],
+    'carpenter': ['carpenter', 'furniture', 'wood'],
+    'cleaning': ['clean', 'cleaning', 'housekeeping'],
+    'hardware shop': ['hardware', 'sanitary', 'tools', 'paints'],
+    'pharmacy': ['pharmacy', 'chemist', 'medical', 'medicine'],
+    'lab tests': ['lab', 'diagnostic', 'pathology', 'blood test'],
+    'salon': ['salon', 'saloon', 'parlour', 'parlor', 'barber', 'hair'],
+    'library': ['library', 'reading', 'study'],
+    'book store': ['book', 'stationery', 'stationary', 'stationery / book'],
+    'cyber cafe': ['cyber', 'internet', 'online', 'e-mitra', 'emitra'],
+  };
+
+  const synonyms = synonymMap[f] || [f];
+  return synonyms.some((syn) => vs.includes(syn) || vn.includes(syn) || vServices.includes(syn));
+};
+
 export default function CategoryPage() {
   const { slug } = useParams<{ slug: string; }>();
   const navigate = useNavigate();
@@ -65,13 +128,24 @@ export default function CategoryPage() {
   const categoryVendors = allVendors.filter((v) => v.category === slug);
   const totalVerifiedCount = categoryVendors.filter((v) => v.isVerified).length;
 
-  // Extract unique subServices for filter chips
-  const filterOptions = ['All', ...Array.from(new Set(categoryVendors.map((v) => v.subService)))];
+  // Build complete filter options: All + Predefined Sub-Services for this section + Any custom vendor sub-services
+  const defaultSubServices = (slug && DEFAULT_CATEGORY_SUB_SERVICES[slug]) || [];
+  const vendorSubServices: string[] = [];
+  categoryVendors.forEach((v) => {
+    if (v.subService) {
+      v.subService.split(',').forEach((s) => {
+        const trimmed = s.trim();
+        if (trimmed && !vendorSubServices.includes(trimmed) && !defaultSubServices.includes(trimmed)) {
+          vendorSubServices.push(trimmed);
+        }
+      });
+    }
+  });
+
+  const filterOptions = ['All', ...defaultSubServices, ...vendorSubServices];
 
   // Filter vendors based on selected filter chip
-  const filteredVendors = categoryVendors.filter(
-    (v) => selectedFilter === 'All' || v.subService === selectedFilter
-  );
+  const filteredVendors = categoryVendors.filter((v) => isVendorMatch(v, selectedFilter));
 
   useEffect(() => {
     setIsLoading(true);
