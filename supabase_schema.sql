@@ -63,8 +63,9 @@ CREATE TABLE IF NOT EXISTS public.vendors (
     whatsapp_clicks INTEGER DEFAULT 0,
     verification_requested_at TIMESTAMP WITH TIME ZONE,
     verification_status TEXT DEFAULT NULL CHECK (verification_status IN ('pending', 'approved', 'rejected')),
-    subscription_status TEXT DEFAULT NULL,
+    subscription_status TEXT DEFAULT 'inactive',
     subscription_expires_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+    last_payment_id TEXT DEFAULT NULL,
     referral_code TEXT UNIQUE,
     referred_by_code TEXT,
     referral_counted BOOLEAN DEFAULT false,
@@ -72,6 +73,11 @@ CREATE TABLE IF NOT EXISTS public.vendors (
     last_referral_reward_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Ensure columns exist for active deployments
+ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS subscription_status TEXT DEFAULT 'inactive';
+ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMP WITH TIME ZONE DEFAULT NULL;
+ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS last_payment_id TEXT DEFAULT NULL;
 
 -- In-App Customer <-> Vendor Chat Messages Table
 CREATE TABLE IF NOT EXISTS public.chat_messages (

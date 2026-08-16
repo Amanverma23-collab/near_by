@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Check, Sparkles, Tag, X, ShieldCheck, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Check, Sparkles, Tag, X, ShieldCheck, ArrowRight, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { getDynamicPlans, fetchRemotePlans, validatePromoCode, type PromoResult, type Plan } from '../../data/plans';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { processReferralReward } from '../../utils/referral';
+import { initiateRazorpayPayment } from '../../utils/razorpay';
 
 export default function PlanDetailPage() {
   const { planId } = useParams<{ planId: string }>();
@@ -175,7 +176,10 @@ export default function PlanDetailPage() {
     }
   };
 
-  const handleProceedPayment = async () => {
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [paymentSuccessData, setPaymentSuccessData] = useState<{ paymentId: string } | null>(null);
+
+  const activateSubscriptionRecord = async (paymentId?: string) => {
     if (!user) {
       navigate('/dashboard');
       return;
@@ -191,17 +195,21 @@ export default function PlanDetailPage() {
         userPhone ? userPhone.replace(/\D/g, '').slice(-10) :
         (localStorage.getItem('nearby_customer_phone') || (user.email?.includes('@nearbe.app') ? user.email.split('@')[0] : ''));
 
-      const subData = {
+      const subData: any = {
         subscription_status: status,
         subscription_expires_at: expiresAt.toISOString(),
         is_verified: true,
         verification_status: 'approved',
       };
+      if (paymentId) {
+        subData.last_payment_id = paymentId;
+      }
 
       // Save to localStorage as guaranteed offline/immediate fallback
       const subObj = JSON.stringify({
         status: status,
         expiresAt: expiresAt.toISOString(),
+        paymentId: paymentId || '',
       });
       localStorage.setItem(`nearby_subscription_${user.id}`, subObj);
       localStorage.setItem(`nearby_trial_used_${user.id}`, 'true');
@@ -257,9 +265,7 @@ export default function PlanDetailPage() {
       }
 
       window.dispatchEvent(new Event('nearby_vendor_updated'));
-      setTimeout(() => {
-        navigate('/vendor/dashboard', { replace: true });
-      }, 100);
+      setPaymentSuccessData({ paymentId: paymentId || `pay_${Date.now()}` });
     } catch (err) {
       console.error('Payment processing error:', err);
       window.dispatchEvent(new Event('nearby_vendor_updated'));
@@ -267,6 +273,43 @@ export default function PlanDetailPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleProceedPayment = async () => {
+    if (!user) {
+      navigate('/dashboard');
+      return;
+    }
+
+    setPaymentError(null);
+
+    // If total price is 0 (e.g. 100% off promo)
+    if (finalPrice <= 0) {
+      await activateSubscriptionRecord();
+      return;
+    }
+
+    setLoading(true);
+
+    const userPhone = user.phone || user.user_metadata?.phone_number || '';
+    const cleanPhone = userPhone ? userPhone.replace(/\D/g, '').slice(-10) : '';
+
+    await initiateRazorpayPayment({
+      amount: finalPrice,
+      vendorId: vendorRecord?.id || user.id,
+      planName: plan.name,
+      planDurationMonths: plan.id === 'annual_pro' ? 12 : 1,
+      ownerName: vendorRecord?.owner_name || user.user_metadata?.full_name || 'Shop Owner',
+      ownerPhone: cleanPhone || vendorRecord?.phone_number || '',
+      ownerEmail: user.email || '',
+      onSuccess: async (details) => {
+        await activateSubscriptionRecord(details.paymentId);
+      },
+      onFailure: (errorMsg) => {
+        setLoading(false);
+        setPaymentError(errorMsg);
+      },
+    });
   };
 
   // Motion variants
@@ -544,8 +587,33 @@ export default function PlanDetailPage() {
             )}
           </motion.div>
 
+          {/* Payment Error Alert */}
+          <AnimatePresence>
+            {paymentError && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-3 text-red-800 text-xs font-body"
+              >
+                <AlertCircle size={18} className="text-red-500 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-bold font-display text-red-900">Payment Notice</p>
+                  <p className="mt-0.5">{paymentError}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPaymentError(null)}
+                  className="p-1 hover:bg-red-100 rounded-full text-red-400 hover:text-red-600"
+                >
+                  <X size={14} />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Bottom CTA */}
-          <motion.div variants={itemVariants} className="pt-2">
+          <motion.div variants={itemVariants} className="pt-2 space-y-3">
             {plan.isFree ? (
               <button
                 onClick={handleActivateTrial}
@@ -558,16 +626,74 @@ export default function PlanDetailPage() {
             ) : (
               <button
                 onClick={handleProceedPayment}
-                className="w-full py-4 bg-gradient-to-r from-teal-600 via-brand to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white font-display font-extrabold rounded-2xl shadow-brand text-base cursor-pointer transition-all flex items-center justify-center gap-2 border border-amber-300/30 group"
+                disabled={loading}
+                className="w-full py-4 bg-gradient-to-r from-teal-600 via-brand to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white font-display font-extrabold rounded-2xl shadow-brand text-base cursor-pointer transition-all flex items-center justify-center gap-2 border border-amber-300/30 group disabled:opacity-75"
               >
-                <ShieldCheck size={20} className="text-amber-300" />
-                <span>Proceed to Payment — ₹{finalPrice}</span>
-                <ArrowRight size={18} className="group-hover:translate-x-0.5 transition-transform" />
+                {loading ? (
+                  <>
+                    <Loader2 size={20} className="animate-spin text-amber-300" />
+                    <span>Opening Razorpay UPI…</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck size={20} className="text-amber-300" />
+                    <span>Proceed to UPI Payment — ₹{finalPrice}</span>
+                    <ArrowRight size={18} className="group-hover:translate-x-0.5 transition-transform" />
+                  </>
+                )}
               </button>
+            )}
+
+            {/* UPI & Security Trust Badge */}
+            {!plan.isFree && (
+              <div className="flex items-center justify-center gap-2 text-[11px] font-body text-ink-muted">
+                <ShieldCheck size={14} className="text-teal-600" />
+                <span>Secured by <strong>Razorpay UPI</strong> • Instant Activation</span>
+              </div>
             )}
           </motion.div>
         </motion.div>
       </main>
+
+      {/* Payment Success Celebration Modal */}
+      <AnimatePresence>
+        {paymentSuccessData && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl border border-teal-100 space-y-4"
+            >
+              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full mx-auto flex items-center justify-center">
+                <CheckCircle2 size={36} />
+              </div>
+              <h3 className="text-xl font-display font-extrabold text-ink">
+                Payment Successful! 🎉
+              </h3>
+              <p className="text-xs text-ink-muted font-body leading-relaxed">
+                Your <strong>{plan.name}</strong> subscription is now active. Your shop is verified and live for customers!
+              </p>
+              <div className="p-3 bg-teal-50 rounded-2xl border border-teal-100 text-[11px] font-mono text-teal-800 text-left space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-teal-600 font-sans">Payment ID:</span>
+                  <span className="font-bold truncate max-w-[160px]">{paymentSuccessData.paymentId}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-teal-600 font-sans">Status:</span>
+                  <span className="font-bold text-emerald-600">Active</span>
+                </div>
+              </div>
+              <button
+                onClick={() => navigate('/vendor/dashboard', { replace: true })}
+                className="w-full py-3.5 bg-brand hover:bg-brand-dark text-white font-display font-extrabold rounded-2xl shadow-brand text-sm transition-colors cursor-pointer"
+              >
+                Go to Vendor Dashboard
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
