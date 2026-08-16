@@ -851,39 +851,6 @@ export default function VendorDetailPage() {
         })()}
       </div>
 
-      {/* ═══════════ G — STICKY BOTTOM BAR (mobile) ═══════════ */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 sm:hidden bg-surface-card/95 backdrop-blur-nav border-t border-border-light px-4 py-2.5">
-        <div className="max-w-md mx-auto grid grid-cols-3 gap-2">
-          <a
-            href={`tel:${vendor.phoneNumber}`}
-            onClick={handleCallClick}
-            className="flex items-center justify-center gap-1.5 bg-brand hover:bg-brand-dark text-white py-2.5 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors shadow-sm shadow-brand/10 cursor-pointer"
-          >
-            <Phone size={15} />
-            <span>Call</span>
-          </a>
-
-          <a
-            href={`https://wa.me/91${vendor.whatsappNumber}?text=${waMsg}`}
-            onClick={handleWhatsAppClick}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1.5 border border-[#25D366]/40 hover:bg-[#25D366]/5 text-[#128C7E] py-2.5 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors cursor-pointer"
-          >
-            <WhatsAppIcon size={15} className="text-[#25D366]" />
-            <span>WhatsApp</span>
-          </a>
-
-          <button
-            onClick={handleStartChat}
-            className="flex items-center justify-center gap-1.5 border border-brand/40 bg-brand/10 text-brand py-2.5 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors cursor-pointer shadow-xs"
-          >
-            <MessageSquare size={15} />
-            <span>Chat</span>
-          </button>
-        </div>
-      </div>
-
       {/* Chat Box Modal */}
       <ChatBoxModal
         conversation={activeChatConv}
