@@ -571,7 +571,7 @@ export default function ChatBoxModal({
           />
 
           {/* ═══════════ AUTHENTIC WHATSAPP TOP HEADER BAR ═══════════ */}
-          <div className="p-2.5 px-3 bg-[#075E54] text-white flex items-center justify-between shadow-md shrink-0 z-20">
+          <div className="p-2.5 px-3 bg-[#075E54] text-white flex items-center justify-between shadow-md shrink-0 z-30 relative">
             <div className="flex items-center gap-2 min-w-0">
               <button
                 onClick={onClose}
@@ -610,7 +610,7 @@ export default function ChatBoxModal({
             </div>
 
             {/* Header Right Actions */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 relative z-40">
               {otherPhone && (
                 <a
                   href={`tel:${otherPhone}`}
@@ -625,7 +625,8 @@ export default function ChatBoxModal({
               <div className="relative">
                 <button
                   onClick={() => setMenuOpen((prev) => !prev)}
-                  className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer text-white"
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer text-white relative z-50"
+                  aria-label="More options"
                 >
                   <MoreVertical size={19} />
                 </button>
@@ -633,35 +634,43 @@ export default function ChatBoxModal({
                 {/* Dropdown menu */}
                 <AnimatePresence>
                   {menuOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95, y: -5 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95, y: -5 }}
-                      className="absolute right-0 top-11 z-50 w-48 bg-white text-ink rounded-2xl p-1.5 shadow-2xl border border-gray-200 text-xs font-display font-bold"
-                    >
-                      <button
-                        onClick={handleToggleBlock}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-colors cursor-pointer ${
-                          isBlockedByMe
-                            ? 'text-emerald-700 hover:bg-emerald-50'
-                            : 'text-error hover:bg-error-light'
-                        }`}
-                      >
-                        {isBlockedByMe ? <ShieldCheck size={16} /> : <ShieldOff size={16} />}
-                        <span>{isBlockedByMe ? 'Unblock User' : 'Block User'}</span>
-                      </button>
+                    <>
+                      {/* Transparent backdrop to catch clicks outside */}
+                      <div
+                        className="fixed inset-0 z-[70] bg-transparent"
+                        onClick={() => setMenuOpen(false)}
+                      />
 
-                      <button
-                        onClick={() => {
-                          setMenuOpen(false);
-                          setReportModalOpen(true);
-                        }}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer"
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: -5 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -5 }}
+                        className="absolute right-0 top-11 z-[80] w-48 bg-white text-ink rounded-2xl p-1.5 shadow-2xl border border-gray-200 text-xs font-display font-bold"
                       >
-                        <Flag size={16} />
-                        <span>Report User</span>
-                      </button>
-                    </motion.div>
+                        <button
+                          onClick={handleToggleBlock}
+                          className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-colors cursor-pointer ${
+                            isBlockedByMe
+                              ? 'text-emerald-700 hover:bg-emerald-50'
+                              : 'text-error hover:bg-error-light'
+                          }`}
+                        >
+                          {isBlockedByMe ? <ShieldCheck size={16} /> : <ShieldOff size={16} />}
+                          <span>{isBlockedByMe ? 'Unblock User' : 'Block User'}</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setMenuOpen(false);
+                            setReportModalOpen(true);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer"
+                        >
+                          <Flag size={16} />
+                          <span>Report User</span>
+                        </button>
+                      </motion.div>
+                    </>
                   )}
                 </AnimatePresence>
               </div>
@@ -696,15 +705,26 @@ export default function ChatBoxModal({
             </div>
           )}
 
-          {/* Block Banner */}
+          {/* Block Banner with Direct Unblock Action */}
           {(isBlockedByMe || isBlockedByOther) && (
-            <div className="mx-4 mt-3 p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl text-xs font-bold flex items-center gap-2 shrink-0 z-20">
-              <ShieldOff size={16} className="text-amber-600 shrink-0" />
-              <span>
-                {isBlockedByMe
-                  ? 'You have blocked this user.'
-                  : 'You are blocked by this user. Messaging is disabled.'}
-              </span>
+            <div className="mx-3 mt-2.5 p-2.5 px-3.5 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl text-xs font-bold flex items-center justify-between gap-2 shrink-0 shadow-xs z-10">
+              <div className="flex items-center gap-2 min-w-0">
+                <ShieldOff size={15} className="text-amber-600 shrink-0" />
+                <span className="truncate">
+                  {isBlockedByMe
+                    ? 'You have blocked this user.'
+                    : 'You are blocked by this user. Messaging disabled.'}
+                </span>
+              </div>
+              {isBlockedByMe && (
+                <button
+                  type="button"
+                  onClick={handleToggleBlock}
+                  className="px-3 py-1 bg-amber-200 hover:bg-amber-300 text-amber-950 font-display font-extrabold text-xs rounded-xl transition-colors cursor-pointer shrink-0 shadow-2xs"
+                >
+                  Unblock
+                </button>
+              )}
             </div>
           )}
 
@@ -977,7 +997,22 @@ export default function ChatBoxModal({
 
           {/* ═══════════ AUTHENTIC WHATSAPP FLOATING INPUT TOOLBAR ═══════════ */}
           <div className="p-2 px-2.5 bg-[#EFEAE2] shrink-0 z-30">
-            {isRecording ? (
+            {isBlockedByMe ? (
+              /* Dedicated Unblock CTA Bar */
+              <div className="flex items-center justify-between gap-3 p-2.5 px-4 bg-white rounded-2xl shadow-sm border border-gray-200 text-xs font-bold text-gray-700">
+                <div className="flex items-center gap-2 min-w-0">
+                  <ShieldOff size={16} className="text-amber-600 shrink-0" />
+                  <span className="truncate">You have blocked this contact.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleToggleBlock}
+                  className="px-4 py-2 bg-[#075E54] hover:bg-teal-800 text-white font-display font-extrabold text-xs rounded-xl shadow-xs transition-colors cursor-pointer shrink-0"
+                >
+                  Unblock
+                </button>
+              </div>
+            ) : isRecording ? (
               /* WhatsApp Voice Recording Bar */
               <div className="flex items-center justify-between gap-2 p-1.5 px-3 bg-white rounded-full shadow-lg border border-gray-200">
                 {/* Left: Discard Trash Button */}
@@ -1043,8 +1078,8 @@ export default function ChatBoxModal({
                     onChange={(e) => setTextInput(e.target.value)}
                     disabled={isBlockedByMe || isBlockedByOther}
                     placeholder={
-                      isBlockedByMe || isBlockedByOther
-                        ? 'Messaging disabled'
+                      isBlockedByOther
+                        ? 'You are blocked. Messaging disabled'
                         : 'Message'
                     }
                     className="flex-1 px-2 py-1.5 bg-transparent text-xs font-body text-[#111B21] outline-none placeholder:text-gray-400 disabled:opacity-50 min-w-0"
