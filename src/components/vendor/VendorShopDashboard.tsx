@@ -32,7 +32,6 @@ import {
   MapPin,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { useUnread } from '../../context/UnreadContext';
 import { supabase } from '../../lib/supabase';
 import AnimatedCountUp from '../ui/AnimatedCountUp';
 import ShopTimingModal from './ShopTimingModal';
@@ -49,7 +48,6 @@ interface VendorShopDashboardProps {
 export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorShopDashboardProps) {
   const navigate = useNavigate();
   const { signOut } = useAuth();
-  const { hasUnread } = useUnread();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -264,24 +262,6 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
               <Home size={18} className="text-teal-700" />
             </motion.button>
 
-            {/* Quick Chats Icon Button */}
-            <button
-              onClick={() => navigate('/chats')}
-              className="relative p-2 rounded-full border border-border-light bg-surface hover:bg-brand/10 hover:text-brand transition-colors cursor-pointer text-ink-muted"
-              title="Customer Chats"
-            >
-              <MessageCircle size={18} />
-              {hasUnread && (
-                <motion.span
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  exit={{ scale: 0 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 25 }}
-                  className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#EF4444] border-2 border-white shadow-xs z-30 pointer-events-none"
-                />
-              )}
-            </button>
-
             {/* Profile Menu Dropdown Button */}
             <div className="relative">
               <button
@@ -314,25 +294,6 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
                     >
                       <Home size={15} className="text-teal-700" />
                       <span>Customer App</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setMenuOpen(false);
-                        navigate('/chats');
-                      }}
-                      className="w-full flex items-center justify-between px-3 py-2 text-xs font-display font-bold text-ink hover:bg-surface rounded-xl transition-colors cursor-pointer text-left"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <MessageCircle size={15} className="text-brand" />
-                        <span>Customer Chats</span>
-                      </div>
-                      {hasUnread && (
-                        <motion.span
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          className="w-2 h-2 rounded-full bg-[#EF4444]"
-                        />
-                      )}
                     </button>
                     <button
                       onClick={() => {
@@ -612,38 +573,6 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
           </h2>
 
           <div className="bg-white rounded-3xl border border-border-light shadow-card divide-y divide-border-light/60 overflow-hidden">
-            {/* Customer Chats & Inquiries */}
-            <motion.div
-              whileHover={{ backgroundColor: 'var(--color-surface)' }}
-              whileTap={{ scale: 0.995 }}
-              onClick={() => navigate('/chats')}
-              className="p-4 sm:p-5 flex items-center justify-between cursor-pointer transition-colors bg-brand/5"
-            >
-              <div className="flex items-center gap-4">
-                <div className="relative p-3 bg-brand/15 text-brand rounded-2xl border border-brand/20">
-                  <MessageCircle size={20} />
-                  {hasUnread && (
-                    <motion.span
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      exit={{ scale: 0 }}
-                      transition={{ type: 'spring', stiffness: 500, damping: 25 }}
-                      className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[#EF4444] border-2 border-white shadow-xs z-30 pointer-events-none"
-                    />
-                  )}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-display font-extrabold text-ink">Customer Chats & Inquiries</h3>
-                    <span className="px-2 py-0.5 rounded-full bg-brand text-white font-display font-extrabold text-[10px]">
-                      Live
-                    </span>
-                  </div>
-                  <p className="text-xs text-ink-muted mt-0.5">View & reply to customer messages, voice notes & locations</p>
-                </div>
-              </div>
-              <ChevronRight size={18} className="text-ink-muted shrink-0" />
-            </motion.div>
 
             {/* Shop Photos & Gallery */}
             <motion.div

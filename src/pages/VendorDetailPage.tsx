@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, MapPin, Star, BadgeCheck, Phone, Clock,
-  ChevronLeft, ChevronRight, Navigation, ExternalLink, MessageSquare, Plus, Check, Trash2,
+  ChevronLeft, ChevronRight, Navigation, ExternalLink, Plus, Check, Trash2,
 } from 'lucide-react';
 import { dummyVendors, type Vendor } from '../data/dummyVendors';
 import { getEffectiveShopStatus } from '../utils/shopTiming';
@@ -12,9 +12,6 @@ import AddReviewModal from '../components/customer/AddReviewModal';
 import { getSavedReviews, saveNewReview, deleteReview } from '../utils/reviewStorage';
 import { useAuth } from '../context/AuthContext';
 import SaveHeartButton from '../components/ui/SaveHeartButton';
-import ChatBoxModal from '../components/chat/ChatBoxModal';
-import { getOrCreateConversation } from '../utils/chatStorage';
-import type { ChatConversation } from '../utils/chatStorage';
 import BrandLoader from '../components/ui/BrandLoader';
 
 /* ──────────────────── WhatsApp SVG Icon ──────────────────── */
@@ -109,8 +106,6 @@ export default function VendorDetailPage() {
   const [customReviews, setCustomReviews] = useState<any[]>([]);
   const [reviewToast, setReviewToast] = useState<string | null>(null);
 
-  const [activeChatConv, setActiveChatConv] = useState<ChatConversation | null>(null);
-  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const viewTrackedRef = useRef<string | null>(null);
 
   const handleDeleteUserReview = async (reviewId: string) => {
@@ -120,34 +115,6 @@ export default function VendorDetailPage() {
     setCustomReviews((prev) => prev.filter((r) => r.id !== reviewId));
     setReviewToast('Your previous rating has been deleted. You can now submit a new rating.');
     setTimeout(() => setReviewToast(null), 4000);
-  };
-
-  const handleStartChat = () => {
-    if (!vendor) return;
-    const cleanCustomerPhone = (
-      localStorage.getItem('nearby_customer_phone') ||
-      user?.phone ||
-      user?.user_metadata?.phone_number ||
-      ''
-    ).replace(/\D/g, '').slice(-10);
-    const customerDisplayName =
-      localStorage.getItem('nearby_customer_name') ||
-      user?.user_metadata?.full_name ||
-      'Customer';
-    const effectiveCustomerId = user?.id || (cleanCustomerPhone ? `cust-${cleanCustomerPhone}` : 'cust-guest');
-
-    const conv = getOrCreateConversation({
-      vendorId: vendor.id || vendorId || 'v-1',
-      vendorName: vendor.name,
-      vendorPhone: vendor.phoneNumber,
-      vendorShopPhoto: vendor.shopImages?.[0],
-      vendorSubService: vendor.subService,
-      customerId: effectiveCustomerId,
-      customerName: customerDisplayName,
-      customerPhone: cleanCustomerPhone,
-    });
-    setActiveChatConv(conv);
-    setIsChatModalOpen(true);
   };
 
   useEffect(() => {
@@ -384,14 +351,14 @@ export default function VendorDetailPage() {
 
         {/* ═══════════ C — ACTION BUTTONS ═══════════ */}
         <FadeInSection delay={0.12} className="mb-6">
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-3 gap-2.5">
             {/* Call */}
             <a
               href={`tel:${vendor.phoneNumber}`}
               onClick={handleCallClick}
-              className="flex items-center justify-center gap-1 bg-brand hover:bg-brand-dark text-white py-3 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors shadow-sm shadow-brand/10 cursor-pointer"
+              className="flex items-center justify-center gap-1.5 bg-brand hover:bg-brand-dark text-white py-3 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors shadow-sm shadow-brand/10 cursor-pointer"
             >
-              <Phone size={14} />
+              <Phone size={15} />
               <span>Call</span>
             </a>
 
@@ -401,30 +368,21 @@ export default function VendorDetailPage() {
               onClick={handleWhatsAppClick}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1 border border-[#25D366]/40 hover:bg-[#25D366]/5 text-[#128C7E] py-3 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors cursor-pointer"
+              className="flex items-center justify-center gap-1.5 border border-[#25D366]/40 hover:bg-[#25D366]/5 text-[#128C7E] py-3 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors cursor-pointer shadow-2xs"
             >
-              <WhatsAppIcon size={14} className="text-[#25D366]" />
+              <WhatsAppIcon size={15} className="text-[#25D366]" />
               <span>WhatsApp</span>
             </a>
-
-            {/* In-App Direct Chat */}
-            <button
-              onClick={handleStartChat}
-              className="flex items-center justify-center gap-1 border border-brand/40 bg-brand/5 hover:bg-brand/10 text-brand py-3 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors cursor-pointer shadow-xs"
-            >
-              <MessageSquare size={14} />
-              <span>Chat</span>
-            </button>
 
             {/* View on Map */}
             <a
               href={`https://www.google.com/maps?q=${vendor.latitude},${vendor.longitude}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1 border border-border-light hover:border-brand/30 hover:text-brand text-ink-muted py-3 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors cursor-pointer"
+              className="flex items-center justify-center gap-1.5 border border-border-light hover:border-brand/30 hover:text-brand text-ink-muted py-3 rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors cursor-pointer shadow-2xs"
             >
-              <Navigation size={14} />
-              <span>Map</span>
+              <Navigation size={15} />
+              <span>Directions</span>
             </a>
           </div>
         </FadeInSection>
@@ -727,14 +685,6 @@ export default function VendorDetailPage() {
           );
         })()}
       </div>
-
-      {/* Chat Box Modal */}
-      <ChatBoxModal
-        conversation={activeChatConv}
-        currentUserRole="customer"
-        isOpen={isChatModalOpen}
-        onClose={() => setIsChatModalOpen(false)}
-      />
     </motion.div>
   );
 }

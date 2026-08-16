@@ -21,7 +21,6 @@ import VendorOnboardingDashboard from './components/vendor/VendorOnboardingDashb
 import SearchPage from './pages/SearchPage';
 import FavoritesPage from './pages/FavoritesPage';
 import MyRatingsPage from './pages/MyRatingsPage';
-import ChatsPage from './pages/ChatsPage';
 import CustomerBottomNav from './components/navigation/CustomerBottomNav';
 
 import { LanguageProvider } from './context/LanguageContext';
@@ -69,7 +68,7 @@ function AppRoutes() {
         <Route path="/location" element={<LocationPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/search" element={<SearchPage />} />
-        <Route path="/chats" element={<ChatsPage />} />
+        <Route path="/chats" element={<Navigate to="/dashboard" replace />} />
         <Route path="/favorites" element={<FavoritesPage />} />
         <Route path="/category/:slug" element={<CategoryPage />} />
         <Route path="/vendor/:vendorId" element={<VendorDetailPage />} />

@@ -1,34 +1,17 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Home, Search, Heart, User, MessageSquare } from 'lucide-react';
+import { Home, Search, Heart, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { useUnread } from '../../context/UnreadContext';
 
 export default function CustomerBottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const { session } = useAuth();
   const { t } = useLanguage();
-  const { hasUnread } = useUnread();
-  const [isChatOpen, setIsChatOpen] = useState(false);
-
-  useEffect(() => {
-    const handleChatState = (e: any) => {
-      setIsChatOpen(!!e.detail?.isOpen);
-    };
-    window.addEventListener('chatModalStateChange', handleChatState);
-    return () => {
-      window.removeEventListener('chatModalStateChange', handleChatState);
-    };
-  }, []);
 
   // Only display for logged-in sessions
   if (!session) return null;
-
-  // Hide when chat box is open
-  if (isChatOpen) return null;
 
   // Paths where customer bottom nav should be hidden
   if (
@@ -56,12 +39,6 @@ export default function CustomerBottomNav() {
       label: t('search'),
       icon: Search,
       path: '/search',
-    },
-    {
-      id: 'chats',
-      label: 'Chats',
-      icon: MessageSquare,
-      path: '/chats',
     },
     {
       id: 'saved',
@@ -125,26 +102,7 @@ export default function CustomerBottomNav() {
               {!isActive && (
                 <div className="relative text-gray-400 group-hover:text-ink transition-colors mb-1">
                   <IconComponent size={20} />
-                  {tab.id === 'chats' && hasUnread && (
-                    <motion.span
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      exit={{ scale: 0 }}
-                      transition={{ type: 'spring', stiffness: 500, damping: 25 }}
-                      className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#EF4444] border-2 border-white z-30 shadow-xs"
-                    />
-                  )}
                 </div>
-              )}
-
-              {isActive && tab.id === 'chats' && hasUnread && (
-                <motion.span
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  exit={{ scale: 0 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 25 }}
-                  className="absolute -top-4 right-1/2 translate-x-3.5 w-2.5 h-2.5 rounded-full bg-[#EF4444] border-2 border-white z-30 shadow-xs"
-                />
               )}
 
               {/* Text Label */}
