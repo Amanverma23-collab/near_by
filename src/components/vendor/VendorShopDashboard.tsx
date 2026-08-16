@@ -315,17 +315,6 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
                       <Settings size={15} className="text-brand" />
                       <span>Settings</span>
                     </button>
-                    <hr className="border-border-light my-1" />
-                    <button
-                      onClick={() => {
-                        setMenuOpen(false);
-                        signOut();
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-display font-bold text-error hover:bg-error-light/50 rounded-xl transition-colors cursor-pointer text-left"
-                    >
-                      <LogOut size={15} />
-                      <span>Logout</span>
-                    </button>
                   </motion.div>
                 )}
               </AnimatePresence>
