@@ -58,9 +58,11 @@ export default function SubscriptionPlaceholder() {
   const [hasUsedTrial, setHasUsedTrial] = useState<boolean>(() => {
     if (!user) return false;
     const cleanPhone = (user.phone || '').replace(/\D/g, '').slice(-10);
+    const subStatus = vendorRecord?.subscription_status;
+    const hasActiveOrPastSub = subStatus && ['trial', 'active', 'pro'].includes(subStatus);
     return (
       Boolean(vendorRecord?.has_used_trial) ||
-      Boolean(vendorRecord?.subscription_status) ||
+      Boolean(hasActiveOrPastSub) ||
       localStorage.getItem(`nearby_trial_used_${user.id}`) === 'true' ||
       (cleanPhone ? localStorage.getItem(`nearby_trial_used_${cleanPhone}`) === 'true' : false)
     );
@@ -74,7 +76,10 @@ export default function SubscriptionPlaceholder() {
         localStorage.getItem(`nearby_trial_used_${user.id}`) === 'true' ||
         (cleanPhone ? localStorage.getItem(`nearby_trial_used_${cleanPhone}`) === 'true' : false);
 
-      if (localUsed || vendorRecord?.has_used_trial || vendorRecord?.subscription_status) {
+      const subStatus = vendorRecord?.subscription_status;
+      const hasActiveOrPastSub = subStatus && ['trial', 'active', 'pro'].includes(subStatus);
+
+      if (localUsed || vendorRecord?.has_used_trial || hasActiveOrPastSub) {
         setHasUsedTrial(true);
         return;
       }
@@ -85,9 +90,16 @@ export default function SubscriptionPlaceholder() {
           .select('has_used_trial, subscription_status')
           .eq('auth_user_id', user.id);
 
-        if (vendors && vendors.some(v => v.has_used_trial || v.subscription_status)) {
+        if (
+          vendors &&
+          vendors.some(
+            v => v.has_used_trial || (v.subscription_status && ['trial', 'active', 'pro'].includes(v.subscription_status))
+          )
+        ) {
           setHasUsedTrial(true);
           localStorage.setItem(`nearby_trial_used_${user.id}`, 'true');
+        } else {
+          setHasUsedTrial(false);
         }
       } catch (e) {
         console.warn('Error checking trial status:', e);

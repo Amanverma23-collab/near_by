@@ -40,14 +40,17 @@ export default function PlanDetailPage() {
   useEffect(() => {
     if (plan.isFree && user) {
       const cleanPhone = (user.phone || '').replace(/\D/g, '').slice(-10);
+      const subStatus = vendorRecord?.subscription_status;
+      const hasActivePaidSub = subStatus && ['active', 'pro'].includes(subStatus);
       const hasUsed =
+        vendorRecord?.has_used_trial ||
+        hasActivePaidSub ||
         localStorage.getItem(`nearby_trial_used_${user.id}`) === 'true' ||
         localStorage.getItem('nearby_has_used_trial') === 'true' ||
-        (cleanPhone ? localStorage.getItem(`nearby_trial_used_${cleanPhone}`) === 'true' : false) ||
-        (vendorRecord?.subscription_status && vendorRecord?.subscription_status !== 'trial');
+        (cleanPhone ? localStorage.getItem(`nearby_trial_used_${cleanPhone}`) === 'true' : false);
 
       if (hasUsed) {
-        navigate('/vendor/subscription', { replace: true });
+        navigate('/vendor/subscriptions', { replace: true });
       }
     }
   }, [plan.isFree, user, vendorRecord, navigate]);
