@@ -10,6 +10,7 @@ import { getEffectiveShopStatus } from '../utils/shopTiming';
 import { fetchCombinedVendors, trackVendorCall, trackVendorWhatsApp, trackVendorView } from '../utils/vendorSync';
 import AddReviewModal from '../components/customer/AddReviewModal';
 import { getSavedReviews, saveNewReview, deleteReview } from '../utils/reviewStorage';
+import { formatDistance } from '../utils/haversine';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from '../context/LocationContext';
 import SaveHeartButton from '../components/ui/SaveHeartButton';
@@ -357,7 +358,7 @@ export default function VendorDetailPage() {
           <div className="flex flex-wrap items-center gap-3 text-[11px] font-body">
             <div className="flex items-center gap-1">
               <MapPin size={12} className="text-brand" />
-              <span className="text-ink-muted">{vendor.distanceKm.toFixed(1)} km away</span>
+              <span className="text-ink-muted">{formatDistance(vendor.distanceKm)} away</span>
             </div>
             <div className="flex items-center gap-1.5">
               <Clock size={12} className="text-ink-muted/80" />

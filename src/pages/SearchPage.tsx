@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Search, X, MapPin, Star, BadgeCheck, Phone, ArrowRight, Sparkles, Filter } from 'lucide-react';
+import { Search, X, MapPin, Star, BadgeCheck, Phone, ArrowRight, Sparkles, Filter, SlidersHorizontal } from 'lucide-react';
 import { dummyVendors, type Vendor } from '../data/dummyVendors';
 import { fetchCombinedVendors } from '../utils/vendorSync';
+import { formatDistance, RADIUS_OPTIONS } from '../utils/haversine';
 import SaveHeartButton from '../components/ui/SaveHeartButton';
 import { useLanguage } from '../context/LanguageContext';
 import { useLocation } from '../context/LocationContext';
@@ -23,6 +24,7 @@ export default function SearchPage() {
   const { location: userLocation } = useLocation();
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedRadius, setSelectedRadius] = useState<number | null>(null);
   const [allVendors, setAllVendors] = useState<Vendor[]>(dummyVendors);
 
   useEffect(() => {
@@ -51,11 +53,13 @@ export default function SearchPage() {
     return () => window.removeEventListener('nearby_gps_updated', handleGpsUpdate);
   }, [userLocation]);
 
-  // Filter vendors based on search query & category
+  // Filter vendors based on search query & category & radius
   const filteredVendors = allVendors.filter((vendor) => {
     const matchesCategory = selectedCategory ? vendor.category === selectedCategory : true;
+    const matchesRadius = selectedRadius !== null ? vendor.distanceKm <= selectedRadius : true;
     const q = query.toLowerCase().trim();
-    if (!q) return matchesCategory;
+
+    if (!q) return matchesCategory && matchesRadius;
 
     const matchesName = vendor.name.toLowerCase().includes(q);
     const matchesSubService = vendor.subService.toLowerCase().includes(q);
@@ -63,7 +67,7 @@ export default function SearchPage() {
     const matchesCat = vendor.category.toLowerCase().includes(q);
     const matchesServices = vendor.servicesOffered.some((s) => s.name.toLowerCase().includes(q));
 
-    return matchesCategory && (matchesName || matchesSubService || matchesAddress || matchesCat || matchesServices);
+    return matchesCategory && matchesRadius && (matchesName || matchesSubService || matchesAddress || matchesCat || matchesServices);
   });
 
   return (
@@ -93,17 +97,50 @@ export default function SearchPage() {
             {query && (
               <button
                 onClick={() => setQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-ink-muted hover:text-ink rounded-full"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-ink-muted hover:text-ink rounded-full cursor-pointer"
               >
                 <X size={16} />
               </button>
             )}
           </div>
+
+          {/* Quick Radius Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none select-none">
+            <span className="text-[10px] font-display font-extrabold text-ink-muted uppercase tracking-wider pl-1 shrink-0">
+              Radius:
+            </span>
+            {RADIUS_OPTIONS.map((r) => {
+              const isSelected = selectedRadius === r.radiusKm;
+              return (
+                <button
+                  key={r.label}
+                  onClick={() => setSelectedRadius(isSelected ? null : r.radiusKm)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-display font-bold transition-all shrink-0 cursor-pointer border ${
+                    isSelected
+                      ? 'bg-brand text-white border-brand shadow-2xs'
+                      : 'bg-surface text-ink-muted border-border-light hover:border-brand/40 hover:text-brand'
+                  }`}
+                >
+                  {r.label}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setSelectedRadius(null)}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-display font-bold transition-all shrink-0 cursor-pointer border ${
+                selectedRadius === null
+                  ? 'bg-brand text-white border-brand shadow-2xs'
+                  : 'bg-surface text-ink-muted border-border-light hover:border-brand/40 hover:text-brand'
+              }`}
+            >
+              All
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-md mx-auto px-4 py-5 space-y-6">
+      <main className="max-w-md mx-auto px-4 py-4 space-y-5">
 
         {/* Popular Search Suggestions */}
         {!query && (
@@ -137,16 +174,23 @@ export default function SearchPage() {
               <div className="p-3 bg-surface rounded-full w-12 h-12 mx-auto flex items-center justify-center text-ink-muted">
                 <Search size={20} />
               </div>
-              <h3 className="text-base font-display font-bold text-ink">No matching listings found</h3>
+              <h3 className="text-base font-display font-bold text-ink">
+                {selectedRadius
+                  ? `No vendors found within ${RADIUS_OPTIONS.find((r) => r.radiusKm === selectedRadius)?.label || selectedRadius + ' km'}`
+                  : 'No matching listings found'}
+              </h3>
               <p className="text-xs text-ink-muted max-w-xs mx-auto">
-                Try searching for broader keywords like "repair", "doctor", "salon", or clear your search term.
+                {selectedRadius
+                  ? 'Try expanding your distance filter or searching for broader keywords.'
+                  : 'Try searching for broader keywords like "repair", "doctor", "salon", or clear your search term.'}
               </p>
               <button
                 onClick={() => {
                   setQuery('');
                   setSelectedCategory(null);
+                  setSelectedRadius(null);
                 }}
-                className="px-4 py-2 bg-brand/10 text-brand font-display font-extrabold text-xs rounded-xl"
+                className="px-4 py-2 bg-brand/10 text-brand font-display font-extrabold text-xs rounded-xl cursor-pointer"
               >
                 Clear Search Filters
               </button>
@@ -187,17 +231,17 @@ export default function SearchPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs text-ink-muted border-t border-border-light/60 pt-2.5">
-                    <div className="flex items-center gap-1 text-[11px]">
-                      <MapPin size={12} className="text-brand shrink-0" />
-                      <span className="truncate max-w-[180px]">{vendor.address}</span>
+                    <div className="flex items-center justify-between text-xs text-ink-muted border-t border-border-light/60 pt-2.5">
+                      <div className="flex items-center gap-1 text-[11px]">
+                        <MapPin size={12} className="text-brand shrink-0" />
+                        <span className="truncate max-w-[180px]">{vendor.address}</span>
+                      </div>
+                      <span className="font-bold text-brand text-[11px] shrink-0">
+                        {formatDistance(vendor.distanceKm)} &rarr;
+                      </span>
                     </div>
-                    <span className="font-bold text-brand text-[11px] shrink-0">
-                      {vendor.distanceKm.toFixed(1)} km &rarr;
-                    </span>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                ))}
             </div>
           )}
         </div>

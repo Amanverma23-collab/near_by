@@ -27,11 +27,11 @@ import {
   Home,
   MapPin,
   ChevronDown,
-  LocateFixed,
 } from 'lucide-react';
 import { useLocation } from '../../context/LocationContext';
 import { useLanguage } from '../../context/LanguageContext';
 import CitySelector from '../location/CitySelector';
+import DetectLocationCard from '../location/DetectLocationCard';
 import RegisterShopBanner from './RegisterShopBanner';
 
 interface ServiceInfo {
@@ -145,7 +145,7 @@ function ServiceTile({ categorySlug, service, gradient, shadowColor, categoryCol
       onClick={handleClick}
       whileHover={{ scale: 1.03, y: -2 }}
       whileTap={{ scale: 0.97 }}
-      className="flex flex-col w-[135px] sm:w-[150px] shrink-0 cursor-pointer select-none group"
+      className="flex flex-col w-[135px] min-w-[135px] sm:w-[150px] sm:min-w-[150px] shrink-0 cursor-pointer select-none group"
     >
       {/* Clean Image Card */}
       <div 
@@ -161,7 +161,7 @@ function ServiceTile({ categorySlug, service, gradient, shadowColor, categoryCol
       </div>
       
       {/* Service Name Label Below Card */}
-      <div className="flex items-center gap-1.5 mt-2 px-0.5">
+      <div className="flex items-center gap-1.5 mt-2 px-0.5 min-w-0">
         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: categoryColor }} />
         <span className="text-[11px] sm:text-xs font-display font-extrabold text-ink leading-tight truncate group-hover:text-brand transition-colors">
           {t(service.label)}
@@ -193,36 +193,6 @@ export default function CategoryGrid() {
   const handleCitySelect = (city: string, coords?: { latitude: number; longitude: number }) => {
     setCityManually(city, coords);
     setCityModalOpen(false);
-  };
-
-  const handleRedetect = () => {
-    localStorage.removeItem('nearby_manual_location_selected');
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          try {
-            const resp = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-            );
-            const data = await resp.json();
-            const city =
-              data.address?.city ||
-              data.address?.town ||
-              data.address?.village ||
-              data.address?.state_district ||
-              'Unknown';
-            setCityManually(city, { latitude, longitude });
-          } catch {
-            setCityManually('Unknown', { latitude, longitude });
-          }
-          setCityModalOpen(false);
-        },
-        () => {
-          // Keep modal open for manual entry
-        }
-      );
-    }
   };
 
   return (
@@ -326,9 +296,9 @@ export default function CategoryGrid() {
               transition={{ type: 'spring', damping: 25, stiffness: 250 }}
               className="relative w-full sm:max-w-md bg-surface rounded-t-[var(--radius-xl)] sm:rounded-[var(--radius-xl)] p-6 shadow-elevated z-10 border border-border-light max-h-[85vh] overflow-y-auto"
             >
-              <div className="flex justify-between items-center mb-6">
+              <div className="flex justify-between items-center mb-2">
                 <div>
-                  <h3 className="text-lg font-display font-extrabold text-ink">Change City</h3>
+                  <h3 className="text-lg font-display font-extrabold text-ink">Change Location</h3>
                   <p className="text-xs text-ink-muted font-body mt-0.5">Select or search for your city</p>
                 </div>
                 <button
@@ -339,18 +309,22 @@ export default function CategoryGrid() {
                 </button>
               </div>
 
-              {/* GPS Auto-detect */}
-              <button
-                onClick={handleRedetect}
-                className="w-full mb-6 flex items-center justify-center gap-2 py-3 bg-brand-50 hover:bg-brand-100 text-brand rounded-[var(--radius-md)] text-xs font-display font-bold transition-colors cursor-pointer"
-              >
-                <LocateFixed size={14} />
-                <span>Detect My Location</span>
-              </button>
-
-              <div className="border-t border-border-light pt-6">
-                <CitySelector onSelect={handleCitySelect} />
+              {/* Detect Location Component with full Geolocation Flow */}
+              <div className="my-4">
+                <DetectLocationCard
+                  onSuccess={() => {
+                    setTimeout(() => setCityModalOpen(false), 900);
+                  }}
+                />
               </div>
+
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-xs text-ink-muted font-body uppercase tracking-wider">or select city</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+
+              <CitySelector onSelect={handleCitySelect} />
             </motion.div>
           </motion.div>
         )}

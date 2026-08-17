@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useParams, useLocation as useRouterLocation } from 'react-router-dom';
-import { ArrowLeft, MapPin, Star, BadgeCheck, Phone, AlertCircle, Clock } from 'lucide-react';
+import { ArrowLeft, MapPin, Star, BadgeCheck, Phone, AlertCircle, Clock, SlidersHorizontal } from 'lucide-react';
 import { dummyVendors, type Vendor } from '../data/dummyVendors';
 import { getEffectiveShopStatus } from '../utils/shopTiming';
 import { fetchCombinedVendors, trackVendorCall, trackVendorWhatsApp } from '../utils/vendorSync';
+import { formatDistance, RADIUS_OPTIONS, filterNearbyVendors } from '../utils/haversine';
 import SaveHeartButton from '../components/ui/SaveHeartButton';
 import { useLocation as useAppLocation } from '../context/LocationContext';
 
@@ -119,6 +120,7 @@ export default function CategoryPage() {
   const [selectedFilter, setSelectedFilter] = useState(() => {
     return (routerLocation.state as { initialFilter?: string })?.initialFilter || 'All';
   });
+  const [selectedRadius, setSelectedRadius] = useState<number | null>(5); // Default 5 km
   const [isLoading, setIsLoading] = useState(true);
   const [allVendors, setAllVendors] = useState<Vendor[]>(dummyVendors);
 
@@ -144,8 +146,11 @@ export default function CategoryPage() {
 
   const filterOptions = ['All', ...defaultSubServices, ...vendorSubServices];
 
-  // Filter vendors based on selected filter chip
-  const filteredVendors = categoryVendors.filter((v) => isVendorMatch(v, selectedFilter));
+  // Filter vendors based on selected sub-service chip and radius filter
+  const filteredVendors = categoryVendors
+    .filter((v) => isVendorMatch(v, selectedFilter))
+    .filter((v) => (selectedRadius !== null ? v.distanceKm <= selectedRadius : true))
+    .sort((a, b) => a.distanceKm - b.distanceKm);
 
   useEffect(() => {
     setIsLoading(true);
@@ -232,9 +237,9 @@ export default function CategoryPage() {
       </div>
 
       {/* Main Content Area */}
-      <div className="max-w-md mx-auto px-4 py-5 flex flex-col">
-        {/* Horizontal scrollable filter chips */}
-        <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-none -mx-4 px-4 select-none">
+      <div className="max-w-md mx-auto px-4 py-4 flex flex-col space-y-3">
+        {/* Horizontal scrollable sub-service filter chips */}
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none -mx-4 px-4 select-none">
           {filterOptions.map((opt) => {
             const isActive = opt === selectedFilter;
             return (
@@ -251,6 +256,39 @@ export default function CategoryPage() {
               </button>
             );
           })}
+        </div>
+
+        {/* Radius Filter Pills */}
+        <div className="flex items-center gap-1.5 bg-surface-card p-2 rounded-xl border border-border-light shadow-2xs overflow-x-auto scrollbar-none select-none">
+          <span className="text-[10px] font-display font-extrabold text-ink-muted uppercase tracking-wider pl-1 shrink-0">
+            Radius:
+          </span>
+          {RADIUS_OPTIONS.map((r) => {
+            const isSelected = selectedRadius === r.radiusKm;
+            return (
+              <button
+                key={r.label}
+                onClick={() => setSelectedRadius(isSelected ? null : r.radiusKm)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-display font-bold transition-all shrink-0 cursor-pointer border ${
+                  isSelected
+                    ? 'bg-brand text-white border-brand shadow-2xs'
+                    : 'bg-surface text-ink-muted border-border-light hover:border-brand/40 hover:text-brand'
+                }`}
+              >
+                {r.label}
+              </button>
+            );
+          })}
+          <button
+            onClick={() => setSelectedRadius(null)}
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-display font-bold transition-all shrink-0 cursor-pointer border ${
+              selectedRadius === null
+                ? 'bg-brand text-white border-brand shadow-2xs'
+                : 'bg-surface text-ink-muted border-border-light hover:border-brand/40 hover:text-brand'
+            }`}
+          >
+            All
+          </button>
         </div>
 
         {/* Vendors list state handling */}
@@ -279,11 +317,23 @@ export default function CategoryPage() {
                 <AlertCircle size={28} className="text-brand" />
               </div>
               <h3 className="text-base font-display font-bold text-ink mb-1">
-                No vendors here yet
+                {selectedRadius
+                  ? `No vendors found within ${RADIUS_OPTIONS.find((r) => r.radiusKm === selectedRadius)?.label || selectedRadius + ' km'}`
+                  : 'No vendors here yet'}
               </h3>
-              <p className="text-xs text-ink-muted font-body max-w-[240px]">
-                There are no <strong>{selectedFilter}</strong> providers listed in this category right now. Check back soon!
+              <p className="text-xs text-ink-muted font-body max-w-[260px] mb-3">
+                {selectedRadius
+                  ? 'Try expanding your discovery radius to find vendors a bit further away.'
+                  : `There are no ${selectedFilter} providers listed in this category right now.`}
               </p>
+              {selectedRadius && (
+                <button
+                  onClick={() => setSelectedRadius(null)}
+                  className="px-4 py-2 bg-brand/10 hover:bg-brand/20 text-brand font-display font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                >
+                  Show All Distances
+                </button>
+              )}
             </motion.div>
           ) : (
             <motion.div
@@ -291,7 +341,7 @@ export default function CategoryPage() {
               variants={listContainerVariants}
               initial="hidden"
               animate="show"
-              className="space-y-4 mt-2"
+              className="space-y-4 mt-1"
             >
               {filteredVendors.map((vendor) => (
                 <motion.div
@@ -300,10 +350,10 @@ export default function CategoryPage() {
                   whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.995 }}
                   onClick={() => navigate(`/vendor/${vendor.id}`)}
-                  className="bg-surface-card rounded-[var(--radius-lg)] p-4 border border-border-light shadow-sm flex flex-col text-left transition-all cursor-pointer"
+                  className="bg-surface-card rounded-[var(--radius-lg)] p-4 border border-border-light shadow-sm flex flex-col text-left transition-all cursor-pointer space-y-2.5"
                 >
                   {/* Top line: Name + verified badge + rating */}
-                  <div className="flex justify-between items-start gap-3 mb-1.5">
+                  <div className="flex justify-between items-start gap-3">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <h2 className="text-sm sm:text-base font-display font-extrabold text-ink truncate leading-snug">
                         {vendor.name}
@@ -326,7 +376,7 @@ export default function CategoryPage() {
                   </div>
 
                   {/* SubService Pill, Location & Save Heart Button */}
-                  <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="flex items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="inline-block px-2 py-0.5 bg-surface text-ink-muted border border-border-light rounded-[var(--radius-pill)] text-[9px] font-display font-semibold uppercase tracking-wider">
                         {vendor.subService}
@@ -334,67 +384,67 @@ export default function CategoryPage() {
 
                       <div className="flex items-center gap-1 text-[11px] text-ink-muted font-body">
                         <MapPin size={12} className="text-brand" />
-                        <span>{vendor.distanceKm.toFixed(1)} km away</span>
+                        <span className="font-semibold text-ink">{formatDistance(vendor.distanceKm)} away</span>
                       </div>
                     </div>
 
-                    {/* Save / Like Heart Button positioned under the 4.6 Rating badge */}
+                    {/* Save / Like Heart Button */}
                     <SaveHeartButton vendorId={vendor.id} size={16} className="p-1.5" />
                   </div>
 
                   {/* Operational Status & Hours */}
-                  {(() => {
-                    const status = getEffectiveShopStatus(vendor);
-                    return (
-                      <div className="flex items-center gap-1.5 text-[11px] font-body mb-4 border-t border-border-light/60 pt-3">
-                        <Clock size={12} className="text-ink-muted/80" />
-                        <div className="flex items-center gap-1">
-                          <div className={`w-1.5 h-1.5 rounded-full ${status.isOpen ? 'bg-emerald-500' : 'bg-rose-400'}`} />
-                          <span className={status.isOpen ? 'text-emerald-600 font-semibold' : 'text-rose-500 font-semibold'}>
-                            {status.isOpen ? 'Open Now' : 'Closed'}
-                          </span>
-                          {status.isManual && (
-                            <span className="font-mono text-[9px] px-1 bg-amber-100 text-amber-900 rounded font-bold">Manual</span>
-                          )}
+                    {(() => {
+                      const status = getEffectiveShopStatus(vendor);
+                      return (
+                        <div className="flex items-center gap-1.5 text-[11px] font-body border-t border-border-light/60 pt-2.5">
+                          <Clock size={12} className="text-ink-muted/80" />
+                          <div className="flex items-center gap-1">
+                            <div className={`w-1.5 h-1.5 rounded-full ${status.isOpen ? 'bg-emerald-500' : 'bg-rose-400'}`} />
+                            <span className={status.isOpen ? 'text-emerald-600 font-semibold' : 'text-rose-500 font-semibold'}>
+                              {status.isOpen ? 'Open Now' : 'Closed'}
+                            </span>
+                            {status.isManual && (
+                              <span className="font-mono text-[9px] px-1 bg-amber-100 text-amber-900 rounded font-bold">Manual</span>
+                            )}
+                          </div>
+                          <span className="text-ink-muted">• {status.openingTimeFormatted} – {status.closingTimeFormatted}</span>
                         </div>
-                        <span className="text-ink-muted">• {status.openingTimeFormatted} – {status.closingTimeFormatted}</span>
-                      </div>
-                    );
-                  })()}
+                      );
+                    })()}
 
-                  {/* Generous thumb-sized call / whatsapp action buttons */}
-                  <div className="grid grid-cols-2 gap-3 mt-auto">
-                    {/* Call CTA */}
-                    <a
-                      href={`tel:${vendor.phoneNumber}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        trackVendorCall(vendor.id, vendor.phoneNumber);
-                      }}
-                      className="flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white py-2.5 rounded-[var(--radius-md)] text-xs sm:text-sm font-display font-bold transition-colors shadow-sm shadow-brand/10 cursor-pointer"
-                    >
-                      <Phone size={14} className="fill-white/10" />
-                      <span>Call</span>
-                    </a>
+                    {/* Generous thumb-sized call / whatsapp action buttons */}
+                    <div className="grid grid-cols-2 gap-3 pt-1">
+                      {/* Call CTA */}
+                      <a
+                        href={`tel:${vendor.phoneNumber}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          trackVendorCall(vendor.id, vendor.phoneNumber);
+                        }}
+                        className="flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white py-2.5 rounded-[var(--radius-md)] text-xs sm:text-sm font-display font-bold transition-colors shadow-sm shadow-brand/10 cursor-pointer"
+                      >
+                        <Phone size={14} className="fill-white/10" />
+                        <span>Call</span>
+                      </a>
 
-                    <a
-                      href={`https://wa.me/91${vendor.whatsappNumber}?text=${encodeURIComponent(
-                        'Hi, I found your business on NearBy and would like to inquire about your services.'
-                      )}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        trackVendorWhatsApp(vendor.id, vendor.whatsappNumber);
-                      }}
-                      className="flex items-center justify-center gap-2 border border-[#25D366]/40 hover:bg-[#25D366]/5 text-[#128C7E] py-2.5 rounded-[var(--radius-md)] text-xs sm:text-sm font-display font-bold transition-colors cursor-pointer"
-                    >
-                      <WhatsAppIcon size={14} className="text-[#25D366]" />
-                      <span>WhatsApp</span>
-                    </a>
-                  </div>
-                </motion.div>
-              ))}
+                      <a
+                        href={`https://wa.me/91${vendor.whatsappNumber}?text=${encodeURIComponent(
+                          'Hi, I found your business on NearBy and would like to inquire about your services.'
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          trackVendorWhatsApp(vendor.id, vendor.whatsappNumber);
+                        }}
+                        className="flex items-center justify-center gap-2 border border-[#25D366]/40 hover:bg-[#25D366]/5 text-[#128C7E] py-2.5 rounded-[var(--radius-md)] text-xs sm:text-sm font-display font-bold transition-colors cursor-pointer"
+                      >
+                        <WhatsAppIcon size={14} className="text-[#25D366]" />
+                        <span>WhatsApp</span>
+                      </a>
+                    </div>
+                  </motion.div>
+                ))}
             </motion.div>
           )}
         </AnimatePresence>

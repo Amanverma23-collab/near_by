@@ -1,8 +1,32 @@
 import { Geolocation } from '@capacitor/geolocation';
+import { INDIAN_CITY_COORDINATES } from '../components/location/CitySelector';
+import { getDistance } from './haversine';
 
 export interface LocationCoordinates {
   latitude: number;
   longitude: number;
+}
+
+export interface DetectedLocationResult extends LocationCoordinates {
+  city: string;
+}
+
+/**
+ * Finds the closest known Indian city from the given latitude and longitude.
+ */
+export function findClosestIndianCity(lat: number, lon: number): { city: string; distanceKm: number } {
+  let closestCity = 'Sikar';
+  let minDistance = Infinity;
+
+  for (const [cityName, coords] of Object.entries(INDIAN_CITY_COORDINATES)) {
+    const dist = getDistance(lat, lon, coords.latitude, coords.longitude);
+    if (dist < minDistance) {
+      minDistance = dist;
+      closestCity = cityName;
+    }
+  }
+
+  return { city: closestCity, distanceKm: minDistance };
 }
 
 /**
@@ -49,11 +73,62 @@ export async function getCurrentLocation(): Promise<LocationCoordinates> {
           } catch {}
           resolve(coords);
         },
-        (error) => reject(error),
+        (error) => {
+          let msg = 'Unable to access your device location.';
+          if (error.code === error.PERMISSION_DENIED) {
+            msg = 'Location permission denied. Please allow location access in your browser or device settings.';
+          } else if (error.code === error.TIMEOUT) {
+            msg = 'Location request timed out. Please try again.';
+          }
+          reject(new Error(msg));
+        },
         { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
       );
     });
   }
+}
+
+/**
+ * Detects device location, determines city name (via reverse geocoding or closest Indian hub),
+ * and returns coordinates + resolved city name.
+ */
+export async function detectUserGPSLocation(): Promise<DetectedLocationResult> {
+  const coords = await getCurrentLocation();
+  const { latitude, longitude } = coords;
+
+  const closest = findClosestIndianCity(latitude, longitude);
+  let detectedCity = closest.distanceKm <= 45 ? closest.city : 'Current Location';
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3500);
+
+    const resp = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=12`,
+      {
+        signal: controller.signal,
+        headers: { Accept: 'application/json' },
+      }
+    );
+    clearTimeout(timer);
+
+    if (resp.ok) {
+      const data = await resp.json();
+      const name =
+        data.address?.city ||
+        data.address?.town ||
+        data.address?.village ||
+        data.address?.suburb ||
+        data.address?.state_district;
+      if (name) {
+        detectedCity = name;
+      }
+    }
+  } catch {
+    // Reverse geocoding network/timeout fallback - already set to closest city
+  }
+
+  return { city: detectedCity, latitude, longitude };
 }
 
 /**

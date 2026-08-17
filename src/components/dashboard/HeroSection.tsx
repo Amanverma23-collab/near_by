@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, MapPin, ChevronDown, LocateFixed } from 'lucide-react';
+import { MapPin, ChevronDown } from 'lucide-react';
 import { useLocation } from '../../context/LocationContext';
 import CitySelector from '../location/CitySelector';
+import DetectLocationCard from '../location/DetectLocationCard';
 
 export default function HeroSection() {
   const { location, setCityManually } = useLocation();
@@ -11,36 +12,6 @@ export default function HeroSection() {
   const handleCitySelect = (city: string, coords?: { latitude: number; longitude: number }) => {
     setCityManually(city, coords);
     setCityModalOpen(false);
-  };
-
-  const handleRedetect = () => {
-    localStorage.removeItem('nearby_manual_location_selected');
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          try {
-            const resp = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-            );
-            const data = await resp.json();
-            const city =
-              data.address?.city ||
-              data.address?.town ||
-              data.address?.village ||
-              data.address?.state_district ||
-              'Unknown';
-            setCityManually(city, { latitude, longitude });
-          } catch {
-            setCityManually('Unknown', { latitude, longitude });
-          }
-          setCityModalOpen(false);
-        },
-        () => {
-          // If denied, keep modal open for manual entry
-        }
-      );
-    }
   };
 
   return (
@@ -98,7 +69,7 @@ export default function HeroSection() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setCityModalOpen(false)}
-              className="absolute inset-0 bg-ink/40"
+              className="absolute inset-0 bg-ink/40 backdrop-blur-xs"
             />
 
             {/* Modal */}
@@ -107,39 +78,39 @@ export default function HeroSection() {
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 100, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="relative w-full max-w-md bg-surface-card rounded-t-[var(--radius-xl)] sm:rounded-[var(--radius-xl)] p-6 pb-8 shadow-elevated"
+              className="relative w-full max-w-md bg-surface-card rounded-t-[var(--radius-xl)] sm:rounded-[var(--radius-xl)] p-6 pb-8 shadow-elevated z-10 border border-border-light max-h-[90vh] overflow-y-auto"
             >
               {/* Drag handle */}
-              <div className="w-10 h-1 bg-border rounded-full mx-auto mb-6 sm:hidden" />
+              <div className="w-10 h-1 bg-border rounded-full mx-auto mb-5 sm:hidden" />
 
-              <h3 className="text-lg font-display font-bold text-ink mb-1">
-                Change Location
-              </h3>
-              <p className="text-sm text-ink-muted font-body mb-6">
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="text-lg font-display font-bold text-ink">
+                  Change Location
+                </h3>
+                <button
+                  onClick={() => setCityModalOpen(false)}
+                  className="text-xs font-display font-bold text-ink-muted hover:text-ink cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+
+              <p className="text-xs sm:text-sm text-ink-muted font-body mb-4">
                 Update your city to see relevant services
               </p>
 
-              {/* Re-detect button */}
-              <button
-                onClick={handleRedetect}
-                className="w-full flex items-center gap-3 p-3 mb-4 rounded-[var(--radius-md)] border border-brand/20 bg-brand-50 hover:bg-brand-100 transition-colors"
-              >
-                <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center">
-                  <LocateFixed size={20} className="text-brand" />
-                </div>
-                <div className="text-left">
-                  <p className="text-sm font-display font-semibold text-ink">
-                    Detect my location
-                  </p>
-                  <p className="text-xs text-ink-muted font-body">
-                    Using GPS
-                  </p>
-                </div>
-              </button>
+              {/* Detect Location Component with full Geolocation Flow */}
+              <div className="mb-5">
+                <DetectLocationCard
+                  onSuccess={() => {
+                    setTimeout(() => setCityModalOpen(false), 900);
+                  }}
+                />
+              </div>
 
               <div className="flex items-center gap-3 mb-4">
                 <div className="flex-1 h-px bg-border" />
-                <span className="text-xs text-ink-muted font-body uppercase tracking-wider">or</span>
+                <span className="text-xs text-ink-muted font-body uppercase tracking-wider">or select city</span>
                 <div className="flex-1 h-px bg-border" />
               </div>
 
