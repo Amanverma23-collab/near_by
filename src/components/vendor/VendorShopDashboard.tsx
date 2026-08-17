@@ -7,7 +7,6 @@ import {
   PhoneCall,
   MessageCircle,
   Star,
-  Edit3,
   ListPlus,
   CreditCard,
   ExternalLink,
@@ -814,25 +813,6 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
                     </span>
                   </div>
                   <p className="text-xs text-ink-muted mt-0.5">Upload & manage multiple photos shown to customers</p>
-                </div>
-              </div>
-              <ChevronRight size={18} className="text-ink-muted shrink-0" />
-            </motion.div>
-
-            {/* Edit Shop Details */}
-            <motion.div
-              whileHover={{ backgroundColor: 'var(--color-surface)' }}
-              whileTap={{ scale: 0.995 }}
-              onClick={() => navigate('/vendor/register?mode=edit')}
-              className="p-4 sm:p-5 flex items-center justify-between cursor-pointer transition-colors"
-            >
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-teal-50 text-teal-600 rounded-2xl border border-teal-100">
-                  <Edit3 size={20} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-display font-extrabold text-ink">Edit Shop Details</h3>
-                  <p className="text-xs text-ink-muted mt-0.5">Update shop name, address, photos & location pin</p>
                 </div>
               </div>
               <ChevronRight size={18} className="text-ink-muted shrink-0" />
