@@ -37,6 +37,7 @@ import AnimatedCountUp from '../ui/AnimatedCountUp';
 import ShopTimingModal from './ShopTimingModal';
 import VendorReviewsModal from './VendorReviewsModal';
 import ShopPhotosModal from './ShopPhotosModal';
+import ReferralMilestoneRewardModal from './ReferralMilestoneRewardModal';
 import { getEffectiveShopStatus } from '../../utils/shopTiming';
 import { calculateReferralProgress, ensureUniqueReferralCode, generatePermanentReferralCode, getVendorCandidateCodes } from '../../utils/referral';
 
@@ -56,6 +57,7 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
   const [isReviewsModalOpen, setIsReviewsModalOpen] = useState(false);
   const [isPhotosModalOpen, setIsPhotosModalOpen] = useState(false);
   const [isReferredModalOpen, setIsReferredModalOpen] = useState(false);
+  const [isMilestoneModalOpen, setIsMilestoneModalOpen] = useState(false);
 
   // Compute live effective status
   const effectiveStatus = getEffectiveShopStatus(vendor);
@@ -249,6 +251,15 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
         const realCount = uniqueReferred.length;
         setLiveReferralCount(realCount);
 
+        // Check if 5 referrals milestone is achieved & trigger celebration modal
+        if (realCount >= 5 && vendor?.id) {
+          const milestoneCycle = Math.floor(realCount / 5);
+          const celebrationKey = `nearby_reward_celebrated_${vendor.id}_cycle_${milestoneCycle}`;
+          if (localStorage.getItem(celebrationKey) !== 'true') {
+            setIsMilestoneModalOpen(true);
+          }
+        }
+
         // Auto-sync database counter with real referred rows
         if (vendor?.id && typeof vRowData?.successful_referral_count === 'number' && vRowData.successful_referral_count !== realCount) {
           await supabase.from('vendors').update({ successful_referral_count: realCount }).eq('id', vendor.id);
@@ -263,6 +274,14 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
 
   const referralMetrics = calculateReferralProgress(liveReferralCount);
   const referralLink = `${window.location.origin}/vendor/register?ref=${vendorReferralCode || ''}`;
+
+  const handleCloseMilestoneModal = () => {
+    if (vendor?.id && liveReferralCount >= 5) {
+      const milestoneCycle = Math.floor(liveReferralCount / 5);
+      localStorage.setItem(`nearby_reward_celebrated_${vendor.id}_cycle_${milestoneCycle}`, 'true');
+    }
+    setIsMilestoneModalOpen(false);
+  };
 
   const handleCopyLink = async () => {
     try {
@@ -795,10 +814,14 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
                 <span>Vendor Referral Program</span>
               </span>
               {referralMetrics.totalFreeMonthsEarned > 0 && (
-                <span className="text-[10px] font-display font-extrabold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 inline-flex items-center gap-1">
+                <button
+                  onClick={() => setIsMilestoneModalOpen(true)}
+                  className="text-[10px] font-display font-extrabold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 inline-flex items-center gap-1 hover:bg-emerald-500/30 transition-colors cursor-pointer"
+                  title="Click to view your free reward certificate"
+                >
                   <Award size={12} />
-                  <span>{referralMetrics.totalFreeMonthsEarned} Month{referralMetrics.totalFreeMonthsEarned > 1 ? 's' : ''} Free Earned!</span>
-                </span>
+                  <span>{referralMetrics.totalFreeMonthsEarned} Month{referralMetrics.totalFreeMonthsEarned > 1 ? 's' : ''} Free Earned! 🎉</span>
+                </button>
               )}
             </div>
             <h3 className="text-xl sm:text-2xl font-display font-extrabold text-white">
@@ -1067,6 +1090,16 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Referral Milestone Celebration Reward Modal (5 Referrals = 1 Month Free) */}
+      <ReferralMilestoneRewardModal
+        isOpen={isMilestoneModalOpen}
+        onClose={handleCloseMilestoneModal}
+        vendorName={vendor?.owner_name || vendor?.name || 'Merchant'}
+        totalReferrals={liveReferralCount}
+        freeMonthsEarned={referralMetrics.totalFreeMonthsEarned || Math.floor(liveReferralCount / 5) || 1}
+        newExpiryDate={vendor?.subscription_expires_at}
+      />
     </div>
   );
 }
