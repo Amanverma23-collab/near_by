@@ -50,14 +50,32 @@ export function calculateHaversineDistanceKm(
  * Resolves current customer GPS or city coordinates from localStorage
  */
 export function getUserCurrentCoordinates(): { latitude: number; longitude: number } {
-  // 1. Try nearby_location from LocationContext (active selected location or live GPS)
+  // 1. Try nearbe_user_location
+  try {
+    const rawUserLoc = localStorage.getItem('nearbe_user_location');
+    if (rawUserLoc) {
+      const parsed = JSON.parse(rawUserLoc);
+      const lat = parsed.lat ?? parsed.latitude;
+      const lon = parsed.lon ?? parsed.longitude ?? parsed.lng;
+      if (typeof lat === 'number' && typeof lon === 'number' && !isNaN(lat) && !isNaN(lon)) {
+        return { latitude: Number(lat), longitude: Number(lon) };
+      }
+      if (parsed.name && INDIAN_CITY_COORDINATES[parsed.name]) {
+        return INDIAN_CITY_COORDINATES[parsed.name];
+      }
+    }
+  } catch {}
+
+  // 2. Try nearby_location from LocationContext (active selected location or live GPS)
   try {
     const rawLoc = localStorage.getItem('nearby_location');
     if (rawLoc) {
       const parsed = JSON.parse(rawLoc);
       if (parsed) {
-        if (typeof parsed.latitude === 'number' && typeof parsed.longitude === 'number' && parsed.latitude !== 0) {
-          return { latitude: Number(parsed.latitude), longitude: Number(parsed.longitude) };
+        const lat = parsed.latitude ?? parsed.lat;
+        const lon = parsed.longitude ?? parsed.lon ?? parsed.lng;
+        if (typeof lat === 'number' && typeof lon === 'number' && !isNaN(lat) && !isNaN(lon)) {
+          return { latitude: Number(lat), longitude: Number(lon) };
         }
         if (parsed.city && INDIAN_CITY_COORDINATES[parsed.city]) {
           return INDIAN_CITY_COORDINATES[parsed.city];
@@ -66,18 +84,20 @@ export function getUserCurrentCoordinates(): { latitude: number; longitude: numb
     }
   } catch {}
 
-  // 2. Try nearby_current_gps cached coordinates
+  // 3. Try nearby_current_gps cached coordinates
   try {
     const rawGps = localStorage.getItem('nearby_current_gps');
     if (rawGps) {
       const parsed = JSON.parse(rawGps);
-      if (parsed && typeof parsed.latitude === 'number' && typeof parsed.longitude === 'number') {
-        return { latitude: Number(parsed.latitude), longitude: Number(parsed.longitude) };
+      const lat = parsed.latitude ?? parsed.lat;
+      const lon = parsed.longitude ?? parsed.lon ?? parsed.lng;
+      if (typeof lat === 'number' && typeof lon === 'number' && !isNaN(lat) && !isNaN(lon)) {
+        return { latitude: Number(lat), longitude: Number(lon) };
       }
     }
   } catch {}
 
-  // 3. Try nearby_selected_city
+  // 4. Try nearby_selected_city
   try {
     const selectedCity = localStorage.getItem('nearby_selected_city');
     if (selectedCity && INDIAN_CITY_COORDINATES[selectedCity]) {
@@ -85,7 +105,7 @@ export function getUserCurrentCoordinates(): { latitude: number; longitude: numb
     }
   } catch {}
 
-  // 4. Default fallback: Sikar, Rajasthan (27.6094, 75.1398)
+  // 5. Default fallback: Sikar, Rajasthan (27.6094, 75.1398)
   return { latitude: 27.6094, longitude: 75.1398 };
 }
 

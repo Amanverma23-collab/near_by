@@ -168,21 +168,35 @@ export default function CitySelector({ onSelect, showDivider = false }: CitySele
 
   // Set user location handler
   const handleSelectLocation = (cityName: string, lat?: number, lon?: number) => {
-    const coords: LocationCoordinates | undefined =
+    const coords: LocationCoordinates =
       typeof lat === 'number' && typeof lon === 'number'
         ? { latitude: lat, longitude: lon }
-        : INDIAN_CITY_COORDINATES[cityName];
+        : INDIAN_CITY_COORDINATES[cityName] || { latitude: 27.6094, longitude: 75.1398 };
 
-    // Persist to localStorage
+    // Persist to all localStorage location keys
     const locationPayload = {
-      lat: coords?.latitude,
-      lon: coords?.longitude,
+      lat: coords.latitude,
+      lon: coords.longitude,
+      latitude: coords.latitude,
+      longitude: coords.longitude,
       name: cityName,
+      city: cityName,
+      isManual: true,
     };
+
     try {
       localStorage.setItem('nearbe_user_location', JSON.stringify(locationPayload));
+      localStorage.setItem('nearby_location', JSON.stringify(locationPayload));
+      localStorage.setItem('nearby_current_gps', JSON.stringify({ latitude: coords.latitude, longitude: coords.longitude }));
       localStorage.setItem('nearby_selected_city', cityName);
+      localStorage.setItem('nearby_manual_location_selected', 'true');
     } catch {}
+
+    // Dispatch global location updated events for all listeners
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('nearby_gps_updated', { detail: { latitude: coords.latitude, longitude: coords.longitude, city: cityName } }));
+      window.dispatchEvent(new CustomEvent('nearby_location_changed', { detail: { latitude: coords.latitude, longitude: coords.longitude, city: cityName } }));
+    }
 
     // Invoke parent onSelect
     onSelect(cityName, coords);

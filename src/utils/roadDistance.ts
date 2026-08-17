@@ -1,10 +1,10 @@
 /**
- * NearBe Road Distance Engine (OpenRouteService + Haversine fallback)
+ * NearBe Road Distance Engine (OpenRouteService + OSRM + Haversine fallback)
  * Calculates actual driving road distance & duration for vendor detail views
  * with 24-hour client-side coordinate caching.
  */
 
-import { calculateHaversineDistanceKm } from './haversine';
+import { getDistance } from './haversine';
 
 export interface RoadDistanceResult {
   distanceKm: number;
@@ -33,6 +33,19 @@ export function formatDistanceKm(km: number): string {
     return `${Math.max(10, Math.round(km * 1000))} m`;
   }
   return `${km.toFixed(1)} km`;
+}
+
+/**
+ * Formats duration in minutes or hours
+ */
+export function formatDurationMin(minutes: number | null): string | null {
+  if (typeof minutes !== 'number' || isNaN(minutes) || minutes <= 0) return null;
+  if (minutes < 60) {
+    return `${minutes} min`;
+  }
+  const hrs = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return mins > 0 ? `${hrs} hr ${mins} min` : `${hrs} hr`;
 }
 
 /**
@@ -67,7 +80,7 @@ export async function getAccurateVendorDistance(
   }
 
   // Calculate default straight-line Haversine fallback
-  const straightLineKm = calculateHaversineDistanceKm(userLat, userLon, vendorLat, vendorLon);
+  const straightLineKm = getDistance(userLat, userLon, vendorLat, vendorLon);
   const fallbackResult: RoadDistanceResult = {
     distanceKm: parseFloat(straightLineKm.toFixed(2)),
     formattedDistance: formatDistanceKm(straightLineKm),
@@ -93,7 +106,7 @@ export async function getAccurateVendorDistance(
           distanceKm: cached.distanceKm,
           formattedDistance: formatDistanceKm(cached.distanceKm),
           durationMin: cached.durationMin,
-          formattedDuration: cached.durationMin ? `${cached.durationMin} min` : null,
+          formattedDuration: formatDurationMin(cached.durationMin),
           source: cached.source || 'road',
           isApprox: cached.source === 'straight_line',
         };
@@ -101,14 +114,15 @@ export async function getAccurateVendorDistance(
     }
   } catch {}
 
-  // 3. Try Backend / Express API or direct ORS
-  try {
-    let roadData: { distanceKm: number; durationMin: number | null; source: 'road' | 'straight_line' } | null = null;
+  // 3. Try Route calculation APIs in priority order:
+  let roadData: { distanceKm: number; durationMin: number | null; source: 'road' | 'straight_line' } | null = null;
 
-    if (ORS_API_KEY) {
+  // A. OpenRouteService (if configured via env key)
+  if (ORS_API_KEY) {
+    try {
       const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${ORS_API_KEY}&start=${userLon},${userLat}&end=${vendorLon},${vendorLat}`;
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4500);
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
 
       const res = await fetch(url, {
         signal: controller.signal,
@@ -127,12 +141,39 @@ export async function getAccurateVendorDistance(
           };
         }
       }
-    }
+    } catch {}
+  }
 
-    if (!roadData && vendorId) {
+  // B. OSRM High-Speed Public Driving Router (zero-config, works everywhere)
+  if (!roadData) {
+    try {
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${userLon},${userLat};${vendorLon},${vendorLat}?overview=false`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+      const res = await fetch(osrmUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.code === 'Ok' && json.routes && json.routes.length > 0) {
+          const route = json.routes[0];
+          roadData = {
+            distanceKm: parseFloat((route.distance / 1000).toFixed(2)),
+            durationMin: Math.max(1, Math.round(route.duration / 60)),
+            source: 'road',
+          };
+        }
+      }
+    } catch {}
+  }
+
+  // C. Backend REST proxy fallback
+  if (!roadData && vendorId) {
+    try {
       const backendUrl = `/api/vendor/${vendorId}/distance?userLat=${userLat}&userLon=${userLon}`;
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
 
       const res = await fetch(backendUrl, { signal: controller.signal });
       clearTimeout(timeoutId);
@@ -147,35 +188,33 @@ export async function getAccurateVendorDistance(
           };
         }
       }
-    }
+    } catch {}
+  }
 
-    if (roadData) {
-      const finalResult: RoadDistanceResult = {
-        distanceKm: roadData.distanceKm,
-        formattedDistance: formatDistanceKm(roadData.distanceKm),
-        durationMin: roadData.durationMin,
-        formattedDuration: roadData.durationMin ? `${roadData.durationMin} min` : null,
-        source: roadData.source,
-        isApprox: roadData.source === 'straight_line',
-      };
+  // 4. Return result and persist to cache
+  if (roadData) {
+    const finalResult: RoadDistanceResult = {
+      distanceKm: roadData.distanceKm,
+      formattedDistance: formatDistanceKm(roadData.distanceKm),
+      durationMin: roadData.durationMin,
+      formattedDuration: formatDurationMin(roadData.durationMin),
+      source: roadData.source,
+      isApprox: roadData.source === 'straight_line',
+    };
 
-      // Save to 24-hour cache
-      try {
-        localStorage.setItem(
-          cacheKey,
-          JSON.stringify({
-            distanceKm: finalResult.distanceKm,
-            durationMin: finalResult.durationMin,
-            source: finalResult.source,
-            timestamp: Date.now(),
-          })
-        );
-      } catch {}
+    try {
+      localStorage.setItem(
+        cacheKey,
+        JSON.stringify({
+          distanceKm: finalResult.distanceKm,
+          durationMin: finalResult.durationMin,
+          source: finalResult.source,
+          timestamp: Date.now(),
+        })
+      );
+    } catch {}
 
-      return finalResult;
-    }
-  } catch (err) {
-    console.warn('Road distance calculation notice (using Haversine):', (err as any)?.message);
+    return finalResult;
   }
 
   return fallbackResult;

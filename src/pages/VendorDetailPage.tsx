@@ -95,13 +95,14 @@ export default function VendorDetailPage() {
 
     loadVendors();
 
-    const handleGpsUpdate = (e: any) => {
+    const handleLocationUpdate = (e: any) => {
       if (e.detail?.latitude && e.detail?.longitude) {
         loadVendors(e.detail);
       }
     };
 
-    window.addEventListener('nearby_gps_updated', handleGpsUpdate);
+    window.addEventListener('nearby_gps_updated', handleLocationUpdate);
+    window.addEventListener('nearby_location_changed', handleLocationUpdate);
 
     if (vendorId) {
       getSavedReviews(vendorId).then((revs) => {
@@ -109,7 +110,10 @@ export default function VendorDetailPage() {
       });
     }
 
-    return () => window.removeEventListener('nearby_gps_updated', handleGpsUpdate);
+    return () => {
+      window.removeEventListener('nearby_gps_updated', handleLocationUpdate);
+      window.removeEventListener('nearby_location_changed', handleLocationUpdate);
+    };
   }, [vendorId, userLocation]);
 
   const vendor = allVendors.find((v) => v.id === vendorId) || dummyVendors.find((v) => v.id === vendorId);
@@ -160,12 +164,29 @@ export default function VendorDetailPage() {
   const [roadDistance, setRoadDistance] = useState<RoadDistanceResult | null>(null);
   const [isCalculatingDistance, setIsCalculatingDistance] = useState(true);
 
-  // Calculate accurate OpenRouteService driving distance & duration
+  // Calculate accurate OpenRouteService / OSRM driving road distance & duration
   useEffect(() => {
     if (!vendor) return;
 
-    const uLat = userLocation?.latitude || 27.6094;
-    const uLon = userLocation?.longitude || 75.1398;
+    let uLat = userLocation?.latitude;
+    let uLon = userLocation?.longitude;
+
+    if (typeof uLat !== 'number' || typeof uLon !== 'number' || isNaN(uLat) || isNaN(uLon)) {
+      try {
+        const raw = localStorage.getItem('nearbe_user_location') || localStorage.getItem('nearby_location');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          uLat = parsed.lat ?? parsed.latitude;
+          uLon = parsed.lon ?? parsed.longitude;
+        }
+      } catch {}
+    }
+
+    if (typeof uLat !== 'number' || typeof uLon !== 'number') {
+      uLat = 27.6094;
+      uLon = 75.1398;
+    }
+
     const vLat = vendor.latitude || 27.6094;
     const vLon = vendor.longitude || 75.1398;
 
@@ -178,7 +199,14 @@ export default function VendorDetailPage() {
       .catch(() => {
         setIsCalculatingDistance(false);
       });
-  }, [vendor?.id, vendor?.latitude, vendor?.longitude, userLocation?.latitude, userLocation?.longitude]);
+  }, [
+    vendor?.id,
+    vendor?.latitude,
+    vendor?.longitude,
+    userLocation?.latitude,
+    userLocation?.longitude,
+    userLocation?.city,
+  ]);
 
   const handleCallClick = () => {
     trackVendorCall(vendor?.id || vendorId, vendor?.phoneNumber);
