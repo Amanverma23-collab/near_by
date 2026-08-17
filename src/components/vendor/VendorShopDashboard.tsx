@@ -55,6 +55,7 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
   const [isTimingModalOpen, setIsTimingModalOpen] = useState(false);
   const [isReviewsModalOpen, setIsReviewsModalOpen] = useState(false);
   const [isPhotosModalOpen, setIsPhotosModalOpen] = useState(false);
+  const [isReferredModalOpen, setIsReferredModalOpen] = useState(false);
 
   // Compute live effective status
   const effectiveStatus = getEffectiveShopStatus(vendor);
@@ -828,13 +829,22 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
               </div>
             </div>
 
-            {/* Total Referrals */}
-            <div className="bg-black/30 backdrop-blur-sm border border-white/10 rounded-2xl p-3 flex flex-col justify-between">
-              <span className="text-[10px] font-bold text-teal-200 uppercase tracking-wider">
-                Shops Referred
-              </span>
+            {/* Total Referrals (Clickable) */}
+            <div
+              onClick={() => setIsReferredModalOpen(true)}
+              className="bg-black/30 hover:bg-black/45 border border-white/10 hover:border-amber-400/40 rounded-2xl p-3 flex flex-col justify-between cursor-pointer active:scale-98 transition-all group select-none shadow-xs"
+              title="Click to view referred shops list"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-teal-200 uppercase tracking-wider">
+                  Shops Referred
+                </span>
+                <span className="text-[10px] text-amber-300 font-extrabold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                  View <ChevronRight size={11} />
+                </span>
+              </div>
               <div className="flex items-baseline gap-1 mt-1">
-                <span className="text-xl font-display font-black text-white">
+                <span className="text-xl font-display font-black text-white group-hover:text-amber-300 transition-colors">
                   {referralMetrics.totalCount}
                 </span>
                 <span className="text-[11px] text-teal-200">shops</span>
@@ -982,6 +992,123 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
           if (onRefreshVendor) onRefreshVendor();
         }}
       />
+
+      {/* REFERRED SHOPS POPUP MODAL */}
+      <AnimatePresence>
+        {isReferredModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/60 backdrop-blur-xs font-body"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 280 }}
+              className="relative w-full max-w-md bg-surface-card rounded-3xl p-6 shadow-2xl border border-border-light max-h-[85vh] flex flex-col overflow-hidden text-left"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between pb-4 border-b border-border-light">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-200 shrink-0">
+                    <Gift size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-display font-extrabold text-ink">
+                      Referred Shops ({referredVendorsList.length})
+                    </h3>
+                    <p className="text-xs text-ink-muted">
+                      Registered with code <span className="font-mono font-bold text-brand">{vendorReferralCode || vendor?.referral_code}</span>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsReferredModalOpen(false)}
+                  className="p-2 text-ink-muted hover:text-ink rounded-xl hover:bg-surface transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Summary Banner */}
+              <div className="my-4 p-3.5 rounded-2xl bg-teal-50 border border-teal-200/80 flex items-center justify-between text-xs">
+                <div>
+                  <p className="text-teal-900 font-display font-extrabold">Current Reward Progress</p>
+                  <p className="text-teal-700 text-[11px]">
+                    {referralMetrics.currentCycleProgress} / 5 shops ({referralMetrics.neededForNext} more needed for next free month)
+                  </p>
+                </div>
+                <span className="px-3 py-1 bg-teal-600 text-white rounded-full font-display font-extrabold text-xs shrink-0">
+                  {referralMetrics.totalCount} Shops
+                </span>
+              </div>
+
+              {/* Scrollable List of Referred Shops */}
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                {referredVendorsList.length > 0 ? (
+                  referredVendorsList.map((shop, idx) => (
+                    <div
+                      key={shop.id || idx}
+                      className="p-3.5 rounded-2xl bg-surface border border-border-light flex items-center justify-between gap-3 shadow-2xs hover:border-brand/30 transition-all"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold text-sm font-display shrink-0">
+                          {shop.name ? shop.name.charAt(0).toUpperCase() : 'S'}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-display font-bold text-ink text-sm truncate">
+                            {shop.name || 'Unnamed Shop'}
+                          </p>
+                          <p className="text-xs text-ink-muted truncate">
+                            Owner: {shop.owner_name || 'Merchant'}
+                          </p>
+                          {shop.created_at && (
+                            <p className="text-[10px] text-ink-muted/80">
+                              Joined: {new Date(shop.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="shrink-0">
+                        {shop.referral_counted || shop.is_verified || shop.verification_status === 'approved' ? (
+                          <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold flex items-center gap-1">
+                            <Check size={12} strokeWidth={3} className="text-emerald-600" />
+                            <span>Counted (+1)</span>
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-bold">
+                            Pending Approval
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-ink-muted text-xs">
+                    <Gift size={36} className="mx-auto text-ink-muted/40 mb-2" />
+                    <p className="font-bold text-ink">No shops referred yet</p>
+                    <p className="mt-1">Share your referral link to earn 1 free month for every 5 shops!</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer with Copy/Share Link */}
+              <div className="pt-4 mt-2 border-t border-border-light flex gap-2">
+                <button
+                  onClick={handleCopyLink}
+                  className="flex-1 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-display font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Share2 size={14} />
+                  <span>{copiedLink ? 'Link Copied!' : 'Share Referral Link'}</span>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
