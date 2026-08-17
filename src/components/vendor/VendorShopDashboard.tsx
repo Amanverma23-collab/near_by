@@ -38,7 +38,7 @@ import ShopTimingModal from './ShopTimingModal';
 import VendorReviewsModal from './VendorReviewsModal';
 import ShopPhotosModal from './ShopPhotosModal';
 import { getEffectiveShopStatus } from '../../utils/shopTiming';
-import { calculateReferralProgress, ensureUniqueReferralCode, generatePermanentReferralCode } from '../../utils/referral';
+import { calculateReferralProgress, ensureUniqueReferralCode, generatePermanentReferralCode, getVendorCandidateCodes } from '../../utils/referral';
 
 interface VendorShopDashboardProps {
   vendor: any;
@@ -161,6 +161,8 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
       if (!code && !vendor?.id) return;
 
       try {
+        let latestCount = Number(vendor?.successful_referral_count || 0);
+
         // 1. Fetch latest vendor row for exact count
         if (vendor?.id) {
           const { data: vRow } = await supabase
@@ -170,33 +172,92 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
             .maybeSingle();
 
           if (vRow && typeof vRow.successful_referral_count === 'number') {
+            latestCount = vRow.successful_referral_count;
             setLiveReferralCount(vRow.successful_referral_count);
           }
         }
 
-        // 2. Fetch list of all registered shops with this referral code
+        // 2. Build candidate codes (case-insensitive + alternate candidate codes)
+        const candidateCodes = getVendorCandidateCodes({
+          id: vendor?.id,
+          name: vendor?.name,
+          owner_name: vendor?.owner_name,
+          phone_number: vendor?.phone_number,
+          referral_code: code,
+        });
+
+        const allCodesSet = new Set<string>();
+        candidateCodes.forEach((c) => {
+          if (c) {
+            allCodesSet.add(c.trim());
+            allCodesSet.add(c.trim().toUpperCase());
+            allCodesSet.add(c.trim().toLowerCase());
+          }
+        });
         if (code) {
-          const { data: referredList } = await supabase
+          allCodesSet.add(code.trim());
+          allCodesSet.add(code.trim().toUpperCase());
+          allCodesSet.add(code.trim().toLowerCase());
+        }
+
+        const codesList = Array.from(allCodesSet);
+
+        // 3. Fetch all shops using any of these referral codes
+        let matchingShops: any[] = [];
+        if (codesList.length > 0) {
+          const { data: directList } = await supabase
             .from('vendors')
-            .select('id, name, owner_name, is_verified, subscription_status, referral_counted, created_at')
-            .eq('referred_by_code', code)
+            .select('id, name, owner_name, is_verified, verification_status, subscription_status, referral_counted, created_at, referred_by_code')
+            .in('referred_by_code', codesList)
             .order('created_at', { ascending: false });
 
-          if (referredList) {
-            setReferredVendorsList(referredList);
-            const counted = referredList.filter((r) => r.referral_counted || r.is_verified).length;
-            if (counted > liveReferralCount) {
-              setLiveReferralCount(counted);
-            }
+          if (directList) {
+            matchingShops = directList;
           }
         }
+
+        // 4. Broad scan fallback for any case/spacing/format variations
+        try {
+          const { data: allWithRef } = await supabase
+            .from('vendors')
+            .select('id, name, owner_name, is_verified, verification_status, subscription_status, referral_counted, created_at, referred_by_code')
+            .not('referred_by_code', 'is', null);
+
+          if (allWithRef) {
+            const upperCodes = new Set(Array.from(allCodesSet).map((c) => c.toUpperCase()));
+            const extraMatches = allWithRef.filter((v) => {
+              if (!v.referred_by_code) return false;
+              return upperCodes.has(v.referred_by_code.trim().toUpperCase());
+            });
+
+            extraMatches.forEach((shop) => {
+              if (!matchingShops.some((m) => m.id === shop.id)) {
+                matchingShops.push(shop);
+              }
+            });
+          }
+        } catch {}
+
+        // Deduplicate & sort newest first
+        const uniqueReferred = Array.from(
+          new Map(matchingShops.map((item) => [item.id, item])).values()
+        ).sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+
+        setReferredVendorsList(uniqueReferred);
+
+        const countedTotal = Math.max(
+          latestCount,
+          uniqueReferred.filter((r) => r.referral_counted || r.is_verified || r.verification_status === 'approved').length,
+          uniqueReferred.length
+        );
+        setLiveReferralCount(countedTotal);
       } catch (err) {
         console.warn('Error fetching live referral stats:', err);
       }
     }
 
     loadReferralStats();
-  }, [vendor?.id, vendorReferralCode, vendor?.referral_code]);
+  }, [vendor?.id, vendorReferralCode, vendor?.referral_code, vendor?.name, vendor?.owner_name, vendor?.phone_number]);
 
   const referralMetrics = calculateReferralProgress(Math.max(Number(vendor?.successful_referral_count || 0), liveReferralCount));
   const referralLink = `${window.location.origin}/vendor/register?ref=${vendorReferralCode || ''}`;
