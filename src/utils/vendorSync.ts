@@ -90,8 +90,58 @@ export function getUserCurrentCoordinates(): { latitude: number; longitude: numb
 }
 
 /**
+ * Determines if a vendor has an active, valid subscription plan (Trial, Active, Pro).
+ * If the subscription has expired or is cancelled, returns false (offline & hidden).
+ */
+export function isVendorSubscriptionActive(v: any): boolean {
+  if (!v) return false;
+
+  // 1. Explicit expired/cancelled statuses
+  if (v.subscription_status === 'expired' || v.subscription_status === 'cancelled') {
+    return false;
+  }
+
+  // 2. Check local storage cache override (e.g. recent purchase/reward offline sync)
+  const cleanPhone = (v.phone_number || '').replace(/\D/g, '').slice(-10);
+  const cachedSubStr = v.id
+    ? localStorage.getItem(`nearby_subscription_${v.id}`)
+    : cleanPhone
+    ? localStorage.getItem(`nearby_subscription_${cleanPhone}`)
+    : null;
+
+  if (cachedSubStr) {
+    try {
+      const cached = JSON.parse(cachedSubStr);
+      if (cached.status === 'expired' || cached.status === 'cancelled') return false;
+      if (cached.expiresAt) {
+        const expTime = new Date(cached.expiresAt).getTime();
+        if (!isNaN(expTime)) {
+          return expTime > Date.now();
+        }
+      }
+    } catch {}
+  }
+
+  // 3. Check database subscription_expires_at
+  if (v.subscription_expires_at) {
+    const expTime = new Date(v.subscription_expires_at).getTime();
+    if (!isNaN(expTime)) {
+      return expTime > Date.now();
+    }
+  }
+
+  // 4. If status is active/trial/pro without specific expiry date, treat as active
+  if (['trial', 'active', 'pro'].includes(v.subscription_status)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Fetches all registered live vendors from Supabase / database, computes their real
  * dynamic GPS distance based on customer position, and returns them sorted by closest first.
+ * Expired shops are strictly filtered out (offline).
  */
 export async function fetchCombinedVendors(
   userCoords?: { latitude?: number | null; longitude?: number | null } | null
@@ -105,9 +155,13 @@ export async function fetchCombinedVendors(
     const { data } = await supabase.from('vendors').select('*');
 
     if (data && Array.isArray(data) && data.length > 0) {
-      // 1. Filter out unfinished signup placeholder rows
+      // 1. Filter out unfinished placeholder rows AND expired vendors (take them offline)
       const validRows = data.filter(
-        (v: any) => v.name && v.name !== 'Pending Shop Registration' && v.name !== 'pending'
+        (v: any) =>
+          v.name &&
+          v.name !== 'Pending Shop Registration' &&
+          v.name !== 'pending' &&
+          isVendorSubscriptionActive(v)
       );
 
       const realVendors: Vendor[] = validRows.map((v: any, idx: number) => {

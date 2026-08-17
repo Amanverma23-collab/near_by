@@ -38,6 +38,7 @@ import ShopTimingModal from './ShopTimingModal';
 import VendorReviewsModal from './VendorReviewsModal';
 import ShopPhotosModal from './ShopPhotosModal';
 import ReferralMilestoneRewardModal from './ReferralMilestoneRewardModal';
+import PlanExpiredModal from './PlanExpiredModal';
 import { getEffectiveShopStatus } from '../../utils/shopTiming';
 import { calculateReferralProgress, ensureUniqueReferralCode, generatePermanentReferralCode, getVendorCandidateCodes, calculateExtendedExpiry, grantFreeMonth } from '../../utils/referral';
 import { computeVendorPlanMetrics } from '../../utils/planTracking';
@@ -59,6 +60,7 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
   const [isPhotosModalOpen, setIsPhotosModalOpen] = useState(false);
   const [isReferredModalOpen, setIsReferredModalOpen] = useState(false);
   const [isMilestoneModalOpen, setIsMilestoneModalOpen] = useState(false);
+  const [isPlanExpiredModalOpen, setIsPlanExpiredModalOpen] = useState(false);
 
   const cleanPhone = (vendor?.phone_number || '').replace(/\D/g, '').slice(-10);
 
@@ -89,6 +91,7 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
   let daysRemaining = 30;
   let formattedExpiry = '30 days remaining';
   let isExpiringSoon = false;
+  let isPlanExpired = false;
 
   if (rawExpiresAt) {
     const expiresDate = new Date(rawExpiresAt);
@@ -96,9 +99,11 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
     const diffTime = expiresDate.getTime() - now.getTime();
     daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
     
-    if (diffTime <= 0 || daysRemaining === 0) {
+    if (diffTime <= 0 || daysRemaining === 0 || currentSubStatus === 'expired') {
+      daysRemaining = 0;
       formattedExpiry = 'Plan Expired';
       isExpiringSoon = true;
+      isPlanExpired = true;
     } else if (daysRemaining === 1) {
       formattedExpiry = '1 day remaining';
       isExpiringSoon = true;
@@ -108,7 +113,19 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
         isExpiringSoon = true;
       }
     }
+  } else if (currentSubStatus === 'expired') {
+    daysRemaining = 0;
+    formattedExpiry = 'Plan Expired';
+    isExpiringSoon = true;
+    isPlanExpired = true;
   }
+
+  // Automatically show Plan Expired modal whenever merchant opens or refreshes app
+  useEffect(() => {
+    if (isPlanExpired) {
+      setIsPlanExpiredModalOpen(true);
+    }
+  }, [isPlanExpired]);
   const localViews = Math.max(
     Number(localStorage.getItem(`nearby_views_${vendor?.id}`) || 0),
     cleanPhone ? Number(localStorage.getItem(`nearby_views_${cleanPhone}`) || 0) : 0
@@ -460,18 +477,34 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-black/30" />
           </div>
 
-          {/* Top Bar inside Hero: LIVE Badge & Category Tag */}
+          {/* Top Bar inside Hero: LIVE / OFFLINE Badge & Category Tag */}
           <div className="relative z-10 p-4 sm:p-5 flex items-center justify-between gap-2">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1 rounded-full bg-emerald-500/30 border border-emerald-400/50 backdrop-blur-md shrink-0 shadow-xs">
-              {/* Pulsing Dot */}
-              <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" style={{ animationDuration: '2s' }} />
-                <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-emerald-400" />
-              </span>
-              <span className="text-[10px] sm:text-[11px] font-display font-extrabold text-emerald-200 uppercase tracking-wider">
-                LIVE ON NEARBY
-              </span>
-            </div>
+            {isPlanExpired ? (
+              <div
+                onClick={() => setIsPlanExpiredModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1 rounded-full bg-rose-950/80 border border-rose-500/60 backdrop-blur-md shrink-0 shadow-sm cursor-pointer hover:bg-rose-900 transition-colors"
+                title="Your subscription has expired. Click to renew."
+              >
+                <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" style={{ animationDuration: '1.5s' }} />
+                  <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-rose-500" />
+                </span>
+                <span className="text-[10px] sm:text-[11px] font-display font-extrabold text-rose-200 uppercase tracking-wider">
+                  OFFLINE • PLAN EXPIRED
+                </span>
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1 rounded-full bg-emerald-500/30 border border-emerald-400/50 backdrop-blur-md shrink-0 shadow-xs">
+                {/* Pulsing Dot */}
+                <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" style={{ animationDuration: '2s' }} />
+                  <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-emerald-400" />
+                </span>
+                <span className="text-[10px] sm:text-[11px] font-display font-extrabold text-emerald-200 uppercase tracking-wider">
+                  LIVE ON NEARBY
+                </span>
+              </div>
+            )}
 
             {/* Category tag */}
             <span className="text-[10px] sm:text-[11px] font-display font-bold px-2.5 py-1 sm:px-3 sm:py-1 rounded-full bg-black/40 backdrop-blur-md text-white border border-white/20 capitalize truncate max-w-[130px] sm:max-w-none shadow-xs">
@@ -489,6 +522,41 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
             </div>
           </div>
         </motion.section>
+
+        {/* SHOP OFFLINE PLAN EXPIRED CRITICAL BANNER */}
+        {isPlanExpired && (
+          <motion.div
+            custom={0.15}
+            variants={sectionVariants}
+            initial="hidden"
+            animate="show"
+            className="bg-rose-600 text-white p-4 sm:p-4.5 rounded-2xl shadow-md flex items-center justify-between gap-3 border border-rose-500"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="p-2 rounded-xl bg-white/15 text-white shrink-0">
+                <AlertTriangle size={20} className="text-amber-200" />
+              </div>
+              <div className="min-w-0">
+                <h4 className="text-xs sm:text-sm font-display font-extrabold text-white">
+                  Shop is Currently Offline
+                </h4>
+                <p className="text-[11px] text-rose-100/90 leading-tight mt-0.5 truncate sm:whitespace-normal">
+                  Your subscription plan has expired and your shop is hidden from customers. Renew now to get back online.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setIsPlanExpiredModalOpen(true);
+                navigate('/vendor/subscriptions');
+              }}
+              className="px-4 py-2 bg-white hover:bg-rose-50 text-rose-700 rounded-xl text-xs font-display font-black transition-all cursor-pointer shrink-0 shadow-sm active:scale-95 whitespace-nowrap"
+            >
+              Renew Plan
+            </button>
+          </motion.div>
+        )}
 
         {/* SECTION 1.5: VENDOR PLAN TRACKING CARD */}
         {(() => {
@@ -1181,6 +1249,14 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
         totalReferrals={liveReferralCount}
         freeMonthsEarned={referralMetrics.totalFreeMonthsEarned || Math.floor(liveReferralCount / 5) || 1}
         newExpiryDate={extendedExpiryDate}
+      />
+
+      {/* Plan Expired Popup Modal */}
+      <PlanExpiredModal
+        isOpen={isPlanExpiredModalOpen}
+        onClose={() => setIsPlanExpiredModalOpen(false)}
+        vendorName={vendor?.owner_name || vendor?.name || 'Merchant'}
+        expiredDate={rawExpiresAt}
       />
     </div>
   );
