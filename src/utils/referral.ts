@@ -128,6 +128,18 @@ export async function ensureUniqueReferralCode(
 }
 
 /**
+ * Calculates the extended expiry date (+1 month or +N months) from the current expiry date.
+ */
+export function calculateExtendedExpiry(currentExpiry?: string | null, monthsToAdd: number = 1): string {
+  const now = new Date();
+  const current = currentExpiry ? new Date(currentExpiry) : now;
+  const base = current > now ? current : now;
+  const target = new Date(base);
+  target.setMonth(target.getMonth() + monthsToAdd);
+  return target.toISOString();
+}
+
+/**
  * Extends the referring vendor's subscription by exactly 1 month.
  * If active, adds 1 month onto current expiry; if expired/none, adds 1 month from today.
  */

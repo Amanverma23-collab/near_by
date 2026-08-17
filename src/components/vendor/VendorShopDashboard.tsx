@@ -39,7 +39,7 @@ import VendorReviewsModal from './VendorReviewsModal';
 import ShopPhotosModal from './ShopPhotosModal';
 import ReferralMilestoneRewardModal from './ReferralMilestoneRewardModal';
 import { getEffectiveShopStatus } from '../../utils/shopTiming';
-import { calculateReferralProgress, ensureUniqueReferralCode, generatePermanentReferralCode, getVendorCandidateCodes } from '../../utils/referral';
+import { calculateReferralProgress, ensureUniqueReferralCode, generatePermanentReferralCode, getVendorCandidateCodes, calculateExtendedExpiry, grantFreeMonth } from '../../utils/referral';
 
 interface VendorShopDashboardProps {
   vendor: any;
@@ -274,11 +274,14 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
 
   const referralMetrics = calculateReferralProgress(liveReferralCount);
   const referralLink = `${window.location.origin}/vendor/register?ref=${vendorReferralCode || ''}`;
+  const extendedExpiryDate = calculateExtendedExpiry(vendor?.subscription_expires_at, 1);
 
-  const handleCloseMilestoneModal = () => {
+  const handleCloseMilestoneModal = async () => {
     if (vendor?.id && liveReferralCount >= 5) {
       const milestoneCycle = Math.floor(liveReferralCount / 5);
       localStorage.setItem(`nearby_reward_celebrated_${vendor.id}_cycle_${milestoneCycle}`, 'true');
+      await grantFreeMonth(vendor.id);
+      if (onRefreshVendor) onRefreshVendor();
     }
     setIsMilestoneModalOpen(false);
   };
@@ -1098,7 +1101,7 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
         vendorName={vendor?.owner_name || vendor?.name || 'Merchant'}
         totalReferrals={liveReferralCount}
         freeMonthsEarned={referralMetrics.totalFreeMonthsEarned || Math.floor(liveReferralCount / 5) || 1}
-        newExpiryDate={vendor?.subscription_expires_at}
+        newExpiryDate={extendedExpiryDate}
       />
     </div>
   );
