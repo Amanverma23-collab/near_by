@@ -59,12 +59,31 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
   const [isReferredModalOpen, setIsReferredModalOpen] = useState(false);
   const [isMilestoneModalOpen, setIsMilestoneModalOpen] = useState(false);
 
+  const cleanPhone = (vendor?.phone_number || '').replace(/\D/g, '').slice(-10);
+
   // Compute live effective status
   const effectiveStatus = getEffectiveShopStatus(vendor);
 
-  // Calculate subscription status details
-  const isTrial = vendor?.subscription_status === 'trial';
-  const rawExpiresAt = vendor?.subscription_expires_at;
+  // Read latest cached subscription (auto-synced upon referral rewards)
+  const cachedSubStr = vendor?.id
+    ? localStorage.getItem(`nearby_subscription_${vendor.id}`)
+    : cleanPhone
+    ? localStorage.getItem(`nearby_subscription_${cleanPhone}`)
+    : null;
+
+  let cachedSub: any = null;
+  if (cachedSubStr) {
+    try {
+      cachedSub = JSON.parse(cachedSubStr);
+    } catch {}
+  }
+
+  const rawExpiresAt = cachedSub?.expiresAt && new Date(cachedSub.expiresAt) > new Date(vendor?.subscription_expires_at || 0)
+    ? cachedSub.expiresAt
+    : vendor?.subscription_expires_at;
+
+  const currentSubStatus = cachedSub?.status || vendor?.subscription_status;
+  const isTrial = currentSubStatus === 'trial';
 
   let daysRemaining = 30;
   let formattedExpiry = '30 days remaining';
@@ -90,9 +109,6 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
       isExpiringSoon = true;
     }
   }
-
-  // Real stats computation directly from vendor database record & live interactions
-  const cleanPhone = (vendor?.phone_number || '').replace(/\D/g, '').slice(-10);
   const localViews = Math.max(
     Number(localStorage.getItem(`nearby_views_${vendor?.id}`) || 0),
     cleanPhone ? Number(localStorage.getItem(`nearby_views_${cleanPhone}`) || 0) : 0
@@ -251,9 +267,23 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
         const realCount = uniqueReferred.length;
         setLiveReferralCount(realCount);
 
-        // Check if 5 referrals milestone is achieved & trigger celebration modal
+        // Check if 5 referrals milestone is achieved -> AUTOMATICALLY grant 1 month free & show celebration modal
         if (realCount >= 5 && vendor?.id) {
           const milestoneCycle = Math.floor(realCount / 5);
+          const grantedCyclesKey = `nearby_reward_granted_${vendor.id}_milestones`;
+          const previouslyGranted = Number(localStorage.getItem(grantedCyclesKey) || 0);
+
+          if (milestoneCycle > previouslyGranted) {
+            const cyclesToGrant = milestoneCycle - previouslyGranted;
+            for (let i = 0; i < cyclesToGrant; i++) {
+              await grantFreeMonth(vendor.id);
+            }
+            localStorage.setItem(grantedCyclesKey, String(milestoneCycle));
+            if (onRefreshVendor) {
+              onRefreshVendor();
+            }
+          }
+
           const celebrationKey = `nearby_reward_celebrated_${vendor.id}_cycle_${milestoneCycle}`;
           if (localStorage.getItem(celebrationKey) !== 'true') {
             setIsMilestoneModalOpen(true);
