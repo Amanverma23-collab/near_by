@@ -101,8 +101,17 @@ async function runTests() {
     console.log(`   Distance: ${resDist.body.distanceKm} km (Source: ${resDist.body.source})`);
     console.log('   ✅ Passed!\n');
 
+    // 7. Test Batch Matrix Road Distances for Nearby Vendor List
+    console.log('7. Testing GET /api/vendors/nearby (Batch Matrix Road Distance for All Vendors)...');
+    const resNearby = await api(`/api/vendors/nearby?userLat=27.6094&userLon=75.1397&radiusKm=50`);
+    console.log('   Nearby Matrix Batch Response count:', resNearby.body.count, 'Vendors:', resNearby.body.vendors?.length);
+    if (!resNearby.body.success || !Array.isArray(resNearby.body.vendors)) {
+      throw new Error('Matrix nearby vendors batch endpoint failed');
+    }
+    console.log('   ✅ Batch Matrix Calculation Passed!\n');
+
     console.log('====================================================');
-    console.log('🎉 ALL BACKEND API, REFERRAL & DISTANCE TESTS PASSED!');
+    console.log('🎉 ALL BACKEND API, REFERRAL & BATCH MATRIX TESTS PASSED!');
     console.log('====================================================');
   } catch (err) {
     console.error('❌ Test failed:', err);

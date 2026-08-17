@@ -472,7 +472,7 @@ async function getRoadDistanceCached(userLat, userLon, vendorId, vLat, vLon) {
 }
 
 /**
- * 4. Get Accurate Vendor Road Distance
+ * 4. Get Accurate Vendor Road Distance (Single Vendor)
  * GET /api/vendor/:id/distance?userLat=27.6094&userLon=75.1397
  */
 app.get('/api/vendor/:id/distance', async (req, res) => {
@@ -513,6 +513,257 @@ app.get('/api/vendor/:id/distance', async (req, res) => {
     });
   } catch (err) {
     console.error('Distance calculation error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================================
+// BATCH MATRIX ROAD DISTANCES (ORS MATRIX API + OSRM TABLE)
+// ==========================================================
+
+async function getCachedDistance(userLat, userLon, vendorId) {
+  const rLat = roundCoord(userLat);
+  const rLon = roundCoord(userLon);
+
+  try {
+    const [cached] = await db.query(
+      `SELECT distance_km, duration_min, source FROM distance_cache 
+       WHERE user_lat = ? AND user_lon = ? AND vendor_id = ?
+       AND created_at > NOW() - INTERVAL 6 HOUR`,
+      [rLat, rLon, String(vendorId)]
+    );
+
+    return cached && cached.length > 0
+      ? {
+          distanceKm: Number(cached[0].distance_km),
+          durationMin: cached[0].duration_min ? Number(cached[0].duration_min) : null,
+          source: cached[0].source,
+        }
+      : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function saveCachedDistance(userLat, userLon, vendorId, result) {
+  const rLat = roundCoord(userLat);
+  const rLon = roundCoord(userLon);
+
+  try {
+    await db.query(
+      `INSERT INTO distance_cache 
+       (user_lat, user_lon, vendor_id, distance_km, duration_min, source)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE 
+         distance_km = ?, duration_min = ?, source = ?, created_at = NOW()`,
+      [
+        rLat,
+        rLon,
+        String(vendorId),
+        result.distanceKm,
+        result.durationMin,
+        result.source,
+        result.distanceKm,
+        result.durationMin,
+        result.source,
+      ]
+    );
+  } catch (e) {}
+}
+
+/**
+ * Calculates road distances from 1 user origin to multiple vendors in a SINGLE API call.
+ */
+async function getBatchRoadDistances(userLat, userLon, vendors) {
+  if (!vendors || vendors.length === 0) return [];
+
+  // A. Try OpenRouteService Matrix API if API key configured
+  if (ORS_API_KEY && dailyORSCalls < MAX_DAILY_CALLS) {
+    try {
+      const locations = [
+        [userLon, userLat],
+        ...vendors.map((v) => [v.lon || v.longitude || 75.1398, v.lat || v.latitude || 27.6094]),
+      ];
+      const destinationIndices = vendors.map((_, i) => i + 1);
+
+      const body = {
+        locations: locations,
+        sources: [0],
+        destinations: destinationIndices,
+        metrics: ['distance', 'duration'],
+        units: 'km',
+      };
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+      dailyORSCalls++;
+      const res = await fetch('https://api.openrouteservice.org/v2/matrix/driving-car', {
+        method: 'POST',
+        headers: {
+          Authorization: ORS_API_KEY,
+          'Content-Type': 'application/json',
+          'User-Agent': 'NearBe-App',
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.distances && data.distances[0]) {
+          return vendors.map((vendor, i) => ({
+            vendorId: vendor.id,
+            distanceKm: parseFloat(Number(data.distances[0][i] || 0).toFixed(2)),
+            durationMin: data.durations?.[0]?.[i] ? Math.round(Number(data.durations[0][i]) / 60) : null,
+            source: 'road',
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn('ORS Matrix API notice:', err.message);
+    }
+  }
+
+  // B. Try OSRM Table API (High-speed batch router, zero API key required)
+  try {
+    const coordsStr = [
+      `${userLon},${userLat}`,
+      ...vendors.map((v) => `${v.lon || v.longitude || 75.1398},${v.lat || v.latitude || 27.6094}`),
+    ].join(';');
+
+    const destIndicesStr = vendors.map((_, i) => i + 1).join(';');
+    const osrmUrl = `https://router.project-osrm.org/table/v1/driving/${coordsStr}?sources=0&destinations=${destIndicesStr}&annotations=distance,duration`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    const res = await fetch(osrmUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.code === 'Ok' && data.distances && data.distances[0]) {
+        return vendors.map((vendor, i) => {
+          const meters = data.distances[0][i];
+          const seconds = data.durations?.[0]?.[i];
+          const km = typeof meters === 'number' ? meters / 1000 : getHaversineDistance(userLat, userLon, vendor.lat || vendor.latitude || 27.6094, vendor.lon || vendor.longitude || 75.1398);
+          return {
+            vendorId: vendor.id,
+            distanceKm: parseFloat(Number(km).toFixed(2)),
+            durationMin: typeof seconds === 'number' ? Math.max(1, Math.round(seconds / 60)) : null,
+            source: 'road',
+          };
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('OSRM Table API notice:', err.message);
+  }
+
+  // C. Fallback: Haversine for all vendors
+  return vendors.map((vendor) => {
+    const vLat = vendor.lat || vendor.latitude || 27.6094;
+    const vLon = vendor.lon || vendor.longitude || 75.1398;
+    return {
+      vendorId: vendor.id,
+      distanceKm: parseFloat(getHaversineDistance(userLat, userLon, vLat, vLon).toFixed(2)),
+      durationMin: null,
+      source: 'straight_line',
+    };
+  });
+}
+
+/**
+ * Splits large vendor lists into safe chunks of 50 locations
+ */
+async function getBatchRoadDistancesSafe(userLat, userLon, vendors) {
+  const BATCH_SIZE = 50;
+  let allResults = [];
+
+  for (let i = 0; i < vendors.length; i += BATCH_SIZE) {
+    const batch = vendors.slice(i, i + BATCH_SIZE);
+    const results = await getBatchRoadDistances(userLat, userLon, batch);
+    allResults = allResults.concat(results);
+  }
+
+  return allResults;
+}
+
+/**
+ * 5. GET /api/vendors/nearby?userLat=27.6094&userLon=75.1397&radiusKm=10
+ * Returns vendors within radiusKm with accurate road distances calculated via Matrix API.
+ */
+app.get('/api/vendors/nearby', async (req, res) => {
+  try {
+    const { userLat, userLon, radiusKm = 10 } = req.query;
+
+    if (!userLat || !userLon) {
+      return res.status(400).json({ error: 'userLat and userLon query params are required' });
+    }
+
+    const uLat = parseFloat(userLat);
+    const uLon = parseFloat(userLon);
+    const maxRadius = parseFloat(radiusKm);
+
+    // Step 1: Get all vendors from DB
+    const [allVendors] = await db.query(`SELECT * FROM vendors`);
+
+    // Step 2: Quick Haversine pre-filter (buffer: 1.5x of radius)
+    const roughlyNearby = (allVendors || []).filter((v) => {
+      const vLat = v.lat || v.latitude || 27.6094;
+      const vLon = v.lon || v.longitude || 75.1398;
+      const roughKm = getHaversineDistance(uLat, uLon, vLat, vLon);
+      return roughKm <= maxRadius * 1.5;
+    });
+
+    if (roughlyNearby.length === 0) {
+      return res.json({ vendors: [] });
+    }
+
+    // Step 3: Check 6-hour cache first
+    const uncachedVendors = [];
+    const cachedResults = [];
+
+    for (const vendor of roughlyNearby) {
+      const cached = await getCachedDistance(uLat, uLon, vendor.id);
+      if (cached) {
+        cachedResults.push({ ...vendor, ...cached });
+      } else {
+        uncachedVendors.push(vendor);
+      }
+    }
+
+    // Step 4: Batch-fetch road distance for only uncached vendors
+    let freshResults = [];
+    if (uncachedVendors.length > 0) {
+      const batchCalcs = await getBatchRoadDistancesSafe(uLat, uLon, uncachedVendors);
+
+      // Save fresh results to cache
+      for (const result of batchCalcs) {
+        await saveCachedDistance(uLat, uLon, result.vendorId, result);
+      }
+
+      // Merge distance data back into vendor objects
+      freshResults = batchCalcs.map((r) => {
+        const vendor = uncachedVendors.find((v) => v.id === r.vendorId);
+        return { ...vendor, ...r };
+      });
+    }
+
+    // Step 5: Combine, filter by actual radius, sort by distance
+    const combined = [...cachedResults, ...freshResults]
+      .filter((v) => v.distanceKm <= maxRadius)
+      .sort((a, b) => a.distanceKm - b.distanceKm);
+
+    res.json({
+      success: true,
+      count: combined.length,
+      vendors: combined,
+    });
+  } catch (err) {
+    console.error('Nearby vendors matrix calculation error:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

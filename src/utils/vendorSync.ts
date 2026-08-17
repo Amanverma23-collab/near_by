@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 import { dummyVendors, type Vendor } from '../data/dummyVendors';
 import { getEffectiveShopStatus } from './shopTiming';
 import { INDIAN_CITY_COORDINATES } from '../components/location/CitySelector';
+import { getBatchVendorRoadDistances } from './roadDistance';
 
 /**
  * Haversine formula to compute great-circle distance between two GPS points in Kilometers.
@@ -255,7 +256,7 @@ export async function fetchCombinedVendors(
         };
       });
 
-      // Combine real registered vendors with sample dummy vendors and sort by distance (nearest first)
+      // Combine real registered vendors with sample dummy vendors
       const existingIds = new Set(realVendors.map((rv) => rv.id));
       const nonDuplicateDummies = dummyVendors
         .filter((dv) => !existingIds.has(dv.id))
@@ -270,7 +271,28 @@ export async function fetchCombinedVendors(
         }));
 
       const merged = [...realVendors, ...nonDuplicateDummies];
-      // Sort nearest first
+
+      // Calculate batch road distances using OpenRouteService Matrix API / OSRM Table
+      try {
+        const roadDistancesMap = await getBatchVendorRoadDistances(
+          activeCoords.latitude,
+          activeCoords.longitude,
+          merged
+        );
+
+        merged.forEach((v) => {
+          const roadDist = roadDistancesMap[v.id];
+          if (roadDist && typeof roadDist.distanceKm === 'number') {
+            v.distanceKm = roadDist.distanceKm;
+            (v as any).roadDurationMin = roadDist.durationMin;
+            (v as any).isRoadDistance = !roadDist.isApprox;
+          }
+        });
+      } catch (distErr) {
+        console.warn('Batch road distance calculation notice:', distErr);
+      }
+
+      // Sort nearest first by road distance
       merged.sort((a, b) => a.distanceKm - b.distanceKm);
 
       return merged;

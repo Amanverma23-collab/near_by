@@ -6,6 +6,7 @@ import { dummyVendors, type Vendor } from '../data/dummyVendors';
 import { getEffectiveShopStatus } from '../utils/shopTiming';
 import { fetchCombinedVendors, trackVendorCall, trackVendorWhatsApp } from '../utils/vendorSync';
 import { formatDistance, RADIUS_OPTIONS, filterNearbyVendors } from '../utils/haversine';
+import { formatDurationMin } from '../utils/roadDistance';
 import SaveHeartButton from '../components/ui/SaveHeartButton';
 import { useLocation as useAppLocation } from '../context/LocationContext';
 
@@ -383,8 +384,15 @@ export default function CategoryPage() {
                       </span>
 
                       <div className="flex items-center gap-1 text-[11px] text-ink-muted font-body">
-                        <MapPin size={12} className="text-brand" />
-                        <span className="font-semibold text-ink">{formatDistance(vendor.distanceKm)} away</span>
+                        <MapPin size={12} className="text-brand shrink-0" />
+                        <span className="font-semibold text-ink">
+                          {formatDistance(vendor.distanceKm)} away
+                          {(vendor as any).roadDurationMin ? (
+                            <span className="text-ink-muted font-normal ml-1">
+                              · 🚗 {formatDurationMin((vendor as any).roadDurationMin)}
+                            </span>
+                          ) : null}
+                        </span>
                       </div>
                     </div>
 

@@ -26,20 +26,29 @@ class MemoryDb {
         referral_code,
         referred_by: referred_by || null,
         referral_count: 0,
+        latitude: 27.6094 + (this.nextVendorId * 0.003),
+        longitude: 75.1398 + (this.nextVendorId * 0.003),
+        lat: 27.6094 + (this.nextVendorId * 0.003),
+        lon: 75.1398 + (this.nextVendorId * 0.003),
         created_at: new Date()
       };
       this.vendors.push(vendor);
       return [{ insertId: vendor.id, affectedRows: 1 }];
     }
 
-    // 2. SELECT * FROM vendors WHERE referral_code = ?
+    // 2. SELECT * FROM vendors
+    if (s.startsWith('SELECT * FROM VENDORS') && !s.includes('WHERE')) {
+      return [this.vendors];
+    }
+
+    // 3. SELECT * FROM vendors WHERE referral_code = ?
     if (s.includes('FROM VENDORS WHERE REFERRAL_CODE = ?')) {
       const code = params[0];
       const match = this.vendors.filter(v => v.referral_code === code);
       return [match];
     }
 
-    // 3. SELECT referral_code, referral_count FROM vendors WHERE id = ?
+    // 4. SELECT referral_code, referral_count FROM vendors WHERE id = ?
     if (s.includes('FROM VENDORS WHERE ID = ?')) {
       const id = Number(params[0]);
       const match = this.vendors.filter(v => v.id === id);
