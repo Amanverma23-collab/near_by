@@ -40,6 +40,7 @@ import ShopPhotosModal from './ShopPhotosModal';
 import ReferralMilestoneRewardModal from './ReferralMilestoneRewardModal';
 import { getEffectiveShopStatus } from '../../utils/shopTiming';
 import { calculateReferralProgress, ensureUniqueReferralCode, generatePermanentReferralCode, getVendorCandidateCodes, calculateExtendedExpiry, grantFreeMonth } from '../../utils/referral';
+import { computeVendorPlanMetrics } from '../../utils/planTracking';
 
 interface VendorShopDashboardProps {
   vendor: any;
@@ -489,41 +490,90 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
           </div>
         </motion.section>
 
-        {/* SECTION 1.5: SUBSCRIPTION & STARTER FREE TRIAL STATUS (Below Photo) */}
-        <motion.div
-          custom={0.2}
-          variants={sectionVariants}
-          initial="hidden"
-          animate="show"
-          className="bg-white rounded-2xl p-3.5 sm:p-4 border border-border-light shadow-xs flex items-center justify-between gap-3"
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/80 shrink-0">
-              <Sparkles size={18} />
-            </div>
-            <div className="min-w-0 space-y-0.5">
-              <div className="flex items-center gap-2">
-                <span className="text-xs sm:text-sm font-display font-extrabold text-ink truncate">
-                  {isTrial ? 'Starter Free Trial' : 'NearBy Partner Pro'}
-                </span>
-                <span className="text-[9px] sm:text-[10px] font-display font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase tracking-wider">
-                  Active
-                </span>
-              </div>
-              <p className="text-[11px] text-ink-muted truncate font-medium">
-                {formattedExpiry}
-              </p>
-            </div>
-          </div>
+        {/* SECTION 1.5: VENDOR PLAN TRACKING CARD */}
+        {(() => {
+          const planMetrics = computeVendorPlanMetrics(
+            isTrial ? 'REFERRAL_FREE' : (vendor?.subscription_plan_type || 'MONTHLY'),
+            vendor?.subscription_started_at || vendor?.created_at,
+            rawExpiresAt,
+            vendorReferralCode || vendor?.referral_code,
+            liveReferralCount
+          );
 
-          <button
-            onClick={() => navigate('/vendor/subscriptions')}
-            className="px-3.5 py-2 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-xl text-xs font-display font-extrabold transition-colors cursor-pointer shrink-0 flex items-center gap-1"
-          >
-            <span>Manage Plan</span>
-            <ChevronRight size={14} />
-          </button>
-        </motion.div>
+          return (
+            <motion.div
+              custom={0.2}
+              variants={sectionVariants}
+              initial="hidden"
+              animate="show"
+              className="bg-white rounded-2xl p-4 sm:p-5 border border-border-light shadow-xs space-y-3.5"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/80 shrink-0">
+                    <Sparkles size={18} />
+                  </div>
+                  <div className="min-w-0 space-y-0.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs sm:text-sm font-display font-extrabold text-ink truncate">
+                        {isTrial ? 'Starter Free Trial' : (vendor?.plan_name || 'NearBy Partner Pro')}
+                      </span>
+                      <span className={`text-[9px] sm:text-[10px] font-display font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                        daysRemaining <= 0
+                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                          : daysRemaining <= 7
+                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                          : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      }`}>
+                        {daysRemaining <= 0 ? 'Expired' : 'Active'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-semibold text-ink flex items-center gap-1.5 flex-wrap">
+                      <span className={daysRemaining <= 7 ? 'text-rose-600 font-bold' : 'text-emerald-700 font-bold'}>
+                        {daysRemaining <= 0 ? 'Plan Expired' : `${daysRemaining} days left`}
+                      </span>
+                      {rawExpiresAt && daysRemaining > 0 && (
+                        <span className="text-[10px] text-ink-muted font-normal">
+                          • {new Date(vendor?.subscription_started_at || vendor?.created_at || Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} → {new Date(rawExpiresAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => navigate('/vendor/subscriptions')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-display font-extrabold transition-all cursor-pointer shrink-0 flex items-center gap-1 shadow-xs ${
+                    daysRemaining <= 7
+                      ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                      : 'bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200'
+                  }`}
+                >
+                  <span>{daysRemaining <= 7 ? 'Renew Plan' : 'Manage Plan'}</span>
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+
+              {/* Dynamic Plan Duration Progress Bar: (daysUsed / totalDays) * 100% */}
+              {daysRemaining > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex justify-between items-center text-[10px] text-ink-muted font-semibold">
+                    <span>Plan Duration Progress</span>
+                    <span>{planMetrics.progressPercent}% Elapsed</span>
+                  </div>
+                  <div className="w-full h-2 bg-surface-dark rounded-full overflow-hidden border border-border-light/60">
+                    <div
+                      className={`h-full rounded-full transition-all duration-700 ${
+                        daysRemaining <= 7 ? 'bg-rose-500' : 'bg-gradient-to-r from-teal-500 to-emerald-500'
+                      }`}
+                      style={{ width: `${Math.max(4, planMetrics.progressPercent)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          );
+        })()}
 
         {/* Expiration Warning Banner */}
         {isExpiringSoon && (

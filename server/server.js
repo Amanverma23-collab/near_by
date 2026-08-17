@@ -1,0 +1,390 @@
+const express = require('express');
+const cors = require('cors');
+const cron = require('node-cron');
+const db = require('./db');
+require('dotenv').config();
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+// ==========================================
+// PLAN TYPES DEFINITION
+// ==========================================
+const PLANS = {
+  MONTHLY: {
+    name: "1 Month",
+    duration: 30,       // days
+    price: 499,         // INR
+  },
+  HALF_YEARLY: {
+    name: "6 Month",
+    duration: 180,
+    price: 2499,
+  },
+  YEARLY: {
+    name: "1 Year",
+    duration: 365,
+    price: 4499,
+  },
+  REFERRAL_FREE: {
+    name: "Referral Bonus",
+    duration: 30,
+    price: 0,           // free
+  }
+};
+
+// ==========================================
+// HELPER FUNCTIONS
+// ==========================================
+
+/**
+ * Generates an 8-character unique referral code (e.g., "NB8X2K9P")
+ */
+function generateReferralCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = 'NB'; // NearBe prefix
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+/**
+ * Adds N days to a given date string or Date object
+ */
+function addDays(date, days) {
+  const result = new Date(date);
+  result.setDate(result.getDate() + Number(days));
+  return result;
+}
+
+/**
+ * Formats date to YYYY-MM-DD string
+ */
+function formatDate(date) {
+  return new Date(date).toISOString().split('T')[0];
+}
+
+/**
+ * Internal function to award a free month to a vendor.
+ * Extends current active plan's end date by +30 days, or creates a new 30-day plan from today.
+ */
+async function awardFreeMonth(vendorId) {
+  // Check existing active plan
+  const [existing] = await db.query(
+    `SELECT * FROM vendor_plans 
+     WHERE vendor_id = ? AND status = 'active'
+     ORDER BY end_date DESC LIMIT 1`,
+    [vendorId]
+  );
+
+  let startDate, endDate;
+
+  if (existing.length > 0) {
+    startDate = existing[0].end_date;
+    endDate = addDays(startDate, 30);
+  } else {
+    startDate = new Date();
+    endDate = addDays(startDate, 30);
+  }
+
+  await db.query(
+    `INSERT INTO vendor_plans 
+     (vendor_id, plan_type, start_date, end_date, duration_days, price_paid)
+     VALUES (?, 'REFERRAL_FREE', ?, ?, 30, 0)`,
+    [vendorId, formatDate(startDate), formatDate(endDate)]
+  );
+
+  console.log(`[Referral Bonus] Free month awarded to vendor ${vendorId}. Valid until: ${formatDate(endDate)}`);
+  return { startDate: formatDate(startDate), endDate: formatDate(endDate) };
+}
+
+/**
+ * Mock/Helper notification dispatcher for expiry warnings
+ */
+function sendExpiryWarning(email, name, daysLeft) {
+  console.log(`[Notification Alert] Sent ${daysLeft}-day expiry reminder to ${name} (${email})`);
+}
+
+// ==========================================
+// REST API ENDPOINTS
+// ==========================================
+
+// Get available plan list
+app.get('/api/plans', (req, res) => {
+  res.json({ success: true, plans: PLANS });
+});
+
+/**
+ * 1. Vendor Signup (with referral code support)
+ * POST /api/vendor/signup
+ * Body: { name, email, phone, referred_by? }
+ */
+app.post('/api/vendor/signup', async (req, res) => {
+  try {
+    const { name, email, phone, referred_by } = req.body;
+
+    if (!name || !email) {
+      return res.status(400).json({ success: false, error: 'Name and Email are required.' });
+    }
+
+    // Generate unique referral code (e.g. "NB8X2K9P")
+    let referral_code = generateReferralCode();
+    
+    // Check collision safety
+    const [existingCode] = await db.query(
+      `SELECT id FROM vendors WHERE referral_code = ?`, [referral_code]
+    );
+    if (existingCode && existingCode.length > 0) {
+      referral_code = generateReferralCode();
+    }
+
+    // Insert new vendor
+    const [result] = await db.query(
+      `INSERT INTO vendors (name, email, phone, referral_code, referred_by)
+       VALUES (?, ?, ?, ?, ?)`,
+      [name, email, phone || null, referral_code, referred_by ? referred_by.trim().toUpperCase() : null]
+    );
+    const newVendorId = result.insertId;
+
+    let freeMonthAwarded = false;
+
+    // Handle referral tracking
+    if (referred_by) {
+      const cleanRefCode = referred_by.trim().toUpperCase();
+      const [referrer] = await db.query(
+        `SELECT * FROM vendors WHERE referral_code = ?`, [cleanRefCode]
+      );
+
+      if (referrer && referrer.length > 0) {
+        const referrerId = referrer[0].id;
+
+        // Log referral
+        await db.query(
+          `INSERT INTO referrals (referrer_id, referred_id, referral_code)
+           VALUES (?, ?, ?)`,
+          [referrerId, newVendorId, cleanRefCode]
+        );
+
+        // Increment referrer's lifetime referral count
+        await db.query(
+          `UPDATE vendors SET referral_count = referral_count + 1 
+           WHERE id = ?`, [referrerId]
+        );
+
+        // Check if referral_count is multiple of 5 → award free month
+        const [updated] = await db.query(
+          `SELECT referral_count FROM vendors WHERE id = ?`, [referrerId]
+        );
+        const count = updated[0].referral_count;
+
+        if (count % 5 === 0) {
+          await awardFreeMonth(referrerId);
+          freeMonthAwarded = true;
+
+          // Mark referral as bonus awarded
+          await db.query(
+            `UPDATE referrals SET bonus_awarded = TRUE 
+             WHERE referrer_id = ? 
+             ORDER BY created_at DESC LIMIT 1`,
+            [referrerId]
+          );
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      vendorId: newVendorId,
+      referral_code,
+      referred_by: referred_by || null,
+      freeMonthAwardedToReferrer: freeMonthAwarded
+    });
+  } catch (err) {
+    console.error('Signup error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * 2. Purchase Plan
+ * POST /api/vendor/purchase-plan
+ * Body: { vendor_id, plan_type }
+ */
+app.post('/api/vendor/purchase-plan', async (req, res) => {
+  try {
+    const { vendor_id, plan_type } = req.body;
+
+    if (!vendor_id || !plan_type) {
+      return res.status(400).json({ success: false, error: 'vendor_id and plan_type are required.' });
+    }
+
+    const plan = PLANS[plan_type];
+    if (!plan) {
+      return res.status(400).json({ success: false, error: `Invalid plan_type: ${plan_type}` });
+    }
+
+    // Check existing active plan
+    const [existing] = await db.query(
+      `SELECT * FROM vendor_plans 
+       WHERE vendor_id = ? AND status = 'active'
+       ORDER BY end_date DESC LIMIT 1`,
+      [vendor_id]
+    );
+
+    let startDate, endDate;
+
+    if (existing && existing.length > 0) {
+      // Extend from current plan's end date (stacking)
+      startDate = existing[0].end_date;
+      endDate = addDays(startDate, plan.duration);
+    } else {
+      // Fresh plan from today
+      startDate = new Date();
+      endDate = addDays(startDate, plan.duration);
+    }
+
+    await db.query(
+      `INSERT INTO vendor_plans 
+       (vendor_id, plan_type, start_date, end_date, duration_days, price_paid)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [vendor_id, plan_type, 
+       formatDate(startDate), formatDate(endDate), 
+       plan.duration, plan.price]
+    );
+
+    res.json({ 
+      success: true, 
+      plan_type,
+      plan_name: plan.name,
+      start_date: formatDate(startDate),
+      end_date: formatDate(endDate),
+      duration_days: plan.duration,
+      price_paid: plan.price
+    });
+  } catch (err) {
+    console.error('Purchase plan error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * 3. Get Vendor Plan Status
+ * GET /api/vendor/plan-status/:vendor_id
+ */
+app.get('/api/vendor/plan-status/:vendor_id', async (req, res) => {
+  try {
+    const { vendor_id } = req.params;
+    const today = new Date();
+
+    // Get active plan
+    const [plans] = await db.query(
+      `SELECT * FROM vendor_plans 
+       WHERE vendor_id = ? AND status = 'active'
+       ORDER BY end_date DESC LIMIT 1`,
+      [vendor_id]
+    );
+
+    // Referral info
+    const [vendors] = await db.query(
+      `SELECT referral_code, referral_count FROM vendors WHERE id = ?`,
+      [vendor_id]
+    );
+
+    const referralCode = vendors && vendors.length > 0 ? vendors[0].referral_code : 'NB000000';
+    const referralCount = vendors && vendors.length > 0 ? Number(vendors[0].referral_count || 0) : 0;
+    const referralsToNextBonus = referralCount % 5 === 0 && referralCount > 0 ? 5 : (5 - (referralCount % 5));
+
+    if (!plans || plans.length === 0) {
+      return res.json({ 
+        hasPlan: false,
+        message: "No active plan. Purchase a plan to list your business.",
+        referral_code: referralCode,
+        referral_count: referralCount,
+        referrals_to_next_bonus: referralsToNextBonus
+      });
+    }
+
+    const plan = plans[0];
+    const startDate = new Date(plan.start_date);
+    const endDate = new Date(plan.end_date);
+
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const totalDays = plan.duration_days;
+    const daysUsed = Math.max(0, Math.floor((today - startDate) / msPerDay));
+    const daysLeft = Math.max(0, Math.ceil((endDate - today) / msPerDay));
+    const progressPercent = Math.min(100, 
+      parseFloat(((daysUsed / totalDays) * 100).toFixed(1))
+    );
+
+    res.json({
+      hasPlan: true,
+      plan_type: plan.plan_type,
+      start_date: formatDate(plan.start_date),
+      end_date: formatDate(plan.end_date),
+      total_days: totalDays,
+      days_used: daysUsed,
+      days_left: daysLeft,
+      progress_percent: progressPercent,
+      is_expiring_soon: daysLeft <= 7,   // 7 days or fewer remaining
+      referral_code: referralCode,
+      referral_count: referralCount,
+      referrals_to_next_bonus: referralsToNextBonus
+    });
+  } catch (err) {
+    console.error('Plan status error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
+// CRON JOBS (AUTO-EXPIRY & EXPIRY WARNINGS)
+// ==========================================
+
+// 1. Auto-Expire Cron Job - Runs every day at midnight (12:00 AM)
+cron.schedule('0 0 * * *', async () => {
+  try {
+    const [result] = await db.query(
+      `UPDATE vendor_plans 
+       SET status = 'expired'
+       WHERE end_date < CURDATE() 
+       AND status = 'active'`
+    );
+    console.log(`[Auto-Expire Cron] Expired ${result.affectedRows || 0} plans.`);
+  } catch (err) {
+    console.warn('[Auto-Expire Cron Warn]:', err.message);
+  }
+});
+
+// 2. Expiry Warning Cron Job - Runs every day at 9:00 AM
+cron.schedule('0 9 * * *', async () => {
+  try {
+    const [vendors] = await db.query(
+      `SELECT v.email, v.name, vp.end_date,
+              DATEDIFF(vp.end_date, CURDATE()) AS days_left
+       FROM vendor_plans vp
+       JOIN vendors v ON v.id = vp.vendor_id
+       WHERE vp.status = 'active'
+       AND DATEDIFF(vp.end_date, CURDATE()) = 7`
+    );
+
+    if (vendors && vendors.length > 0) {
+      vendors.forEach(vendor => {
+        sendExpiryWarning(vendor.email, vendor.name, vendor.days_left);
+      });
+    }
+  } catch (err) {
+    console.warn('[Expiry Warning Cron Warn]:', err.message);
+  }
+});
+
+// Start listening if not in test/import mode
+const PORT = process.env.PORT || 5000;
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`NearBe Vendor Plan Tracking Server running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = { app, PLANS, generateReferralCode, addDays, formatDate, awardFreeMonth };
