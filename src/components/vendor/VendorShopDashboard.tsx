@@ -95,18 +95,17 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
     const diffTime = expiresDate.getTime() - now.getTime();
     daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
     
-    if (isTrial) {
-      formattedExpiry = `${daysRemaining} days remaining`;
-    } else {
-      formattedExpiry = `Active until ${expiresDate.toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      })}`;
-    }
-
-    if (daysRemaining <= 5) {
+    if (diffTime <= 0 || daysRemaining === 0) {
+      formattedExpiry = 'Plan Expired';
       isExpiringSoon = true;
+    } else if (daysRemaining === 1) {
+      formattedExpiry = '1 day remaining';
+      isExpiringSoon = true;
+    } else {
+      formattedExpiry = `${daysRemaining} days remaining`;
+      if (daysRemaining <= 5) {
+        isExpiringSoon = true;
+      }
     }
   }
   const localViews = Math.max(
