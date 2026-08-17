@@ -883,49 +883,6 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
             </div>
           </div>
 
-          {/* Referred Shops Activity List */}
-          {referredVendorsList.length > 0 && (
-            <div className="relative z-10 pt-2 border-t border-white/10 space-y-2">
-              <span className="text-[11px] font-display font-bold text-teal-200 uppercase tracking-wider block">
-                Referred Merchants ({referredVendorsList.length})
-              </span>
-              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                {referredVendorsList.map((shop) => (
-                  <div
-                    key={shop.id}
-                    className="bg-black/25 backdrop-blur-sm border border-white/10 rounded-xl px-3.5 py-2.5 flex items-center justify-between gap-3 text-xs"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-amber-400/20 text-amber-300 flex items-center justify-center font-bold text-xs font-display">
-                        {shop.name ? shop.name.charAt(0).toUpperCase() : 'S'}
-                      </div>
-                      <div>
-                        <p className="font-display font-bold text-white leading-tight">
-                          {shop.name || 'Unnamed Shop'}
-                        </p>
-                        <p className="text-[10px] text-teal-200/70">
-                          Owner: {shop.owner_name || 'Merchant'}
-                        </p>
-                      </div>
-                    </div>
-                    <div>
-                      {shop.referral_counted || (shop.is_verified && shop.subscription_status) ? (
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] font-bold flex items-center gap-1">
-                          <Check size={10} strokeWidth={3} />
-                          <span>Counted (+1)</span>
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30 text-[10px] font-bold">
-                          Pending Approval
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Action Buttons */}
           <div className="relative z-10 pt-1 flex flex-wrap items-center gap-3">
             <button
