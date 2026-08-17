@@ -162,7 +162,7 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
       if (!code && !vendor?.id) return;
 
       try {
-        let latestCount = Number(vendor?.successful_referral_count || 0);
+        let vRowData: any = null;
 
         // 1. Fetch latest vendor row for exact count
         if (vendor?.id) {
@@ -172,10 +172,7 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
             .eq('id', vendor.id)
             .maybeSingle();
 
-          if (vRow && typeof vRow.successful_referral_count === 'number') {
-            latestCount = vRow.successful_referral_count;
-            setLiveReferralCount(vRow.successful_referral_count);
-          }
+          vRowData = vRow;
         }
 
         // 2. Build candidate codes (case-insensitive + alternate candidate codes)
@@ -248,12 +245,14 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
 
         setReferredVendorsList(uniqueReferred);
 
-        const countedTotal = Math.max(
-          latestCount,
-          uniqueReferred.filter((r) => r.referral_counted || r.is_verified).length,
-          uniqueReferred.length
-        );
-        setLiveReferralCount(countedTotal);
+        // Always keep the count and the list in 100% exact sync
+        const realCount = uniqueReferred.length;
+        setLiveReferralCount(realCount);
+
+        // Auto-sync database counter with real referred rows
+        if (vendor?.id && typeof vRowData?.successful_referral_count === 'number' && vRowData.successful_referral_count !== realCount) {
+          await supabase.from('vendors').update({ successful_referral_count: realCount }).eq('id', vendor.id);
+        }
       } catch (err) {
         console.warn('Error fetching live referral stats:', err);
       }
@@ -262,7 +261,7 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
     loadReferralStats();
   }, [vendor?.id, vendorReferralCode, vendor?.referral_code, vendor?.name, vendor?.owner_name, vendor?.phone_number]);
 
-  const referralMetrics = calculateReferralProgress(Math.max(Number(vendor?.successful_referral_count || 0), liveReferralCount));
+  const referralMetrics = calculateReferralProgress(liveReferralCount);
   const referralLink = `${window.location.origin}/vendor/register?ref=${vendorReferralCode || ''}`;
 
   const handleCopyLink = async () => {
