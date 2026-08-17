@@ -339,8 +339,193 @@ app.get('/api/vendor/plan-status/:vendor_id', async (req, res) => {
 });
 
 // ==========================================
-// CRON JOBS (AUTO-EXPIRY & EXPIRY WARNINGS)
+// OPENROUTESERVICE ROAD DISTANCE ENGINE
 // ==========================================
+
+let dailyORSCalls = 0;
+const MAX_DAILY_CALLS = 1900;
+const ORS_API_KEY = process.env.ORS_API_KEY || '';
+
+/**
+ * Straight-line Haversine fallback distance
+ */
+function getHaversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function roundCoord(coord) {
+  return Math.round(Number(coord) * 1000) / 1000;
+}
+
+/**
+ * OpenRouteService road distance with 5-second timeout and Haversine fallback
+ */
+async function getRoadDistance(lat1, lon1, lat2, lon2) {
+  if (!ORS_API_KEY || dailyORSCalls >= MAX_DAILY_CALLS) {
+    const straightLineKm = getHaversineDistance(lat1, lon1, lat2, lon2);
+    return {
+      distanceKm: parseFloat(straightLineKm.toFixed(2)),
+      durationMin: null,
+      source: 'straight_line',
+    };
+  }
+
+  const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${ORS_API_KEY}&start=${lon1},${lat1}&end=${lon2},${lat2}`;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    dailyORSCalls++;
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'NearBe-App' },
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) throw new Error(`ORS API returned ${res.status}`);
+
+    const data = await res.json();
+    const segment = data.features?.[0]?.properties?.segments?.[0];
+    if (!segment) throw new Error('No route segment returned from ORS');
+
+    const distanceMeters = segment.distance;
+    const durationSeconds = segment.duration;
+
+    return {
+      distanceKm: parseFloat((distanceMeters / 1000).toFixed(2)),
+      durationMin: Math.round(durationSeconds / 60),
+      source: 'road',
+    };
+  } catch (error) {
+    console.warn('[ORS Road Distance Fallback]:', error.message);
+    const straightLineKm = getHaversineDistance(lat1, lon1, lat2, lon2);
+    return {
+      distanceKm: parseFloat(straightLineKm.toFixed(2)),
+      durationMin: null,
+      source: 'straight_line',
+    };
+  }
+}
+
+/**
+ * Cached road distance to protect daily quota (1-day TTL, ~100m coordinate clustering)
+ */
+async function getRoadDistanceCached(userLat, userLon, vendorId, vLat, vLon) {
+  const rLat = roundCoord(userLat);
+  const rLon = roundCoord(userLon);
+
+  try {
+    const [cached] = await db.query(
+      `SELECT * FROM distance_cache 
+       WHERE user_lat = ? AND user_lon = ? AND vendor_id = ?
+       AND created_at > NOW() - INTERVAL 1 DAY`,
+      [rLat, rLon, String(vendorId)]
+    );
+
+    if (cached && cached.length > 0) {
+      return {
+        distanceKm: Number(cached[0].distance_km),
+        durationMin: cached[0].duration_min ? Number(cached[0].duration_min) : null,
+        source: cached[0].source,
+      };
+    }
+  } catch (err) {
+    // Continue to API fetch if cache table not initialized
+  }
+
+  const result = await getRoadDistance(userLat, userLon, vLat, vLon);
+
+  try {
+    await db.query(
+      `INSERT INTO distance_cache 
+       (user_lat, user_lon, vendor_id, distance_km, duration_min, source)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE 
+         distance_km = ?, duration_min = ?, source = ?, created_at = NOW()`,
+      [
+        rLat,
+        rLon,
+        String(vendorId),
+        result.distanceKm,
+        result.durationMin,
+        result.source,
+        result.distanceKm,
+        result.durationMin,
+        result.source,
+      ]
+    );
+  } catch (err) {
+    // Continue cleanly
+  }
+
+  return result;
+}
+
+/**
+ * 4. Get Accurate Vendor Road Distance
+ * GET /api/vendor/:id/distance?userLat=27.6094&userLon=75.1397
+ */
+app.get('/api/vendor/:id/distance', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userLat, userLon } = req.query;
+
+    if (!userLat || !userLon) {
+      return res.status(400).json({ error: 'userLat and userLon query params are required' });
+    }
+
+    const uLat = parseFloat(userLat);
+    const uLon = parseFloat(userLon);
+
+    let vLat = 27.6094;
+    let vLon = 75.1398;
+
+    const [vendors] = await db.query(
+      `SELECT id, latitude, longitude FROM vendors WHERE id = ?`,
+      [id]
+    );
+
+    if (vendors && vendors.length > 0) {
+      if (vendors[0].latitude && vendors[0].longitude) {
+        vLat = parseFloat(vendors[0].latitude);
+        vLon = parseFloat(vendors[0].longitude);
+      }
+    }
+
+    const result = await getRoadDistanceCached(uLat, uLon, id, vLat, vLon);
+
+    res.json({
+      success: true,
+      vendorId: id,
+      distanceKm: result.distanceKm,
+      durationMin: result.durationMin,
+      source: result.source, // 'road' or 'straight_line'
+    });
+  } catch (err) {
+    console.error('Distance calculation error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
+// CRON JOBS (AUTO-EXPIRY, EXPIRY WARNINGS & ORS COUNTER RESET)
+// ==========================================
+
+// Reset ORS daily quota counter at midnight
+cron.schedule('0 0 * * *', () => {
+  dailyORSCalls = 0;
+  console.log('[ORS Quota] Reset daily call counter.');
+});
 
 // 1. Auto-Expire Cron Job - Runs every day at midnight (12:00 AM)
 cron.schedule('0 0 * * *', async () => {

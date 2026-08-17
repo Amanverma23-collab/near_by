@@ -91,8 +91,18 @@ async function runTests() {
     console.log(`   Days Left: ${resStatus.body.days_left} (Original 30 days + 30 days referral free month = ~60 days)`);
     console.log('   ✅ Passed!\n');
 
+    // 6. Test Get Accurate Road Distance
+    console.log('6. Testing GET /api/vendor/:id/distance (Road Distance + Haversine Fallback)...');
+    const resDist = await api(`/api/vendor/${mainVendorId}/distance?userLat=27.6094&userLon=75.1397`);
+    console.log('   Distance Response:', resDist.body);
+    if (!resDist.body.success || typeof resDist.body.distanceKm !== 'number') {
+      throw new Error('Distance calculation endpoint failed');
+    }
+    console.log(`   Distance: ${resDist.body.distanceKm} km (Source: ${resDist.body.source})`);
+    console.log('   ✅ Passed!\n');
+
     console.log('====================================================');
-    console.log('🎉 ALL BACKEND API & REFERRAL TRACKING TESTS PASSED!');
+    console.log('🎉 ALL BACKEND API, REFERRAL & DISTANCE TESTS PASSED!');
     console.log('====================================================');
   } catch (err) {
     console.error('❌ Test failed:', err);

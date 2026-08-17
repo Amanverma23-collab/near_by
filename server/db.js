@@ -118,6 +118,46 @@ class MemoryDb {
       return [{ affectedRows: affected }];
     }
 
+    // 10. SELECT * FROM distance_cache
+    if (s.includes('FROM DISTANCE_CACHE')) {
+      const [rLat, rLon, vendorId] = params;
+      const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+      const match = (this.distance_cache || []).filter(c => 
+        Number(c.user_lat) === Number(rLat) && 
+        Number(c.user_lon) === Number(rLon) && 
+        String(c.vendor_id) === String(vendorId) &&
+        new Date(c.created_at).getTime() > oneDayAgo
+      );
+      return [match];
+    }
+
+    // 11. INSERT / UPSERT distance_cache
+    if (s.startsWith('INSERT INTO DISTANCE_CACHE')) {
+      if (!this.distance_cache) this.distance_cache = [];
+      const [user_lat, user_lon, vendor_id, distance_km, duration_min, source] = params;
+      const existingIdx = this.distance_cache.findIndex(c => 
+        Number(c.user_lat) === Number(user_lat) && 
+        Number(c.user_lon) === Number(user_lon) && 
+        String(c.vendor_id) === String(vendor_id)
+      );
+      const record = {
+        id: this.nextPlanId++,
+        user_lat: Number(user_lat),
+        user_lon: Number(user_lon),
+        vendor_id: String(vendor_id),
+        distance_km: Number(distance_km),
+        duration_min: duration_min ? Number(duration_min) : null,
+        source,
+        created_at: new Date()
+      };
+      if (existingIdx >= 0) {
+        this.distance_cache[existingIdx] = record;
+      } else {
+        this.distance_cache.push(record);
+      }
+      return [{ affectedRows: 1 }];
+    }
+
     return [[]];
   }
 }

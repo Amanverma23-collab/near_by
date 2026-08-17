@@ -11,6 +11,7 @@ import { fetchCombinedVendors, trackVendorCall, trackVendorWhatsApp, trackVendor
 import AddReviewModal from '../components/customer/AddReviewModal';
 import { getSavedReviews, saveNewReview, deleteReview } from '../utils/reviewStorage';
 import { formatDistance } from '../utils/haversine';
+import { getAccurateVendorDistance, type RoadDistanceResult } from '../utils/roadDistance';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from '../context/LocationContext';
 import SaveHeartButton from '../components/ui/SaveHeartButton';
@@ -155,6 +156,29 @@ export default function VendorDetailPage() {
       }
     }
   }, [vendorId]);
+
+  const [roadDistance, setRoadDistance] = useState<RoadDistanceResult | null>(null);
+  const [isCalculatingDistance, setIsCalculatingDistance] = useState(true);
+
+  // Calculate accurate OpenRouteService driving distance & duration
+  useEffect(() => {
+    if (!vendor) return;
+
+    const uLat = userLocation?.latitude || 27.6094;
+    const uLon = userLocation?.longitude || 75.1398;
+    const vLat = vendor.latitude || 27.6094;
+    const vLon = vendor.longitude || 75.1398;
+
+    setIsCalculatingDistance(true);
+    getAccurateVendorDistance(uLat, uLon, vLat, vLon, vendor.id)
+      .then((res) => {
+        setRoadDistance(res);
+        setIsCalculatingDistance(false);
+      })
+      .catch(() => {
+        setIsCalculatingDistance(false);
+      });
+  }, [vendor?.id, vendor?.latitude, vendor?.longitude, userLocation?.latitude, userLocation?.longitude]);
 
   const handleCallClick = () => {
     trackVendorCall(vendor?.id || vendorId, vendor?.phoneNumber);
@@ -354,14 +378,31 @@ export default function VendorDetailPage() {
             </span>
           </button>
 
-          {/* Distance + open/closed */}
-          <div className="flex flex-wrap items-center gap-3 text-[11px] font-body">
-            <div className="flex items-center gap-1">
-              <MapPin size={12} className="text-brand" />
-              <span className="text-ink-muted">{formatDistance(vendor.distanceKm)} away</span>
+          {/* Accurate Road Distance + open/closed */}
+          <div className="flex flex-wrap items-center gap-2.5 text-[11px] font-body">
+            <div className="inline-flex items-center gap-1.5 bg-surface px-2.5 py-1 rounded-full border border-border-light shadow-2xs">
+              <MapPin size={13} className="text-brand shrink-0" />
+              {isCalculatingDistance && !roadDistance ? (
+                <span className="text-ink-muted text-[11px] animate-pulse">Calculating route...</span>
+              ) : (
+                <span className="text-ink font-semibold flex items-center gap-1">
+                  <span>{roadDistance?.formattedDistance || formatDistance(vendor.distanceKm)} away</span>
+                  {roadDistance?.formattedDuration && (
+                    <span className="text-ink-muted font-normal">
+                      · 🚗 {roadDistance.formattedDuration}
+                    </span>
+                  )}
+                  {roadDistance?.isApprox && (
+                    <span className="text-[10px] text-ink-muted/80 font-normal">
+                      (approx)
+                    </span>
+                  )}
+                </span>
+              )}
             </div>
-            <div className="flex items-center gap-1.5">
-              <Clock size={12} className="text-ink-muted/80" />
+
+            <div className="inline-flex items-center gap-1.5 bg-surface px-2.5 py-1 rounded-full border border-border-light shadow-2xs">
+              <Clock size={12} className="text-ink-muted/80 shrink-0" />
               <div className={`w-1.5 h-1.5 rounded-full ${effectiveStatus.isOpen ? 'bg-emerald-500' : 'bg-rose-400'}`} />
               <span className={effectiveStatus.isOpen ? 'text-emerald-600 font-semibold' : 'text-rose-500 font-semibold'}>
                 {effectiveStatus.isOpen ? 'Open Now' : 'Closed'}

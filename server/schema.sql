@@ -48,3 +48,17 @@ CREATE TABLE IF NOT EXISTS referrals (
   FOREIGN KEY (referrer_id) REFERENCES vendors(id) ON DELETE CASCADE,
   FOREIGN KEY (referred_id) REFERENCES vendors(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 4. Distance cache table (OpenRouteService Road Distances)
+CREATE TABLE IF NOT EXISTS distance_cache (
+  id            INT AUTO_INCREMENT PRIMARY KEY,
+  user_lat      DECIMAL(10,7) NOT NULL,
+  user_lon      DECIMAL(10,7) NOT NULL,
+  vendor_id     VARCHAR(64) NOT NULL,
+  distance_km   DECIMAL(6,2) NOT NULL,
+  duration_min  INT DEFAULT NULL,
+  source        VARCHAR(20) NOT NULL,
+  created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_lookup (user_lat, user_lon, vendor_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

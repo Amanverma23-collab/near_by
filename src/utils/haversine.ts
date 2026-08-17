@@ -64,6 +64,8 @@ export function getDistance(lat1: number, lon1: number, lat2: number, lon2: numb
   return distanceKm;
 }
 
+export const calculateHaversineDistanceKm = getDistance;
+
 /**
  * 2. DISTANCE DISPLAY HELPER
  * If < 1 km -> returns meters (e.g. 0.35 km -> "350 m")
