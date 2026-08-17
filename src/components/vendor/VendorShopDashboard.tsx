@@ -206,12 +206,13 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
         // 3. Fetch all shops using any of these referral codes
         let matchingShops: any[] = [];
         if (codesList.length > 0) {
-          const { data: directList } = await supabase
+          const { data: directList, error: directErr } = await supabase
             .from('vendors')
-            .select('id, name, owner_name, is_verified, verification_status, subscription_status, referral_counted, created_at, referred_by_code')
+            .select('id, name, owner_name, is_verified, subscription_status, referral_counted, created_at, referred_by_code')
             .in('referred_by_code', codesList)
             .order('created_at', { ascending: false });
 
+          if (directErr) console.warn('Direct referral fetch notice:', directErr);
           if (directList) {
             matchingShops = directList;
           }
@@ -219,11 +220,12 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
 
         // 4. Broad scan fallback for any case/spacing/format variations
         try {
-          const { data: allWithRef } = await supabase
+          const { data: allWithRef, error: allErr } = await supabase
             .from('vendors')
-            .select('id, name, owner_name, is_verified, verification_status, subscription_status, referral_counted, created_at, referred_by_code')
+            .select('id, name, owner_name, is_verified, subscription_status, referral_counted, created_at, referred_by_code')
             .not('referred_by_code', 'is', null);
 
+          if (allErr) console.warn('All with ref notice:', allErr);
           if (allWithRef) {
             const upperCodes = new Set(Array.from(allCodesSet).map((c) => c.toUpperCase()));
             const extraMatches = allWithRef.filter((v) => {
@@ -248,7 +250,7 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
 
         const countedTotal = Math.max(
           latestCount,
-          uniqueReferred.filter((r) => r.referral_counted || r.is_verified || r.verification_status === 'approved').length,
+          uniqueReferred.filter((r) => r.referral_counted || r.is_verified).length,
           uniqueReferred.length
         );
         setLiveReferralCount(countedTotal);
@@ -1073,7 +1075,7 @@ export default function VendorShopDashboard({ vendor, onRefreshVendor }: VendorS
                       </div>
 
                       <div className="shrink-0">
-                        {shop.referral_counted || shop.is_verified || shop.verification_status === 'approved' ? (
+                        {shop.referral_counted || shop.is_verified ? (
                           <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold flex items-center gap-1">
                             <Check size={12} strokeWidth={3} className="text-emerald-600" />
                             <span>Counted (+1)</span>
